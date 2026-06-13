@@ -2,28 +2,40 @@
 {
   "placeholderImages": [
     {
-      "id": "hero-banner-1",
-      "description": "Modern motorcycle showroom",
-      "imageUrl": "https://picsum.photos/seed/moto1/1200/400",
-      "imageHint": "motorcycle showroom"
+      "id": "hero-1",
+      "description": "Premium Motorcycle Banner",
+      "imageUrl": "https://picsum.photos/seed/moto_hero1/1200/600",
+      "imageHint": "motorcycle sports"
     },
     {
-      "id": "category-parts",
-      "description": "Motorcycle engine parts",
-      "imageUrl": "https://picsum.photos/seed/parts/400/400",
-      "imageHint": "motorcycle engine"
+      "id": "hero-2",
+      "description": "Spare Parts Banner",
+      "imageUrl": "https://picsum.photos/seed/moto_hero2/1200/600",
+      "imageHint": "engine parts"
     },
     {
-      "id": "category-tires",
-      "description": "High performance tires",
-      "imageUrl": "https://picsum.photos/seed/tires/400/400",
-      "imageHint": "motorcycle tires"
+      "id": "cat-scooters",
+      "description": "Scooters Category",
+      "imageUrl": "https://picsum.photos/seed/scooters/400/400",
+      "imageHint": "scooter motorcycle"
     },
     {
-      "id": "workshop-service",
-      "description": "Professional workshop technician working",
-      "imageUrl": "https://picsum.photos/seed/workshop/800/600",
-      "imageHint": "motorcycle repair"
+      "id": "cat-sports",
+      "description": "Sports Category",
+      "imageUrl": "https://picsum.photos/seed/sports/400/400",
+      "imageHint": "sports bike"
+    },
+    {
+      "id": "product-tire",
+      "description": "Performance Tire",
+      "imageUrl": "https://picsum.photos/seed/tire1/500/500",
+      "imageHint": "motorcycle tire"
+    },
+    {
+      "id": "product-helmet",
+      "description": "Safety Helmet",
+      "imageUrl": "https://picsum.photos/seed/helmet1/500/500",
+      "imageHint": "motorcycle helmet"
     }
   ]
 }
