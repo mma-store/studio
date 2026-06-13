@@ -10,14 +10,18 @@ import { useEffect } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useUser();
+  const { user, profile, loading } = useUser();
   const router = useRouter();
 
   useEffect(() => {
-    if (!loading && !user) {
-      router.push('/profile'); // Redirect to login if not authenticated
+    if (!loading) {
+      if (!user) {
+        router.push('/login');
+      } else if (profile && !['admin', 'sales_employee', 'workshop_technician', 'warehouse_employee'].includes(profile.role)) {
+        router.push('/'); // Redirect customers away from admin
+      }
     }
-  }, [user, loading, router]);
+  }, [user, profile, loading, router]);
 
   if (loading) {
     return (
@@ -37,6 +41,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
          </div>
       </div>
     );
+  }
+
+  // Double check role before rendering
+  if (!user || (profile && !['admin', 'sales_employee', 'workshop_technician', 'warehouse_employee'].includes(profile.role))) {
+    return null;
   }
 
   return (

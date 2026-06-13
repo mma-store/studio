@@ -14,7 +14,8 @@ import {
   ShieldCheck,
   Truck,
   RotateCcw,
-  Star
+  Star,
+  Tags
 } from "lucide-react";
 import Image from "next/image";
 import { useState, useMemo } from "react";
@@ -27,7 +28,7 @@ import { cn } from "@/lib/utils";
 export default function ProductDetailsPage({ params }: { params: { id: string } }) {
   const { id } = params;
   const db = useFirestore();
-  const { user } = useUser();
+  const { user, profile } = useUser();
   const [quantity, setQuantity] = useState(1);
   const [isFavorite, setIsFavorite] = useState(false);
   const [activeImage, setActiveImage] = useState(0);
@@ -40,6 +41,9 @@ export default function ProductDetailsPage({ params }: { params: { id: string } 
     [db, product]
   );
   const { data: relatedProducts, loading: relatedLoading } = useCollection(relatedQuery);
+
+  const isWholesale = profile?.role === 'wholesale_customer';
+  const displayPrice = isWholesale ? (product?.wholesalePrice || product?.retailPrice) : product?.retailPrice;
 
   if (productLoading) {
     return (
@@ -73,7 +77,6 @@ export default function ProductDetailsPage({ params }: { params: { id: string } 
         <Header />
         
         <div className="container p-0 md:p-4">
-          {/* Product Gallery */}
           <div className="grid md:grid-cols-2 gap-8 md:p-6">
             <div className="flex flex-col gap-4">
                <div className="relative aspect-square w-full overflow-hidden md:rounded-[32px] bg-muted shadow-lg">
@@ -106,7 +109,6 @@ export default function ProductDetailsPage({ params }: { params: { id: string } 
                </div>
             </div>
 
-            {/* Product Info */}
             <div className="flex flex-col gap-6 p-6 md:p-0">
                <div className="space-y-2">
                  <div className="flex items-center justify-between">
@@ -120,11 +122,19 @@ export default function ProductDetailsPage({ params }: { params: { id: string } 
                     </div>
                  </div>
                  <h1 className="text-3xl font-black leading-tight text-foreground">{product.name}</h1>
-                 <div className="flex items-baseline gap-2 pt-2">
-                    <span className="text-4xl font-black text-primary">
-                      {product.retailPrice?.toLocaleString()}
-                    </span>
-                    <span className="text-xl text-muted-foreground font-bold">د.ع</span>
+                 
+                 <div className="flex items-center gap-4 pt-2">
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-4xl font-black text-primary">
+                        {displayPrice?.toLocaleString()}
+                      </span>
+                      <span className="text-xl text-muted-foreground font-bold">د.ع</span>
+                    </div>
+                    {isWholesale && (
+                       <Badge variant="outline" className="rounded-full border-primary/20 text-primary gap-1 font-bold h-7">
+                          <Tags className="h-3 w-3" /> سعر الجملة
+                       </Badge>
+                    )}
                  </div>
                </div>
 
@@ -175,7 +185,6 @@ export default function ProductDetailsPage({ params }: { params: { id: string } 
             </div>
           </div>
 
-          {/* Related Products */}
           <section className="p-6 space-y-4">
             <h3 className="text-xl font-black">منتجات قد تعجبك</h3>
             <div className="flex gap-4 overflow-x-auto no-scrollbar -mx-6 px-6 pb-6">
@@ -187,7 +196,7 @@ export default function ProductDetailsPage({ params }: { params: { id: string } 
                     id={p.id}
                     name={p.name}
                     category={p.category}
-                    price={p.retailPrice?.toLocaleString()}
+                    price={isWholesale ? (p.wholesalePrice || p.retailPrice).toLocaleString() : p.retailPrice.toLocaleString()}
                     image={p.images?.[0] || `https://picsum.photos/seed/${p.id}/400/400`}
                   />
                 </div>
