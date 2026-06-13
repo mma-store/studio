@@ -61,6 +61,14 @@ const ADMIN_MENU = [
     ]
   },
   {
+    label: "الورشة",
+    items: [
+      { title: "نظرة عامة", icon: LayoutDashboard, href: "/admin/workshop" },
+      { title: "أوامر التصليح", icon: Wrench, href: "/admin/workshop/orders" },
+      { title: "إضافة مهمة", icon: ClipboardList, href: "/admin/workshop/new" },
+    ]
+  },
+  {
     label: "المبيعات",
     items: [
       { title: "الطلبات", icon: ClipboardList, href: "/admin/orders" },
@@ -68,9 +76,8 @@ const ADMIN_MENU = [
     ]
   },
   {
-    label: "الفريق والورشة",
+    label: "فريق العمل",
     items: [
-      { title: "الورشة", icon: Wrench, href: "/admin/workshop" },
       { title: "الموظفين", icon: UserSquare2, href: "/admin/employees" },
     ]
   },
@@ -156,4 +163,3 @@ export function AdminSidebar() {
     </Sidebar>
   );
 }
-
