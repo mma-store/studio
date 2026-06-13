@@ -7,19 +7,19 @@ import {
   ShoppingCart, 
   Users, 
   Wrench, 
-  ArrowUpRight,
-  Package,
-  Clock,
-  CheckCircle2,
-  MoreVertical
+  ArrowUpRight, 
+  Package, 
+  Clock, 
+  CheckCircle2, 
+  MoreVertical 
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { 
   Card, 
   CardContent, 
   CardHeader, 
-  CardTitle,
-  CardDescription
+  CardTitle, 
+  CardDescription 
 } from "@/components/ui/card";
 import {
   Table,
@@ -36,6 +36,7 @@ import {
   ChartTooltipContent,
 } from "@/components/ui/chart";
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
+import { cn } from "@/lib/utils";
 
 const DATA = [
   { name: "سبت", sales: 4000 },
