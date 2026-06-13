@@ -1,0 +1,109 @@
+
+{
+  "entities": {
+    "Product": {
+      "title": "Product",
+      "description": "Motorcycle spare parts and accessories",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "barcode": { "type": "string" },
+        "purchasePrice": { "type": "number" },
+        "retailPrice": { "type": "number" },
+        "wholesalePrice": { "type": "number" },
+        "stock": { "type": "number" },
+        "description": { "type": "string" },
+        "motorcycleType": { "type": "string" },
+        "category": { "type": "string" },
+        "storageLocation": { "type": "string" },
+        "images": { "type": "array", "items": { "type": "string" } },
+        "isFeatured": { "type": "boolean" },
+        "isSpecialOffer": { "type": "boolean" },
+        "isNewArrival": { "type": "boolean" },
+        "status": { "type": "string", "enum": ["available", "out_of_stock", "discontinued"] },
+        "createdAt": { "type": "number" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["name", "retailPrice", "stock", "category"]
+    },
+    "Category": {
+      "title": "Category",
+      "description": "Product categories",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "itemsCount": { "type": "number" },
+        "image": { "type": "string" }
+      }
+    },
+    "MotorcycleType": {
+      "title": "MotorcycleType",
+      "description": "Types of motorcycles (Sport, Classic, etc.)",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "image": { "type": "string" }
+      }
+    },
+    "Banner": {
+      "title": "Banner",
+      "description": "Promotional banners for home page",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "subtitle": { "type": "string" },
+        "image": { "type": "string" },
+        "color": { "type": "string" }
+      }
+    },
+    "Offer": {
+      "title": "Offer",
+      "description": "Special offers and deals",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "image": { "type": "string" },
+        "buttonText": { "type": "string" }
+      }
+    },
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Extended user information",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "sales_employee", "workshop_technician", "warehouse_employee", "retail_customer", "wholesale_customer"] },
+        "phoneNumber": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "createdAt": { "type": "number" }
+      }
+    },
+    "Order": {
+      "title": "Order",
+      "description": "Customer orders",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "items": { "type": "array" },
+        "total": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "processing", "shipped", "delivered", "cancelled"] },
+        "createdAt": { "type": "number" }
+      }
+    }
+  },
+  "auth": {
+    "providers": ["google", "password"]
+  },
+  "firestore": {
+    "/products/{productId}": { "schema": "Product", "description": "Collection of products" },
+    "/categories/{categoryId}": { "schema": "Category", "description": "Collection of categories" },
+    "/motorcycleTypes/{typeId}": { "schema": "MotorcycleType", "description": "Collection of motorcycle types" },
+    "/offers/{offerId}": { "schema": "Offer", "description": "Collection of special offers" },
+    "/banners/{bannerId}": { "schema": "Banner", "description": "Collection of banners" },
+    "/users/{userId}": { "schema": "UserProfile", "description": "Collection of users" },
+    "/orders/{orderId}": { "schema": "Order", "description": "Collection of orders" }
+  }
+}

@@ -1,26 +1,23 @@
 
-"use client";
+'use client';
 
 import { Header } from "@/components/layout/header";
 import { BottomNav } from "@/components/layout/bottom-nav";
 import { Input } from "@/components/ui/input";
-import { Search, SlidersHorizontal, ChevronLeft } from "lucide-react";
+import { Search, SlidersHorizontal } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
-
-const ALL_CATEGORIES = [
-  { id: 1, name: "المحركات", items: "125", image: "https://picsum.photos/seed/c1/400/400" },
-  { id: 2, name: "الإطارات", items: "58", image: "https://picsum.photos/seed/c2/400/400" },
-  { id: 3, name: "الإضاءة", items: "34", image: "https://picsum.photos/seed/c3/400/400" },
-  { id: 4, name: "أنظمة الفرامل", items: "29", image: "https://picsum.photos/seed/c4/400/400" },
-  { id: 5, name: "فلاتر وزيوت", items: "87", image: "https://picsum.photos/seed/c5/400/400" },
-  { id: 6, name: "إكسسوارات", items: "210", image: "https://picsum.photos/seed/c6/400/400" },
-  { id: 7, name: "خوذ وتجهيزات", items: "45", image: "https://picsum.photos/seed/c7/400/400" },
-  { id: 8, name: "دراجات جديدة", items: "12", image: "https://picsum.photos/seed/c8/400/400" },
-];
+import { useFirestore, useCollection } from "@/firebase";
+import { collection, query, orderBy } from "firebase/firestore";
+import { useMemo } from "react";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function CatalogPage() {
+  const db = useFirestore();
+  const categoriesQuery = useMemo(() => query(collection(db, 'categories'), orderBy('name')), [db]);
+  const { data: categories, loading } = useCollection(categoriesQuery);
+
   return (
     <div className="flex min-h-screen bg-background">
       <main className="flex-1 pb-24">
@@ -44,18 +41,20 @@ export default function CatalogPage() {
           </div>
 
           <div className="grid grid-cols-2 gap-4 pt-4">
-            {ALL_CATEGORIES.map((cat) => (
+            {loading ? (
+              Array(6).fill(0).map((_, i) => <Skeleton key={i} className="h-48 rounded-[28px]" />)
+            ) : categories.map((cat: any) => (
               <Link key={cat.id} href={`/catalog/${cat.id}`}>
                 <div className="group relative h-48 overflow-hidden rounded-[28px] bg-white shadow-sm hover:shadow-md transition-all">
                   <Image 
-                    src={cat.image} 
+                    src={cat.image || `https://picsum.photos/seed/${cat.id}/400/400`} 
                     alt={cat.name} 
                     fill 
                     className="object-cover transition-transform duration-500 group-hover:scale-110"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex flex-col justify-end p-5">
                     <Badge variant="secondary" className="w-fit mb-2 bg-white/20 text-white border-none backdrop-blur-md">
-                      {cat.items} منتج
+                      {cat.itemsCount || 0} منتج
                     </Badge>
                     <h3 className="text-xl font-black text-white">{cat.name}</h3>
                   </div>
