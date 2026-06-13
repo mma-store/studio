@@ -1,0 +1,29 @@
+
+{
+  "placeholderImages": [
+    {
+      "id": "hero-banner-1",
+      "description": "Modern motorcycle showroom",
+      "imageUrl": "https://picsum.photos/seed/moto1/1200/400",
+      "imageHint": "motorcycle showroom"
+    },
+    {
+      "id": "category-parts",
+      "description": "Motorcycle engine parts",
+      "imageUrl": "https://picsum.photos/seed/parts/400/400",
+      "imageHint": "motorcycle engine"
+    },
+    {
+      "id": "category-tires",
+      "description": "High performance tires",
+      "imageUrl": "https://picsum.photos/seed/tires/400/400",
+      "imageHint": "motorcycle tires"
+    },
+    {
+      "id": "workshop-service",
+      "description": "Professional workshop technician working",
+      "imageUrl": "https://picsum.photos/seed/workshop/800/600",
+      "imageHint": "motorcycle repair"
+    }
+  ]
+}
