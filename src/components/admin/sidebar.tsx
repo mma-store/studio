@@ -19,7 +19,8 @@ import {
   Bell, 
   Settings,
   ChevronRight,
-  LogOut
+  LogOut,
+  Monitor
 } from "lucide-react";
 
 import {
@@ -46,6 +47,7 @@ const ADMIN_MENU = [
     label: "الرئيسية",
     items: [
       { title: "لوحة التحكم", icon: LayoutDashboard, href: "/admin" },
+      { title: "نقطة البيع (POS)", icon: Monitor, href: "/admin/pos" },
       { title: "التقارير", icon: BarChart3, href: "/admin/reports" },
     ]
   },
@@ -63,7 +65,6 @@ const ADMIN_MENU = [
     items: [
       { title: "الطلبات", icon: ClipboardList, href: "/admin/orders" },
       { title: "العملاء", icon: Users, href: "/admin/customers" },
-      { title: "المبيعات (POS)", icon: BadgeDollarSign, href: "/admin/pos" },
     ]
   },
   {
@@ -155,3 +156,4 @@ export function AdminSidebar() {
     </Sidebar>
   );
 }
+
