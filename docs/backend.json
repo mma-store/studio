@@ -78,37 +78,6 @@
         "image": { "type": "string" }
       }
     },
-    "MotorcycleType": {
-      "title": "MotorcycleType",
-      "description": "Types of motorcycles (Sport, Classic, etc.)",
-      "type": "object",
-      "properties": {
-        "name": { "type": "string" },
-        "image": { "type": "string" }
-      }
-    },
-    "Banner": {
-      "title": "Banner",
-      "description": "Promotional banners for home page",
-      "type": "object",
-      "properties": {
-        "title": { "type": "string" },
-        "subtitle": { "type": "string" },
-        "image": { "type": "string" },
-        "color": { "type": "string" }
-      }
-    },
-    "Offer": {
-      "title": "Offer",
-      "description": "Special offers and deals",
-      "type": "object",
-      "properties": {
-        "title": { "type": "string" },
-        "description": { "type": "string" },
-        "image": { "type": "string" },
-        "buttonText": { "type": "string" }
-      }
-    },
     "UserProfile": {
       "title": "UserProfile",
       "description": "Extended user information",
@@ -128,11 +97,29 @@
       "description": "Customer orders",
       "type": "object",
       "properties": {
+        "orderNumber": { "type": "string" },
         "userId": { "type": "string" },
-        "items": { "type": "array" },
+        "customerName": { "type": "string" },
+        "phoneNumber": { "type": "string" },
+        "deliveryMethod": { "type": "string", "enum": ["delivery", "pickup"] },
+        "address": { "type": "string" },
+        "landmark": { "type": "string" },
+        "items": { 
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "productId": { "type": "string" },
+              "name": { "type": "string" },
+              "price": { "type": "number" },
+              "quantity": { "type": "number" }
+            }
+          }
+        },
         "total": { "type": "number" },
-        "status": { "type": "string", "enum": ["pending", "processing", "shipped", "delivered", "cancelled"] },
-        "createdAt": { "type": "number" }
+        "status": { "type": "string", "enum": ["pending", "confirmed", "preparing", "ready", "shipped", "delivered", "cancelled"] },
+        "createdAt": { "type": "number" },
+        "updatedAt": { "type": "number" }
       }
     }
   },
@@ -143,9 +130,6 @@
     "/products/{productId}": { "schema": "Product", "description": "Collection of products" },
     "/repairOrders/{orderId}": { "schema": "RepairOrder", "description": "Collection of workshop repair orders" },
     "/categories/{categoryId}": { "schema": "Category", "description": "Collection of categories" },
-    "/motorcycleTypes/{typeId}": { "schema": "MotorcycleType", "description": "Collection of motorcycle types" },
-    "/offers/{offerId}": { "schema": "Offer", "description": "Collection of special offers" },
-    "/banners/{bannerId}": { "schema": "Banner", "description": "Collection of banners" },
     "/users/{userId}": { "schema": "UserProfile", "description": "Collection of users" },
     "/orders/{orderId}": { "schema": "Order", "description": "Collection of orders" }
   }

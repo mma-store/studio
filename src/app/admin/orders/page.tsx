@@ -1,5 +1,5 @@
 
-'use client';
+"use client";
 
 import { 
   Search, 
@@ -13,7 +13,8 @@ import {
   Package,
   CheckCircle2,
   Clock,
-  XCircle
+  XCircle,
+  MoreHorizontal
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,10 +35,11 @@ import {
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
 import { useFirestore, useCollection } from "@/firebase";
-import { collection, query, orderBy } from "firebase/firestore";
+import { collection, query, orderBy, updateDoc, doc, serverTimestamp } from "firebase/firestore";
 import { useMemo, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { toast } from "@/hooks/use-toast";
 
 const statusConfig = {
   pending: { label: "قيد الانتظار", icon: Clock, color: "bg-orange-100 text-orange-700 border-orange-200" },
@@ -51,9 +53,42 @@ const statusConfig = {
 
 export default function OrdersManagementPage() {
   const db = useFirestore();
+  const [searchQuery, setSearchQuery] = useState("");
   const ordersQuery = useMemo(() => query(collection(db, 'orders'), orderBy('createdAt', 'desc')), [db]);
   const { data: orders, loading } = useCollection(ordersQuery);
-  const [searchQuery, setSearchQuery] = useState("");
+
+  const filteredOrders = orders.filter((o: any) => 
+    o.orderNumber?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    o.customerName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    o.phoneNumber?.includes(searchQuery)
+  );
+
+  const updateStatus = async (orderId: string, newStatus: string) => {
+    try {
+      await updateDoc(doc(db, "orders", orderId), {
+        status: newStatus,
+        updatedAt: serverTimestamp()
+      });
+      toast({ title: "تم التحديث", description: "تم تغيير حالة الطلب بنجاح." });
+    } catch (error) {
+      toast({ variant: "destructive", title: "خطأ", description: "فشل تحديث الحالة." });
+    }
+  };
+
+  const handleWhatsApp = (order: any) => {
+    const statusLabel = statusConfig[order.status as keyof typeof statusConfig]?.label || order.status;
+    const itemsList = order.items?.map((i: any) => `- ${i.name} (x${i.quantity})`).join("\n") || "";
+    const message = `مرحباً ${order.customerName}،
+نود إعلامكم بأن حالة طلبكم رقم *${order.orderNumber}* هي الآن: *${statusLabel}*.
+
+المنتجات:
+${itemsList}
+
+المجموع الكلي: ${order.total?.toLocaleString()} د.ع
+شكراً لتعاملكم مع مجمع محمد علاء.`;
+
+    window.open(`https://wa.me/${order.phoneNumber}?text=${encodeURIComponent(message)}`, '_blank');
+  };
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -108,28 +143,30 @@ export default function OrdersManagementPage() {
                   <TableCell><Skeleton className="h-8 w-8 rounded-lg text-left" /></TableCell>
                 </TableRow>
               ))
-            ) : orders.length > 0 ? (
-              orders.map((order: any) => {
+            ) : filteredOrders.length > 0 ? (
+              filteredOrders.map((order: any) => {
                 const status = (order.status || 'pending') as keyof typeof statusConfig;
                 const config = statusConfig[status] || statusConfig.pending;
                 const Icon = config.icon;
 
                 return (
                   <TableRow key={order.id} className="hover:bg-muted/5 transition-colors">
-                    <TableCell className="font-black text-sm">{order.id}</TableCell>
+                    <TableCell className="font-black text-sm">{order.orderNumber}</TableCell>
                     <TableCell>
                        <div className="flex flex-col">
-                          <span className="font-bold text-sm">أحمد محمد</span>
-                          <span className="text-[10px] text-muted-foreground font-medium">07701234567</span>
+                          <span className="font-bold text-sm">{order.customerName}</span>
+                          <span className="text-[10px] text-muted-foreground font-medium">{order.phoneNumber}</span>
                        </div>
                     </TableCell>
                     <TableCell className="text-muted-foreground text-xs font-medium">
-                       12/10/2023 <br /> 05:30 م
+                       {new Date(order.createdAt).toLocaleDateString("ar-EG")} <br /> 
+                       {new Date(order.createdAt).toLocaleTimeString("ar-EG", { hour: '2-digit', minute: '2-digit' })}
                     </TableCell>
-                    <TableCell className="font-black text-primary">145,000 د.ع</TableCell>
+                    <TableCell className="font-black text-primary">{order.total?.toLocaleString()} د.ع</TableCell>
                     <TableCell>
                        <Badge variant="outline" className="rounded-full gap-1 border-primary/20 text-primary text-[10px] font-bold">
-                          <Truck className="h-3 w-3" /> توصيل منزلي
+                          {order.deliveryMethod === 'delivery' ? <Truck className="h-3 w-3" /> : <Store className="h-3 w-3" />}
+                          {order.deliveryMethod === 'delivery' ? 'توصيل منزلي' : 'استلام من المجمع'}
                        </Badge>
                     </TableCell>
                     <TableCell>
@@ -140,18 +177,24 @@ export default function OrdersManagementPage() {
                     </TableCell>
                     <TableCell className="text-left">
                       <div className="flex items-center justify-end gap-1">
-                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg"><Eye className="h-4 w-4" /></Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg"><Printer className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg" onClick={() => handleWhatsApp(order)}>
+                          <MessageCircle className="h-4 w-4 text-emerald-600" />
+                        </Button>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg"><MoreVertical className="h-4 w-4" /></Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="rounded-2xl p-2 w-48">
                             <DropdownMenuLabel className="font-bold">تحديث الحالة</DropdownMenuLabel>
-                            <DropdownMenuItem className="rounded-xl gap-2 font-medium cursor-pointer text-blue-600">تأكيد الطلب</DropdownMenuItem>
-                            <DropdownMenuItem className="rounded-xl gap-2 font-medium cursor-pointer text-purple-600">بدء التجهيز</DropdownMenuItem>
-                            <DropdownMenuItem className="rounded-xl gap-2 font-medium cursor-pointer text-emerald-600">تم التسليم</DropdownMenuItem>
-                            <DropdownMenuItem className="rounded-xl gap-2 font-medium cursor-pointer text-red-600">إلغاء الطلب</DropdownMenuItem>
+                            {Object.entries(statusConfig).map(([key, cfg]) => (
+                              <DropdownMenuItem 
+                                key={key}
+                                onClick={() => updateStatus(order.id, key)}
+                                className={cn("rounded-xl gap-2 font-medium cursor-pointer", cfg.color.split(' ')[1])}
+                              >
+                                {cfg.label}
+                              </DropdownMenuItem>
+                            ))}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </div>
