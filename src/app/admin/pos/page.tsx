@@ -16,11 +16,12 @@ import {
   User,
   Tags,
   Zap,
-  ChevronDown
+  ChevronDown,
+  Loader2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { 
   DropdownMenu, 
@@ -29,47 +30,62 @@ import {
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
 import { useFirestore, useCollection } from "@/firebase";
-import { collection, query, orderBy, doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { collection, query, orderBy, addDoc, serverTimestamp } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
 
-// --- Components ---
-
 export default function POSPage() {
   const db = useFirestore();
   const [searchQuery, setSearchQuery] = useState("");
   const [cart, setCart] = useState<any[]>([]);
-  const [selectedCustomer, setSelectedCustomer] = useState<{ name: string; type: 'retail' | 'wholesale' }>({ name: "زبون نقدي", type: 'retail' });
+  const [selectedCustomer, setSelectedCustomer] = useState<{ name: string; type: 'retail' | 'wholesale'; id?: string }>({ name: "زبون نقدي", type: 'retail' });
   const [discount, setDiscount] = useState(0);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+  const [processingOrder, setProcessingOrder] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  // Firestore Data
+  // Firestore Data - Optimized
   const productsQuery = useMemo(() => query(collection(db, 'products'), orderBy('name')), [db]);
   const { data: products, loading } = useCollection(productsQuery);
+  
   const categoriesQuery = useMemo(() => collection(db, 'categories'), [db]);
   const { data: categories } = useCollection(categoriesQuery);
 
   // Filtering
-  const filteredProducts = products.filter((p: any) => 
-    p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    p.barcode?.includes(searchQuery)
-  );
+  const filteredProducts = useMemo(() => {
+    if (!searchQuery) return products;
+    const lowerQuery = searchQuery.toLowerCase();
+    return products.filter((p: any) => 
+      p.name.toLowerCase().includes(lowerQuery) || 
+      p.barcode?.includes(lowerQuery)
+    );
+  }, [products, searchQuery]);
 
   // Calculations
-  const subtotal = cart.reduce((acc, item) => {
-    const price = selectedCustomer.type === 'wholesale' ? (item.wholesalePrice || item.retailPrice) : item.retailPrice;
-    return acc + (price * item.quantity);
-  }, 0);
+  const subtotal = useMemo(() => {
+    return cart.reduce((acc, item) => {
+      const price = selectedCustomer.type === 'wholesale' ? (item.wholesalePrice || item.retailPrice) : item.retailPrice;
+      return acc + (price * item.quantity);
+    }, 0);
+  }, [cart, selectedCustomer.type]);
+  
   const total = subtotal - discount;
 
   // Handlers
   const addToCart = (product: any) => {
+    if (product.stock <= 0) {
+      toast({ variant: "destructive", title: "نفذ المخزون", description: "لا يمكن إضافة منتج غير متوفر حالياً." });
+      return;
+    }
     setCart(prev => {
       const existing = prev.find(item => item.id === product.id);
       if (existing) {
+        if (existing.quantity >= product.stock) {
+           toast({ variant: "destructive", title: "تجاوز المخزون", description: "لا يمكن إضافة كمية أكبر من المتوفر." });
+           return prev;
+        }
         return prev.map(item => item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item);
       }
       return [...prev, { ...product, quantity: 1 }];
@@ -83,10 +99,49 @@ export default function POSPage() {
   const updateQuantity = (productId: string, delta: number) => {
     setCart(prev => prev.map(item => {
       if (item.id === productId) {
-        return { ...item, quantity: Math.max(1, item.quantity + delta) };
+        const newQty = Math.max(1, item.quantity + delta);
+        if (delta > 0 && newQty > item.stock) {
+          toast({ variant: "destructive", title: "تجاوز المخزون", description: "وصلت للحد الأقصى للمخزون." });
+          return item;
+        }
+        return { ...item, quantity: newQty };
       }
       return item;
     }));
+  };
+
+  const handleCompleteSale = async () => {
+    setProcessingOrder(true);
+    try {
+      const orderData = {
+        orderNumber: `POS-${Date.now().toString().slice(-6)}`,
+        customerName: selectedCustomer.name,
+        customerType: selectedCustomer.type,
+        items: cart.map(item => ({
+          productId: item.id,
+          name: item.name,
+          price: selectedCustomer.type === 'wholesale' ? (item.wholesalePrice || item.retailPrice) : item.retailPrice,
+          quantity: item.quantity
+        })),
+        subtotal,
+        discount,
+        total,
+        paymentMethod: 'cash',
+        createdAt: serverTimestamp(),
+        status: 'delivered',
+        source: 'pos'
+      };
+
+      await addDoc(collection(db, "orders"), orderData);
+      toast({ title: "تم بنجاح", description: "تم تسجيل العملية وطباعة الفاتورة." });
+      setCart([]);
+      setDiscount(0);
+      setIsCheckoutOpen(false);
+    } catch (error) {
+      toast({ variant: "destructive", title: "خطأ", description: "فشل تسجيل العملية في النظام." });
+    } finally {
+      setProcessingOrder(false);
+    }
   };
 
   // Keyboard Shortcuts
@@ -105,7 +160,7 @@ export default function POSPage() {
         setCart([]);
         setDiscount(0);
         setSelectedCustomer({ name: "زبون نقدي", type: 'retail' });
-        toast({ title: "فاتورة جديدة", description: "تم تصفير السلة بنجاح." });
+        toast({ title: "فاتورة جديدة", description: "تم تصفير السلة." });
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -113,16 +168,16 @@ export default function POSPage() {
   }, [cart]);
 
   return (
-    <div className="flex h-[calc(100vh-80px)] overflow-hidden gap-4 -m-4 md:-m-8">
-      {/* Left Side: Products Grid (70%) */}
-      <div className="flex-1 flex flex-col min-w-0 bg-muted/20 p-4 md:p-8">
+    <div className="flex h-[calc(100vh-80px)] overflow-hidden gap-4 -m-4 md:-m-8 bg-background">
+      {/* Products Grid (70%) */}
+      <div className="flex-1 flex flex-col min-w-0 p-4 md:p-6 lg:p-8">
         <div className="flex gap-4 mb-6">
           <div className="relative flex-1">
-            <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+            <Search className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
             <Input 
               ref={searchInputRef}
-              placeholder="بحث بالاسم أو الباركود (F2)..." 
-              className="h-14 rounded-2xl pr-12 text-lg shadow-sm border-none bg-white dark:bg-card"
+              placeholder="البحث (F2)..." 
+              className="h-14 rounded-2xl pr-12 text-lg shadow-sm border-none bg-white dark:bg-card focus:ring-2 focus:ring-primary/20"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -134,21 +189,25 @@ export default function POSPage() {
 
         {/* Categories Tabs */}
         <div className="flex gap-2 overflow-x-auto no-scrollbar mb-6 pb-2">
-           <Button variant="default" className="rounded-full font-bold px-6">الكل</Button>
+           <Button variant="default" className="rounded-full font-black px-8">الكل</Button>
            {categories?.map((cat: any) => (
-             <Button key={cat.id} variant="outline" className="rounded-full font-bold px-6 bg-white dark:bg-card border-none shadow-sm">{cat.name}</Button>
+             <Button key={cat.id} variant="outline" className="rounded-full font-bold px-8 bg-white dark:bg-card border-none shadow-sm transition-all hover:bg-primary/5">{cat.name}</Button>
            ))}
         </div>
 
-        {/* Products Grid */}
-        <div className="flex-1 overflow-y-auto no-scrollbar">
-           <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        {/* Products Scrollable Area */}
+        <div className="flex-1 overflow-y-auto no-scrollbar pr-1">
+           <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-10">
              {loading ? (
-               Array(8).fill(0).map((_, i) => <Skeleton key={i} className="h-48 rounded-3xl" />)
-             ) : filteredProducts.map((p: any) => (
+               Array(12).fill(0).map((_, i) => <Skeleton key={i} className="h-56 rounded-[32px]" />)
+             ) : filteredProducts.length > 0 ? (
+               filteredProducts.map((p: any) => (
                <Card 
                 key={p.id} 
-                className="group relative cursor-pointer overflow-hidden rounded-[28px] border-none shadow-sm hover:shadow-xl transition-all duration-300 bg-white dark:bg-card active:scale-95"
+                className={cn(
+                  "group cursor-pointer overflow-hidden rounded-[32px] border-none shadow-sm hover:shadow-xl transition-all duration-300 bg-white dark:bg-card active:scale-95",
+                  p.stock <= 0 && "opacity-60 grayscale"
+                )}
                 onClick={() => addToCart(p)}
                >
                  <div className="relative aspect-square h-32 w-full overflow-hidden bg-muted/50">
@@ -156,147 +215,153 @@ export default function POSPage() {
                       src={p.images?.[0] || `https://picsum.photos/seed/${p.id}/300/300`} 
                       alt={p.name} 
                       fill 
-                      className="object-cover" 
+                      className="object-cover group-hover:scale-105 transition-transform duration-500" 
                     />
-                    <div className="absolute top-2 left-2">
-                       <Badge variant={p.stock > 10 ? "secondary" : "destructive"} className="rounded-full text-[10px] px-2 font-bold shadow-sm">
-                          {p.stock} قطعة
+                    <div className="absolute top-3 left-3">
+                       <Badge variant={p.stock > 10 ? "secondary" : "destructive"} className="rounded-full text-[10px] px-2 font-black shadow-sm">
+                          {p.stock > 0 ? `${p.stock} قطعة` : 'نفذت'}
                        </Badge>
                     </div>
                  </div>
-                 <CardContent className="p-4 space-y-1">
-                    <h3 className="font-bold text-sm leading-tight line-clamp-2">{p.name}</h3>
+                 <CardContent className="p-4 space-y-2">
+                    <h3 className="font-bold text-sm leading-tight line-clamp-2 min-h-[2.5rem]">{p.name}</h3>
                     <div className="flex items-end justify-between">
-                       <p className="text-primary font-black text-base">{p.retailPrice?.toLocaleString()} <span className="text-[10px]">د.ع</span></p>
-                       <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white transition-colors">
-                          <Plus className="h-4 w-4" />
+                       <p className="text-primary font-black text-lg">{p.retailPrice?.toLocaleString()} <span className="text-[10px]">د.ع</span></p>
+                       <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white transition-all shadow-sm">
+                          <Plus className="h-5 w-5" />
                        </div>
                     </div>
                  </CardContent>
                </Card>
-             ))}
+             ))) : (
+               <div className="col-span-full h-64 flex flex-col items-center justify-center text-muted-foreground">
+                  <Package className="h-16 w-16 opacity-20 mb-4" />
+                  <p className="font-black text-xl">لا توجد منتجات مطابقة</p>
+               </div>
+             )}
            </div>
         </div>
       </div>
 
-      {/* Right Side: Invoice Panel (30%) */}
-      <div className="w-[400px] flex flex-col bg-white dark:bg-card border-r shadow-2xl z-20">
-        {/* Customer & Header */}
+      {/* Invoice Panel (30%) */}
+      <div className="w-[420px] flex flex-col bg-white dark:bg-card border-r shadow-2xl z-20">
+        {/* Invoice Header */}
         <div className="p-6 border-b space-y-4">
            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-black flex items-center gap-2">
-                <ShoppingCart className="h-5 w-5 text-primary" />
-                الفاتورة الحالية
+              <h2 className="text-2xl font-black flex items-center gap-2">
+                <ShoppingCart className="h-6 w-6 text-primary" />
+                الفاتورة
               </h2>
-              <Button variant="ghost" size="icon" className="rounded-xl text-destructive" onClick={() => setCart([])}>
+              <Button variant="ghost" size="icon" className="rounded-full text-destructive hover:bg-destructive/10" onClick={() => setCart([])}>
                 <Trash2 className="h-5 w-5" />
               </Button>
            </div>
            
            <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                 <Button variant="outline" className="w-full h-12 rounded-2xl justify-between border-2 border-primary/20 bg-primary/5 hover:bg-primary/10 transition-all font-bold group">
-                    <div className="flex items-center gap-2">
-                       <div className="h-8 w-8 rounded-xl bg-primary text-white flex items-center justify-center">
-                          <User className="h-4 w-4" />
+                 <Button variant="outline" className="w-full h-16 rounded-[24px] justify-between border-2 border-primary/20 bg-primary/5 hover:bg-primary/10 transition-all font-bold group px-4">
+                    <div className="flex items-center gap-3">
+                       <div className="h-10 w-10 rounded-2xl bg-primary text-white flex items-center justify-center shadow-lg">
+                          <User className="h-5 w-5" />
                        </div>
                        <div className="text-right">
-                          <p className="text-xs leading-none mb-1 opacity-60">العميل الحالي</p>
-                          <p className="text-sm">{selectedCustomer.name}</p>
+                          <p className="text-[10px] uppercase font-black tracking-widest opacity-60">العميل</p>
+                          <p className="text-base">{selectedCustomer.name}</p>
                        </div>
                     </div>
-                    <ChevronDown className="h-4 w-4 opacity-50 transition-transform group-data-[state=open]:rotate-180" />
+                    <ChevronDown className="h-5 w-5 opacity-40 transition-transform group-data-[state=open]:rotate-180" />
                  </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-80 rounded-2xl p-2" align="end">
-                 <div className="p-2 mb-2 relative">
-                    <Search className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input placeholder="بحث عن عميل..." className="h-10 rounded-xl pr-10 border-none bg-muted/30" />
-                 </div>
-                 <DropdownMenuItem className="rounded-xl gap-2 h-12 font-bold cursor-pointer" onClick={() => setSelectedCustomer({ name: "زبون نقدي", type: 'retail' })}>
-                    <User className="h-4 w-4" /> زبون نقدي (مفرد)
+              <DropdownMenuContent className="w-80 rounded-[24px] p-2" align="end">
+                 <DropdownMenuItem className="rounded-xl gap-3 h-14 font-bold cursor-pointer" onClick={() => setSelectedCustomer({ name: "زبون نقدي", type: 'retail' })}>
+                    <div className="h-10 w-10 rounded-xl bg-muted flex items-center justify-center"><User className="h-5 w-5" /></div>
+                    زبون نقدي (مفرد)
                  </DropdownMenuItem>
-                 <DropdownMenuItem className="rounded-xl gap-2 h-12 font-bold cursor-pointer text-primary" onClick={() => setSelectedCustomer({ name: "شركة النور للقطع", type: 'wholesale' })}>
-                    <Tags className="h-4 w-4" /> جملة - شركة النور
+                 <DropdownMenuItem className="rounded-xl gap-3 h-14 font-bold cursor-pointer text-primary" onClick={() => setSelectedCustomer({ name: "شركة النور للقطع", type: 'wholesale' })}>
+                    <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center"><Tags className="h-5 w-5" /></div>
+                    جملة - شركة النور
                  </DropdownMenuItem>
-                 <div className="h-px bg-muted my-1" />
-                 <Button variant="ghost" className="w-full rounded-xl gap-2 text-primary font-bold h-10 mt-1">
-                    <UserPlus className="h-4 w-4" /> إضافة عميل جديد
+                 <div className="h-px bg-muted my-2 mx-2" />
+                 <Button variant="ghost" className="w-full rounded-xl gap-2 text-primary font-black h-12">
+                    <UserPlus className="h-5 w-5" /> إضافة عميل جديد
                  </Button>
               </DropdownMenuContent>
            </DropdownMenu>
         </div>
 
-        {/* Cart Items */}
+        {/* Invoice Body (Cart) */}
         <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-muted/10">
            {cart.length > 0 ? (
              cart.map((item) => (
-               <div key={item.id} className="flex gap-3 p-3 rounded-2xl bg-white dark:bg-card shadow-sm border border-transparent hover:border-primary/20 transition-all group animate-in slide-in-from-left-2">
-                  <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-muted shadow-inner">
-                     <Image src={item.images?.[0] || `https://picsum.photos/seed/${item.id}/100/100`} alt={item.name} fill className="object-cover" />
+               <div key={item.id} className="flex gap-3 p-4 rounded-[24px] bg-white dark:bg-card shadow-sm border border-transparent hover:border-primary/20 transition-all group animate-in slide-in-from-left-4 duration-300">
+                  <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-[18px] bg-muted shadow-inner border">
+                     <Image src={item.images?.[0] || `https://picsum.photos/seed/${item.id}/150/150`} alt={item.name} fill className="object-cover" />
                   </div>
                   <div className="flex-1 flex flex-col justify-between">
-                     <h4 className="text-xs font-bold leading-tight line-clamp-1">{item.name}</h4>
-                     <div className="flex items-center justify-between">
-                        <span className="text-xs font-black text-primary">
-                          {(selectedCustomer.type === 'wholesale' ? (item.wholesalePrice || item.retailPrice) : item.retailPrice).toLocaleString()}
+                     <h4 className="text-xs font-black leading-tight line-clamp-1">{item.name}</h4>
+                     <div className="flex items-center justify-between mt-1">
+                        <span className="text-sm font-black text-primary">
+                          {(selectedCustomer.type === 'wholesale' ? (item.wholesalePrice || item.retailPrice) : item.retailPrice).toLocaleString()} <span className="text-[10px]">د.ع</span>
                         </span>
-                        <div className="flex items-center gap-2 bg-muted/50 rounded-lg p-0.5">
-                           <button onClick={() => updateQuantity(item.id, -1)} className="h-6 w-6 flex items-center justify-center rounded-md bg-white shadow-sm active:scale-90"><Minus className="h-3 w-3" /></button>
-                           <span className="text-xs font-black w-4 text-center">{item.quantity}</span>
-                           <button onClick={() => updateQuantity(item.id, 1)} className="h-6 w-6 flex items-center justify-center rounded-md bg-primary text-white shadow-sm active:scale-90"><Plus className="h-3 w-3" /></button>
+                        <div className="flex items-center gap-3 bg-muted/50 rounded-xl p-1 px-2 border">
+                           <button onClick={() => updateQuantity(item.id, -1)} className="h-7 w-7 flex items-center justify-center rounded-lg bg-white shadow-sm active:scale-90 transition-transform"><Minus className="h-4 w-4" /></button>
+                           <span className="text-xs font-black w-6 text-center">{item.quantity}</span>
+                           <button onClick={() => updateQuantity(item.id, 1)} className="h-7 w-7 flex items-center justify-center rounded-lg bg-primary text-white shadow-sm active:scale-90 transition-transform"><Plus className="h-4 w-4" /></button>
                         </div>
                      </div>
                   </div>
-                  <button onClick={() => removeFromCart(item.id)} className="opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:bg-destructive/10 p-1 rounded-lg">
-                    <Trash2 className="h-4 w-4" />
+                  <button onClick={() => removeFromCart(item.id)} className="opacity-0 group-hover:opacity-100 transition-all text-destructive hover:bg-destructive/10 p-2 rounded-xl">
+                    <Trash2 className="h-5 w-5" />
                   </button>
                </div>
              ))
            ) : (
-             <div className="h-full flex flex-col items-center justify-center text-center opacity-30 gap-4">
-                <ShoppingCart className="h-16 w-16" strokeWidth={1} />
-                <p className="font-black text-lg">السلة فارغة</p>
+             <div className="h-full flex flex-col items-center justify-center text-center opacity-20 gap-6">
+                <ShoppingCart className="h-24 w-24" strokeWidth={1} />
+                <p className="font-black text-2xl">الفاتورة فارغة</p>
              </div>
            )}
         </div>
 
-        {/* Footer: Totals & Action */}
-        <div className="p-6 bg-white dark:bg-card border-t shadow-[0_-10px_30px_rgba(0,0,0,0.05)] space-y-4">
-           <div className="space-y-2">
+        {/* Invoice Footer */}
+        <div className="p-8 bg-white dark:bg-card border-t shadow-[0_-15px_40px_rgba(0,0,0,0.08)] space-y-6">
+           <div className="space-y-3">
               <div className="flex items-center justify-between text-sm">
-                 <span className="text-muted-foreground font-medium">المجموع الفرعي:</span>
-                 <span className="font-bold">{subtotal.toLocaleString()} د.ع</span>
+                 <span className="text-muted-foreground font-bold uppercase tracking-widest">المجموع الفرعي:</span>
+                 <span className="font-black text-lg">{subtotal.toLocaleString()} د.ع</span>
               </div>
               <div className="flex items-center justify-between text-sm">
-                 <div className="flex items-center gap-2">
-                    <span className="text-muted-foreground font-medium">الخصم:</span>
+                 <div className="flex items-center gap-3">
+                    <span className="text-muted-foreground font-bold uppercase tracking-widest">الخصم:</span>
                     <Input 
                       type="number" 
                       value={discount} 
                       onChange={(e) => setDiscount(Number(e.target.value))}
-                      className="h-7 w-20 rounded-lg bg-muted/30 border-none text-xs font-black p-1 text-center"
+                      className="h-10 w-24 rounded-xl bg-muted/40 border-none text-sm font-black text-center focus:ring-primary/20"
                     />
                  </div>
-                 <span className="font-bold text-destructive">-{discount.toLocaleString()} د.ع</span>
+                 <span className="font-black text-destructive text-lg">-{discount.toLocaleString()} د.ع</span>
               </div>
            </div>
            
            <div className="h-px bg-muted" />
 
-           <div className="flex items-center justify-between">
-              <span className="text-lg font-black">الإجمالي النهائي:</span>
-              <span className="text-3xl font-black text-primary underline decoration-primary/20 underline-offset-8">
-                {total.toLocaleString()} <span className="text-sm">د.ع</span>
-              </span>
+           <div className="flex flex-col gap-1">
+              <span className="text-sm font-black text-muted-foreground uppercase tracking-widest">إجمالي الفاتورة:</span>
+              <div className="flex items-baseline justify-between">
+                <span className="text-5xl font-black text-primary tracking-tighter">
+                  {total.toLocaleString()}
+                </span>
+                <span className="text-xl font-black text-primary">د.ع</span>
+              </div>
            </div>
 
            <Button 
             disabled={cart.length === 0}
-            className="w-full h-16 rounded-[24px] text-xl font-black gap-3 shadow-xl shadow-primary/20 group relative overflow-hidden"
+            className="w-full h-20 rounded-[32px] text-2xl font-black gap-4 shadow-2xl shadow-primary/30 group relative overflow-hidden transition-all hover:scale-[1.02] active:scale-95"
             onClick={() => setIsCheckoutOpen(true)}
            >
-              <Zap className="h-6 w-6 transition-transform group-hover:scale-125 group-hover:rotate-12" />
+              <Zap className="h-8 w-8 transition-all group-hover:scale-125 group-hover:rotate-12" />
               إتمام العملية (F4)
               <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity" />
            </Button>
@@ -305,53 +370,60 @@ export default function POSPage() {
 
       {/* Checkout Dialog */}
       {isCheckoutOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
-           <div className="bg-white dark:bg-card w-full max-w-xl rounded-[40px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
-              <div className="p-8 border-b flex items-center justify-between bg-primary text-white">
-                 <h3 className="text-2xl font-black">تأكيد الدفع</h3>
-                 <Button variant="ghost" size="icon" className="rounded-full hover:bg-white/20 text-white" onClick={() => setIsCheckoutOpen(false)}>
-                    <X className="h-6 w-6" />
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-in fade-in duration-300">
+           <div className="bg-white dark:bg-card w-full max-w-2xl rounded-[48px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-400">
+              <div className="p-10 border-b flex items-center justify-between bg-primary text-white">
+                 <div className="space-y-1">
+                   <h3 className="text-3xl font-black">تأكيد الدفع</h3>
+                   <p className="text-primary-foreground/80 font-bold">يرجى التأكد من المبلغ المستلم</p>
+                 </div>
+                 <Button variant="ghost" size="icon" className="rounded-full h-12 w-12 hover:bg-white/20 text-white" onClick={() => setIsCheckoutOpen(false)}>
+                    <X className="h-8 w-8" />
                  </Button>
               </div>
-              <div className="p-8 space-y-8">
-                 <div className="grid grid-cols-2 gap-8">
-                    <div className="space-y-4">
-                       <p className="text-sm font-bold opacity-60">المبلغ المطلوب</p>
-                       <p className="text-4xl font-black text-primary">{total.toLocaleString()} <span className="text-sm">د.ع</span></p>
+              <div className="p-10 space-y-10">
+                 <div className="grid grid-cols-2 gap-10">
+                    <div className="space-y-2">
+                       <p className="text-sm font-black uppercase tracking-widest opacity-60">المبلغ المطلوب</p>
+                       <p className="text-5xl font-black text-primary">{total.toLocaleString()} <span className="text-xl">د.ع</span></p>
                     </div>
                     <div className="space-y-4">
-                       <p className="text-sm font-bold opacity-60">طريقة الدفع</p>
-                       <div className="flex items-center gap-3 p-4 rounded-3xl bg-primary/5 border-2 border-primary">
-                          <CreditCard className="h-6 w-6 text-primary" />
-                          <span className="font-black">نقداً (Cash)</span>
+                       <p className="text-sm font-black uppercase tracking-widest opacity-60">طريقة الدفع</p>
+                       <div className="flex items-center gap-4 p-5 rounded-[28px] bg-primary/5 border-2 border-primary shadow-sm">
+                          <CreditCard className="h-8 w-8 text-primary" />
+                          <span className="font-black text-lg">نقداً (Cash)</span>
                        </div>
                     </div>
                  </div>
 
                  <div className="space-y-4">
-                    <p className="text-sm font-bold opacity-60">المبلغ المدفوع</p>
-                    <Input 
-                      placeholder="0.00" 
-                      className="h-20 rounded-[28px] text-4xl font-black text-center bg-muted/20 border-none focus:ring-4 focus:ring-primary/10 transition-all" 
-                      autoFocus
-                    />
+                    <p className="text-sm font-black uppercase tracking-widest opacity-60">المبلغ المدفوع من قبل العميل</p>
+                    <div className="relative">
+                       <Input 
+                        placeholder="0.00" 
+                        className="h-28 rounded-[36px] text-6xl font-black text-center bg-muted/20 border-none focus:ring-8 focus:ring-primary/10 transition-all shadow-inner" 
+                        autoFocus
+                       />
+                       <span className="absolute left-8 top-1/2 -translate-y-1/2 text-2xl font-black opacity-20">د.ع</span>
+                    </div>
                  </div>
 
-                 <div className="flex items-center justify-between p-6 rounded-3xl bg-muted/30">
-                    <p className="font-bold">المتبقي (الخردة):</p>
-                    <p className="text-2xl font-black text-emerald-600">0 د.ع</p>
+                 <div className="flex items-center justify-between p-8 rounded-[32px] bg-muted/40 border border-muted-foreground/10">
+                    <p className="text-xl font-bold">المتبقي (الخردة):</p>
+                    <p className="text-4xl font-black text-emerald-600">0 <span className="text-sm">د.ع</span></p>
                  </div>
 
-                 <div className="flex gap-4">
-                    <Button variant="outline" className="flex-1 h-14 rounded-2xl border-2 font-black gap-2" onClick={() => setIsCheckoutOpen(false)}>
+                 <div className="flex gap-6">
+                    <Button variant="outline" className="flex-1 h-18 rounded-[24px] border-2 font-black text-lg h-16" onClick={() => setIsCheckoutOpen(false)}>
                        إلغاء
                     </Button>
-                    <Button className="flex-2 h-14 rounded-2xl font-black gap-2 px-12" onClick={() => {
-                      toast({ title: "تم بنجاح", description: "تم تسجيل الطلب وطباعة الفاتورة." });
-                      setCart([]);
-                      setIsCheckoutOpen(false);
-                    }}>
-                       <Printer className="h-5 w-5" /> تأكيد وطباعة الفاتورة
+                    <Button 
+                      disabled={processingOrder}
+                      className="flex-[2] h-18 rounded-[24px] font-black text-xl gap-3 h-16 shadow-xl shadow-primary/20" 
+                      onClick={handleCompleteSale}
+                    >
+                       {processingOrder ? <Loader2 className="h-6 w-6 animate-spin" /> : <Printer className="h-6 w-6" />}
+                       تأكيد وطباعة الفاتورة
                     </Button>
                  </div>
               </div>
@@ -361,4 +433,3 @@ export default function POSPage() {
     </div>
   );
 }
-

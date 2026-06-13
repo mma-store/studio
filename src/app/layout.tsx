@@ -6,7 +6,7 @@ import { FirebaseClientProvider } from "@/firebase";
 
 export const metadata: Metadata = {
   title: 'مجمع محمد علاء - MMA',
-  description: 'المنصة الرسمية لبيع وصيانة كافة أنواع الدراجات النارية',
+  description: 'المنصة الرسمية لبيع وصيانة كافة أنواع الدراجات النارية في العراق',
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
@@ -29,13 +29,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ar" dir="rtl">
+    <html lang="ar" dir="rtl" className="scroll-smooth">
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+        <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&display=swap" rel="stylesheet" />
       </head>
-      <body className="font-body antialiased selection:bg-primary/20">
+      <body className="font-tajawal antialiased selection:bg-primary/20 overflow-x-hidden bg-background">
         <FirebaseClientProvider>
           {children}
           <Toaster />

@@ -9,8 +9,6 @@ import {
   Wrench, 
   ArrowUpRight, 
   Package, 
-  Clock, 
-  CheckCircle2, 
   MoreVertical 
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -30,13 +28,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import {
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-} from "@/components/ui/chart";
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 import { cn } from "@/lib/utils";
+import { useFirestore, useCollection } from "@/firebase";
+import { collection, query, orderBy, limit } from "firebase/firestore";
+import { useMemo } from "react";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const DATA = [
   { name: "سبت", sales: 4000 },
@@ -48,25 +45,30 @@ const DATA = [
   { name: "جمعة", sales: 3490 },
 ];
 
-const RECENT_ORDERS = [
-  { id: "#MMA-2451", customer: "أحمد محمد", total: "145,000", status: "pending", date: "10:30 ص" },
-  { id: "#MMA-2450", customer: "سارة علي", total: "85,000", status: "confirmed", date: "09:45 ص" },
-  { id: "#MMA-2449", customer: "ياسر قاسم", total: "250,000", status: "preparing", date: "أمس" },
-  { id: "#MMA-2448", customer: "حسين جواد", total: "12,000", status: "delivered", date: "أمس" },
-];
-
 export default function AdminDashboard() {
+  const db = useFirestore();
+  
+  const recentOrdersQuery = useMemo(() => 
+    query(collection(db, 'orders'), orderBy('createdAt', 'desc'), limit(5)), 
+  [db]);
+  const { data: recentOrders, loading: ordersLoading } = useCollection(recentOrdersQuery);
+
+  const lowStockQuery = useMemo(() => 
+    query(collection(db, 'products'), orderBy('stock', 'asc'), limit(4)), 
+  [db]);
+  const { data: lowStockProducts, loading: stockLoading } = useCollection(lowStockQuery);
+
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
+    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
       {/* Page Header */}
-      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div className="space-y-1">
-          <h1 className="text-3xl font-black tracking-tight">لوحة التحكم</h1>
+          <h1 className="text-3xl font-black tracking-tight text-foreground">لوحة التحكم</h1>
           <p className="text-muted-foreground font-medium text-sm">مرحباً بك مجدداً، إليك ملخص أداء المجمع اليوم.</p>
         </div>
         <div className="flex items-center gap-3">
-           <Button variant="outline" className="rounded-xl border-2 font-bold h-11">تصدير التقارير</Button>
-           <Button className="rounded-xl font-bold h-11 shadow-lg shadow-primary/20">إضافة طلب POS</Button>
+           <Button variant="outline" className="rounded-xl border-2 font-bold h-11 px-6">تصدير التقارير</Button>
+           <Button className="rounded-xl font-bold h-11 px-8 shadow-lg shadow-primary/20">إضافة طلب POS</Button>
         </div>
       </div>
 
@@ -103,7 +105,7 @@ export default function AdminDashboard() {
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-7">
         {/* Sales Chart */}
-        <Card className="lg:col-span-4 rounded-[32px] border-none shadow-sm overflow-hidden">
+        <Card className="lg:col-span-4 rounded-[32px] border-none shadow-sm overflow-hidden bg-white dark:bg-card">
           <CardHeader className="flex flex-row items-center justify-between">
              <div className="space-y-1">
                <CardTitle className="text-xl font-black">نظرة عامة على المبيعات</CardTitle>
@@ -119,12 +121,12 @@ export default function AdminDashboard() {
                   dataKey="name" 
                   axisLine={false} 
                   tickLine={false} 
-                  tick={{ fontSize: 12, fontWeight: 600 }}
+                  tick={{ fontSize: 12, fontWeight: 700 }}
                   dy={10}
                 />
                 <YAxis hide />
                 <Tooltip 
-                  cursor={{ fill: 'transparent' }}
+                  cursor={{ fill: 'hsl(var(--primary) / 0.05)' }}
                   content={({ active, payload }) => {
                     if (active && payload && payload.length) {
                       return (
@@ -149,7 +151,7 @@ export default function AdminDashboard() {
         </Card>
 
         {/* Inventory Warning */}
-        <Card className="lg:col-span-3 rounded-[32px] border-none shadow-sm overflow-hidden">
+        <Card className="lg:col-span-3 rounded-[32px] border-none shadow-sm overflow-hidden bg-white dark:bg-card">
           <CardHeader className="flex flex-row items-center justify-between">
              <div className="space-y-1">
                <CardTitle className="text-xl font-black">تنبيهات المخزون</CardTitle>
@@ -158,20 +160,26 @@ export default function AdminDashboard() {
              <Button variant="link" className="text-primary font-bold">مشاهدة الكل</Button>
           </CardHeader>
           <CardContent className="space-y-4">
-            {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="flex items-center justify-between p-4 rounded-2xl bg-muted/30 hover:bg-muted/50 transition-colors">
+            {stockLoading ? (
+               Array(4).fill(0).map((_, i) => <Skeleton key={i} className="h-16 w-full rounded-2xl" />)
+            ) : lowStockProducts.map((p: any) => (
+              <div key={p.id} className="flex items-center justify-between p-4 rounded-2xl bg-muted/30 hover:bg-muted/50 transition-colors">
                  <div className="flex items-center gap-3">
                     <div className="h-10 w-10 rounded-xl bg-white dark:bg-card border flex items-center justify-center">
                        <Package className="h-5 w-5 text-muted-foreground" />
                     </div>
                     <div>
-                       <p className="text-sm font-bold">فلتر زيت هوندا {i}</p>
-                       <p className="text-[10px] text-muted-foreground font-bold">مخزن A-24</p>
+                       <p className="text-sm font-bold truncate max-w-[120px]">{p.name}</p>
+                       <p className="text-[10px] text-muted-foreground font-bold">{p.storageLocation || 'مخزن رئيسي'}</p>
                     </div>
                  </div>
                  <div className="text-left">
-                    <p className="text-xs font-black text-destructive">تبقي 5 قطع</p>
-                    <Badge variant="outline" className="text-[8px] h-4 rounded-full border-destructive/20 text-destructive">منخفض جداً</Badge>
+                    <p className={cn("text-xs font-black", p.stock === 0 ? "text-destructive" : "text-orange-600")}>
+                      {p.stock === 0 ? "نفذت" : `تبقي ${p.stock} قطعة`}
+                    </p>
+                    <Badge variant="outline" className={cn("text-[8px] h-4 rounded-full border-none px-2", p.stock === 0 ? "bg-red-100 text-red-700" : "bg-orange-100 text-orange-700")}>
+                      {p.stock === 0 ? "خارج المخزون" : "منخفض"}
+                    </Badge>
                  </div>
               </div>
             ))}
@@ -180,54 +188,69 @@ export default function AdminDashboard() {
       </div>
 
       {/* Latest Orders Table */}
-      <Card className="rounded-[32px] border-none shadow-sm overflow-hidden">
+      <Card className="rounded-[32px] border-none shadow-sm overflow-hidden bg-white dark:bg-card">
         <CardHeader className="flex flex-row items-center justify-between">
            <div className="space-y-1">
              <CardTitle className="text-xl font-black">أحدث الطلبات</CardTitle>
              <CardDescription className="font-medium">آخر الطلبات التي تم استلامها عبر المنصة</CardDescription>
            </div>
-           <Button variant="outline" className="rounded-xl font-bold h-10 border-2">عرض كل الطلبات</Button>
+           <Button variant="outline" className="rounded-xl font-bold h-10 border-2 px-6">عرض كل الطلبات</Button>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow className="border-b bg-muted/30 hover:bg-muted/30">
-                <TableHead className="text-right font-black text-xs uppercase tracking-widest">رقم الطلب</TableHead>
-                <TableHead className="text-right font-black text-xs uppercase tracking-widest">العميل</TableHead>
-                <TableHead className="text-right font-black text-xs uppercase tracking-widest">المبلغ</TableHead>
-                <TableHead className="text-right font-black text-xs uppercase tracking-widest">الحالة</TableHead>
-                <TableHead className="text-right font-black text-xs uppercase tracking-widest">الوقت</TableHead>
-                <TableHead className="text-left font-black text-xs uppercase tracking-widest">إجراءات</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {RECENT_ORDERS.map((order) => (
-                <TableRow key={order.id} className="hover:bg-muted/10 transition-colors">
-                  <TableCell className="font-bold">{order.id}</TableCell>
-                  <TableCell className="font-medium">{order.customer}</TableCell>
-                  <TableCell className="font-black text-primary">{order.total} د.ع</TableCell>
-                  <TableCell>
-                    <Badge className={cn(
-                      "rounded-full px-3 py-1 border-none font-bold text-[10px]",
-                      order.status === 'pending' ? "bg-orange-100 text-orange-700" :
-                      order.status === 'confirmed' ? "bg-blue-100 text-blue-700" :
-                      order.status === 'preparing' ? "bg-purple-100 text-purple-700" :
-                      "bg-green-100 text-green-700"
-                    )}>
-                       {order.status === 'pending' && "قيد الانتظار"}
-                       {order.status === 'confirmed' && "مؤكد"}
-                       {order.status === 'preparing' && "جاري التجهيز"}
-                       {order.status === 'delivered' && "تم التسليم"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground text-xs">{order.date}</TableCell>
-                  <TableCell className="text-left">
-                     <Button variant="ghost" size="icon" className="rounded-xl"><ArrowUpRight className="h-4 w-4" /></Button>
-                  </TableCell>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="border-b bg-muted/30 hover:bg-muted/30">
+                  <TableHead className="text-right font-black text-xs uppercase tracking-widest">رقم الطلب</TableHead>
+                  <TableHead className="text-right font-black text-xs uppercase tracking-widest">العميل</TableHead>
+                  <TableHead className="text-right font-black text-xs uppercase tracking-widest">المبلغ</TableHead>
+                  <TableHead className="text-right font-black text-xs uppercase tracking-widest">الحالة</TableHead>
+                  <TableHead className="text-right font-black text-xs uppercase tracking-widest">التاريخ</TableHead>
+                  <TableHead className="text-left font-black text-xs uppercase tracking-widest">إجراءات</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {ordersLoading ? (
+                   Array(5).fill(0).map((_, i) => (
+                     <TableRow key={i}>
+                       <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                       <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                       <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                       <TableCell><Skeleton className="h-6 w-20 rounded-full" /></TableCell>
+                       <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                       <TableCell><Skeleton className="h-8 w-8 rounded-lg" /></TableCell>
+                     </TableRow>
+                   ))
+                ) : recentOrders.map((order: any) => (
+                  <TableRow key={order.id} className="hover:bg-muted/10 transition-colors">
+                    <TableCell className="font-bold text-sm">{order.orderNumber}</TableCell>
+                    <TableCell className="font-medium">{order.customerName}</TableCell>
+                    <TableCell className="font-black text-primary">{order.total?.toLocaleString()} د.ع</TableCell>
+                    <TableCell>
+                      <Badge className={cn(
+                        "rounded-full px-3 py-1 border-none font-bold text-[10px]",
+                        order.status === 'pending' ? "bg-orange-100 text-orange-700" :
+                        order.status === 'confirmed' ? "bg-blue-100 text-blue-700" :
+                        order.status === 'preparing' ? "bg-purple-100 text-purple-700" :
+                        "bg-green-100 text-green-700"
+                      )}>
+                         {order.status === 'pending' && "قيد الانتظار"}
+                         {order.status === 'confirmed' && "مؤكد"}
+                         {order.status === 'preparing' && "جاري التجهيز"}
+                         {order.status === 'delivered' && "تم التسليم"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground text-xs font-bold">
+                       {new Date(order.createdAt).toLocaleDateString("ar-EG")}
+                    </TableCell>
+                    <TableCell className="text-left">
+                       <Button variant="ghost" size="icon" className="rounded-xl"><ArrowUpRight className="h-4 w-4" /></Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
     </div>
