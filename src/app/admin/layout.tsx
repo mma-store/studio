@@ -12,7 +12,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const { user, profile, loading } = useUser();
   const router = useRouter();
-  const pathname = usePathname();
   const [isAuthorized, setIsAuthorized] = useState(false);
 
   useEffect(() => {
@@ -30,7 +29,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     }
   }, [user, profile, loading, router]);
 
-  if (loading || !isAuthorized) {
+  if (loading || (!isAuthorized && user)) {
     return (
       <div className="flex h-screen w-full flex-col items-center justify-center bg-background p-8 gap-8">
          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary text-white shadow-xl animate-bounce">
@@ -52,6 +51,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       </div>
     );
   }
+
+  if (!isAuthorized) return null;
 
   return (
     <SidebarProvider>

@@ -36,46 +36,24 @@
         "phoneNumber": { "type": "string" },
         "bikeBrand": { "type": "string" },
         "bikeModel": { "type": "string" },
-        "bikeType": { "type": "string" },
-        "bikeColor": { "type": "string" },
-        "plateNumber": { "type": "string" },
-        "engineNumber": { "type": "string" },
-        "mileage": { "type": "number" },
-        "problemDescription": { "type": "string" },
-        "technicianNotes": { "type": "string" },
         "status": { "type": "string", "enum": ["received", "inspection", "waiting_parts", "in_progress", "quality_check", "ready", "delivered", "cancelled"] },
-        "technicianId": { "type": "string" },
-        "receiveDate": { "type": "number" },
-        "expectedDeliveryDate": { "type": "number" },
-        "partsUsed": { 
-          "type": "array", 
-          "items": { 
-            "type": "object",
-            "properties": {
-              "productId": { "type": "string" },
-              "name": { "type": "string" },
-              "price": { "type": "number" },
-              "quantity": { "type": "number" }
-            }
-          } 
-        },
+        "partsUsed": { "type": "array" },
         "laborCost": { "type": "number" },
-        "additionalCharges": { "type": "number" },
-        "discount": { "type": "number" },
         "totalAmount": { "type": "number" },
-        "images": { "type": "array", "items": { "type": "string" } },
-        "createdAt": { "type": "number" },
-        "updatedAt": { "type": "number" }
+        "createdAt": { "type": "number" }
       }
     },
-    "Category": {
-      "title": "Category",
-      "description": "Product categories",
+    "AuditLog": {
+      "title": "AuditLog",
+      "description": "System audit logs for tracking changes",
       "type": "object",
       "properties": {
-        "name": { "type": "string" },
-        "itemsCount": { "type": "number" },
-        "image": { "type": "string" }
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "action": { "type": "string" },
+        "target": { "type": "string" },
+        "details": { "type": "string" },
+        "timestamp": { "type": "number" }
       }
     },
     "UserProfile": {
@@ -87,39 +65,7 @@
         "email": { "type": "string" },
         "displayName": { "type": "string" },
         "role": { "type": "string", "enum": ["admin", "sales_employee", "workshop_technician", "warehouse_employee", "retail_customer", "wholesale_customer"] },
-        "phoneNumber": { "type": "string" },
-        "photoURL": { "type": "string" },
         "createdAt": { "type": "number" }
-      }
-    },
-    "Order": {
-      "title": "Order",
-      "description": "Customer orders",
-      "type": "object",
-      "properties": {
-        "orderNumber": { "type": "string" },
-        "userId": { "type": "string" },
-        "customerName": { "type": "string" },
-        "phoneNumber": { "type": "string" },
-        "deliveryMethod": { "type": "string", "enum": ["delivery", "pickup"] },
-        "address": { "type": "string" },
-        "landmark": { "type": "string" },
-        "items": { 
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": {
-              "productId": { "type": "string" },
-              "name": { "type": "string" },
-              "price": { "type": "number" },
-              "quantity": { "type": "number" }
-            }
-          }
-        },
-        "total": { "type": "number" },
-        "status": { "type": "string", "enum": ["pending", "confirmed", "preparing", "ready", "shipped", "delivered", "cancelled"] },
-        "createdAt": { "type": "number" },
-        "updatedAt": { "type": "number" }
       }
     }
   },
@@ -131,6 +77,10 @@
     "/repairOrders/{orderId}": { "schema": "RepairOrder", "description": "Collection of workshop repair orders" },
     "/categories/{categoryId}": { "schema": "Category", "description": "Collection of categories" },
     "/users/{userId}": { "schema": "UserProfile", "description": "Collection of users" },
-    "/orders/{orderId}": { "schema": "Order", "description": "Collection of orders" }
+    "/orders/{orderId}": { "schema": "Order", "description": "Collection of orders" },
+    "/auditLogs/{logId}": { "schema": "AuditLog", "description": "System audit logs" },
+    "/motorcycleTypes/{typeId}": { "schema": "Category", "description": "Motorcycle Types" },
+    "/banners/{bannerId}": { "schema": "Category", "description": "Marketing Banners" },
+    "/offers/{offerId}": { "schema": "Category", "description": "Marketing Offers" }
   }
 }
