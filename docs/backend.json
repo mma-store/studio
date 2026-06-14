@@ -70,7 +70,7 @@
     }
   },
   "auth": {
-    "providers": ["google", "password"]
+    "providers": ["google", "password", "phone"]
   },
   "firestore": {
     "/products/{productId}": { "schema": "Product", "description": "Collection of products" },

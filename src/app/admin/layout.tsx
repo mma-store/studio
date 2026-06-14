@@ -5,9 +5,12 @@ import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { AdminSidebar } from "@/components/admin/sidebar";
 import { AdminHeader } from "@/components/admin/header";
 import { useUser } from "@/firebase";
-import { useRouter, usePathname } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
+
+// القائمة البيضاء لأرقام الهواتف التي لها صلاحيات المدير
+const ADMIN_PHONES = ['+9647858833838'];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const { user, profile, loading } = useUser();
@@ -18,12 +21,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     if (!loading) {
       if (!user) {
         router.replace('/login');
-      } else if (profile) {
+      } else {
+        // التحقق من الصلاحيات بناءً على الدور في Firestore أو رقم الهاتف
         const allowedRoles = ['admin', 'sales_employee', 'workshop_technician', 'warehouse_employee'];
-        if (!allowedRoles.includes(profile.role)) {
-          router.replace('/');
-        } else {
+        const isStaff = profile && allowedRoles.includes(profile.role);
+        const isMasterAdmin = user.phoneNumber && ADMIN_PHONES.includes(user.phoneNumber);
+
+        if (isStaff || isMasterAdmin) {
           setIsAuthorized(true);
+        } else {
+          router.replace('/');
         }
       }
     }
