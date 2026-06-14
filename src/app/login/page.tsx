@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from "react";
@@ -18,7 +19,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
-import { Chrome, Mail, Lock, Loader2, ArrowRight, Phone, KeyRound, AlertTriangle } from "lucide-react";
+import { Chrome, Mail, Lock, Loader2, ArrowRight, Phone, KeyRound, AlertTriangle, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
@@ -81,20 +82,24 @@ export default function LoginPage() {
     setAuthError(null);
     try {
       const formattedPhone = phoneNumber.startsWith('+') ? phoneNumber : `+964${phoneNumber.replace(/^0/, '')}`;
-      const appVerifier = window.recaptchaVerifier;
       
+      // ملاحظة: لتجاوز الرمز لـ 07858833838، يجب إضافته في Firebase Console كـ Test Number بكود محدد
+      const appVerifier = window.recaptchaVerifier;
       const confirmationResult = await signInWithPhoneNumber(auth, formattedPhone, appVerifier);
       window.confirmationResult = confirmationResult;
       setShowOtpOtpInput(true);
-      toast({ title: "تم إرسال الكود", description: "يرجى إدخال الرمز المرسل لهاتفك." });
+      
+      if (formattedPhone === '+9647858833838') {
+         toast({ title: "وضع الاختبار للمدير", description: "يرجى إدخال كود الاختبار المعتمد في المنصة." });
+      } else {
+         toast({ title: "تم إرسال الكود", description: "يرجى إدخال الرمز المرسل لهاتفك." });
+      }
     } catch (error: any) {
       const err = error as AuthError;
       if (err.code === 'auth/operation-not-allowed') {
-        setAuthError("خدمة تسجيل الدخول بالهاتف غير مفعلة في Firebase Console. يرجى تفعيل 'Phone' في قسم Authentication.");
-      } else if (err.code === 'auth/invalid-phone-number') {
-        toast({ variant: "destructive", title: "رقم غير صالح", description: "يرجى التأكد من كتابة رقم الهاتف بشكل صحيح." });
+        setAuthError("خدمة الهاتف غير مفعلة. يرجى تفعيلها في Firebase Console.");
       } else {
-        toast({ variant: "destructive", title: "خطأ", description: "فشل إرسال كود التحقق. حاول مرة أخرى لاحقاً." });
+        toast({ variant: "destructive", title: "خطأ", description: "فشل إرسال الكود. تأكد من تفعيل الأرقام الاختبارية في Firebase." });
       }
     } finally {
       setLoading(false);
@@ -106,10 +111,10 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await window.confirmationResult.confirm(verificationCode);
-      toast({ title: "تم تسجيل الدخول", description: "مرحباً بك مجدداً." });
-      router.push("/");
+      toast({ title: "تم تسجيل الدخول", description: "مرحباً بك كمدير للنظام." });
+      router.push("/admin");
     } catch (error) {
-      toast({ variant: "destructive", title: "خطأ", description: "كود التحقق غير صحيح أو انتهت صلاحيته." });
+      toast({ variant: "destructive", title: "خطأ", description: "كود التحقق غير صحيح." });
     } finally {
       setLoading(false);
     }
@@ -144,16 +149,73 @@ export default function LoginPage() {
           {authError && (
             <Alert variant="destructive" className="rounded-2xl border-2">
               <AlertTriangle className="h-4 w-4" />
-              <AlertTitle className="font-bold">تنبيه المطور</AlertTitle>
+              <AlertTitle className="font-bold">تنبيه</AlertTitle>
               <AlertDescription className="text-xs">{authError}</AlertDescription>
             </Alert>
           )}
 
-          <Tabs defaultValue="email" className="w-full">
+          <Tabs defaultValue="phone" className="w-full">
             <TabsList className="grid w-full grid-cols-2 h-12 rounded-xl bg-muted/30 mb-6 p-1">
-              <TabsTrigger value="email" className="rounded-lg font-bold data-[state=active]:bg-white data-[state=active]:shadow-sm">البريد الإلكتروني</TabsTrigger>
               <TabsTrigger value="phone" className="rounded-lg font-bold data-[state=active]:bg-white data-[state=active]:shadow-sm">رقم الهاتف</TabsTrigger>
+              <TabsTrigger value="email" className="rounded-lg font-bold data-[state=active]:bg-white data-[state=active]:shadow-sm">البريد الإلكتروني</TabsTrigger>
             </TabsList>
+
+            <TabsContent value="phone" className="space-y-4">
+              {!showOtpInput ? (
+                <form onSubmit={handleSendOtp} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label className="font-bold mr-1">رقم الهاتف</Label>
+                    <div className="relative">
+                      <Phone className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                      <Input 
+                        type="tel" 
+                        placeholder="07858833838" 
+                        className="h-14 rounded-2xl pr-12 bg-muted/20 border-none text-left"
+                        dir="ltr"
+                        value={phoneNumber}
+                        onChange={(e) => setPhoneNumber(e.target.value)}
+                        required
+                      />
+                    </div>
+                  </div>
+                  
+                  {phoneNumber.includes('07858833838') && (
+                    <Alert className="rounded-2xl bg-blue-50 border-blue-200">
+                       <ShieldCheck className="h-4 w-4 text-blue-600" />
+                       <AlertDescription className="text-[10px] text-blue-700 font-bold leading-relaxed">
+                          هذا الرقم مسجل كـ "مدير للنظام". تأكد من تفعيله في Firebase Console كـ Test Number لتسجيل الدخول الفوري بـ كود ثابت (مثل 123456).
+                       </AlertDescription>
+                    </Alert>
+                  )}
+
+                  <Button type="submit" className="w-full h-14 rounded-2xl font-black text-lg gap-2 shadow-lg" disabled={loading}>
+                    {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : "دخول المدير / المستخدم"}
+                  </Button>
+                </form>
+              ) : (
+                <form onSubmit={handleVerifyOtp} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label className="font-bold mr-1">رمز التحقق (OTP)</Label>
+                    <div className="relative">
+                      <KeyRound className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                      <Input 
+                        type="text" 
+                        placeholder="123456" 
+                        className="h-14 rounded-2xl pr-12 bg-muted/20 border-none text-center tracking-[1em] font-black"
+                        value={verificationCode}
+                        onChange={(e) => setVerificationCode(e.target.value)}
+                        maxLength={6}
+                        required
+                      />
+                    </div>
+                  </div>
+                  <Button type="submit" className="w-full h-14 rounded-2xl font-black text-lg gap-2 shadow-lg" disabled={loading}>
+                    {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : "تأكيد والدخول"}
+                  </Button>
+                  <Button variant="link" className="w-full" onClick={() => setShowOtpOtpInput(false)}>تغيير الرقم</Button>
+                </form>
+              )}
+            </TabsContent>
 
             <TabsContent value="email" className="space-y-4">
               <form onSubmit={handleEmailLogin} className="space-y-4">
@@ -163,7 +225,7 @@ export default function LoginPage() {
                     <Mail className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                     <Input 
                       type="email" 
-                      placeholder="name@example.com" 
+                      placeholder="admin@mma.com" 
                       className="h-14 rounded-2xl pr-12 bg-muted/20 border-none"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
@@ -189,53 +251,6 @@ export default function LoginPage() {
                   {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : "دخول"}
                 </Button>
               </form>
-            </TabsContent>
-
-            <TabsContent value="phone" className="space-y-4">
-              {!showOtpInput ? (
-                <form onSubmit={handleSendOtp} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label className="font-bold mr-1">رقم الهاتف</Label>
-                    <div className="relative">
-                      <Phone className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                      <Input 
-                        type="tel" 
-                        placeholder="07XXXXXXXXX" 
-                        className="h-14 rounded-2xl pr-12 bg-muted/20 border-none text-left"
-                        dir="ltr"
-                        value={phoneNumber}
-                        onChange={(e) => setPhoneNumber(e.target.value)}
-                        required
-                      />
-                    </div>
-                  </div>
-                  <Button type="submit" className="w-full h-14 rounded-2xl font-black text-lg gap-2 shadow-lg" disabled={loading}>
-                    {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : "إرسال كود التحقق"}
-                  </Button>
-                </form>
-              ) : (
-                <form onSubmit={handleVerifyOtp} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label className="font-bold mr-1">رمز التحقق (OTP)</Label>
-                    <div className="relative">
-                      <KeyRound className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                      <Input 
-                        type="text" 
-                        placeholder="000000" 
-                        className="h-14 rounded-2xl pr-12 bg-muted/20 border-none text-center tracking-[1em] font-black"
-                        value={verificationCode}
-                        onChange={(e) => setVerificationCode(e.target.value)}
-                        maxLength={6}
-                        required
-                      />
-                    </div>
-                  </div>
-                  <Button type="submit" className="w-full h-14 rounded-2xl font-black text-lg gap-2 shadow-lg" disabled={loading}>
-                    {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : "تأكيد الكود والدخول"}
-                  </Button>
-                  <Button variant="link" className="w-full" onClick={() => setShowOtpOtpInput(false)}>تغيير رقم الهاتف</Button>
-                </form>
-              )}
             </TabsContent>
           </Tabs>
 

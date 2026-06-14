@@ -9,7 +9,9 @@ import {
   ClipboardList, 
   Camera,
   Calendar,
-  AlertCircle
+  AlertCircle,
+  Loader2,
+  X
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,11 +37,32 @@ import { useFirestore } from "@/firebase";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { toast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
+import { uploadToCloudinary } from "@/lib/cloudinary";
+import Image from "next/image";
 
 export default function NewRepairOrderPage() {
   const db = useFirestore();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadedPhotos, setUploadedPhotos] = useState<string[]>([]);
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+
+    setIsUploading(true);
+    try {
+      const uploadPromises = Array.from(files).map(file => uploadToCloudinary(file));
+      const urls = await Promise.all(uploadPromises);
+      setUploadedPhotos(prev => [...prev, ...urls]);
+      toast({ title: "تم الرفع", description: "تم رفع صور الحالة بنجاح." });
+    } catch (error) {
+      toast({ variant: "destructive", title: "خطأ", description: "فشل رفع الصور." });
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -55,11 +78,9 @@ export default function NewRepairOrderPage() {
       bikeType: formData.get('bikeType'),
       bikeColor: formData.get('bikeColor'),
       plateNumber: formData.get('plateNumber'),
-      engineNumber: formData.get('engineNumber'),
-      mileage: Number(formData.get('mileage')),
       problemDescription: formData.get('problemDescription'),
+      bikePhotos: uploadedPhotos,
       status: 'received',
-      receiveDate: Date.now(),
       partsUsed: [],
       laborCost: 0,
       totalAmount: 0,
@@ -96,14 +117,13 @@ export default function NewRepairOrderPage() {
           form="repair-form" 
           type="submit" 
           className="rounded-xl font-bold h-11 shadow-lg shadow-primary/20 gap-2 px-8"
-          disabled={loading}
+          disabled={loading || isUploading}
         >
           <Save className="h-5 w-5" /> {loading ? "جاري الحفظ..." : "حفظ أمر التصليح"}
         </Button>
       </div>
 
       <form id="repair-form" onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Customer Section */}
         <Card className="md:col-span-1 rounded-[32px] border-none shadow-sm h-fit">
            <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg font-black">
@@ -126,7 +146,6 @@ export default function NewRepairOrderPage() {
            </CardContent>
         </Card>
 
-        {/* Bike Section */}
         <Card className="md:col-span-2 rounded-[32px] border-none shadow-sm">
            <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg font-black">
@@ -150,28 +169,9 @@ export default function NewRepairOrderPage() {
                  <Label className="font-bold mr-1">اللون</Label>
                  <Input name="bikeColor" placeholder="لون الدراجة" className="rounded-2xl h-12 bg-muted/30 border-none" />
               </div>
-              <div className="space-y-2">
-                 <Label className="font-bold mr-1">المسافة المقطوعة (Km)</Label>
-                 <Input name="mileage" type="number" placeholder="0" className="rounded-2xl h-12 bg-muted/30 border-none" />
-              </div>
-              <div className="space-y-2">
-                 <Label className="font-bold mr-1">نوع المحرك</Label>
-                 <Select name="bikeType">
-                    <SelectTrigger className="rounded-2xl h-12 bg-muted/30 border-none">
-                       <SelectValue placeholder="اختر النوع" />
-                    </SelectTrigger>
-                    <SelectContent className="rounded-2xl">
-                       <SelectItem value="sport">رياضي (Sport)</SelectItem>
-                       <SelectItem value="cruiser">كروزر (Cruiser)</SelectItem>
-                       <SelectItem value="scooter">سكوتر (Scooter)</SelectItem>
-                       <SelectItem value="classic">كلاسيك (Classic)</SelectItem>
-                    </SelectContent>
-                 </Select>
-              </div>
            </CardContent>
         </Card>
 
-        {/* Problem Description */}
         <Card className="md:col-span-3 rounded-[32px] border-none shadow-sm">
            <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg font-black">
@@ -186,19 +186,25 @@ export default function NewRepairOrderPage() {
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t">
                  <div className="space-y-4">
-                    <Label className="font-bold block">صور الدراجة عند الاستلام</Label>
-                    <div className="flex gap-4">
-                       <div className="h-24 w-24 rounded-2xl border-2 border-dashed border-muted-foreground/20 flex flex-col items-center justify-center text-muted-foreground gap-1 hover:border-primary/50 transition-colors cursor-pointer bg-muted/5">
-                          <Camera className="h-6 w-6" />
+                    <Label className="font-bold block">صور الدراجة عند الاستلام (Cloudinary)</Label>
+                    <div className="flex flex-wrap gap-4">
+                       {uploadedPhotos.map((url, i) => (
+                         <div key={i} className="relative h-24 w-24 rounded-2xl overflow-hidden border bg-muted shadow-sm">
+                            <Image src={url} alt="Bike Status" fill className="object-cover" />
+                            <button 
+                              type="button" 
+                              onClick={() => setUploadedPhotos(prev => prev.filter((_, idx) => idx !== i))}
+                              className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                         </div>
+                       ))}
+                       <label className="h-24 w-24 rounded-2xl border-2 border-dashed border-muted-foreground/20 flex flex-col items-center justify-center text-muted-foreground gap-1 hover:border-primary/50 transition-colors cursor-pointer bg-muted/5">
+                          {isUploading ? <Loader2 className="h-6 w-6 animate-spin" /> : <Camera className="h-6 w-6" />}
                           <span className="text-[10px] font-bold">إضافة صورة</span>
-                       </div>
-                    </div>
-                 </div>
-                 <div className="space-y-4">
-                    <Label className="font-bold block">موعد التسليم المتوقع</Label>
-                    <div className="relative">
-                       <Calendar className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                       <Input type="date" className="rounded-2xl h-12 bg-muted/30 border-none pr-12" />
+                          <input type="file" multiple accept="image/*" className="hidden" onChange={handlePhotoUpload} disabled={isUploading} />
+                       </label>
                     </div>
                  </div>
               </div>
