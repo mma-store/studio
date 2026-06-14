@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from "react";
@@ -9,7 +8,8 @@ import {
   GoogleAuthProvider, 
   RecaptchaVerifier, 
   signInWithPhoneNumber,
-  ConfirmationResult
+  ConfirmationResult,
+  AuthError
 } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -18,8 +18,9 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
-import { Chrome, Mail, Lock, Loader2, ArrowRight, Phone, KeyRound } from "lucide-react";
+import { Chrome, Mail, Lock, Loader2, ArrowRight, Phone, KeyRound, AlertTriangle } from "lucide-react";
 import Link from "next/link";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 declare global {
   interface Window {
@@ -32,6 +33,7 @@ export default function LoginPage() {
   const auth = useAuth();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
   
   // Email Auth State
   const [email, setEmail] = useState("");
@@ -43,16 +45,21 @@ export default function LoginPage() {
   const [showOtpInput, setShowOtpOtpInput] = useState(false);
 
   useEffect(() => {
-    if (!window.recaptchaVerifier) {
-      window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
-        'size': 'invisible',
-      });
+    if (!window.recaptchaVerifier && typeof window !== 'undefined') {
+      try {
+        window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+          'size': 'invisible',
+        });
+      } catch (e) {
+        console.error("Recaptcha initialization failed", e);
+      }
     }
   }, [auth]);
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setAuthError(null);
     try {
       await signInWithEmailAndPassword(auth, email, password);
       toast({ title: "تم تسجيل الدخول", description: "مرحباً بك مجدداً." });
@@ -61,7 +68,7 @@ export default function LoginPage() {
       toast({ 
         variant: "destructive", 
         title: "خطأ في الدخول", 
-        description: "تأكد من صحة البيانات." 
+        description: "تأكد من صحة البريد الإلكتروني وكلمة المرور." 
       });
     } finally {
       setLoading(false);
@@ -71,16 +78,24 @@ export default function LoginPage() {
   const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setAuthError(null);
     try {
       const formattedPhone = phoneNumber.startsWith('+') ? phoneNumber : `+964${phoneNumber.replace(/^0/, '')}`;
       const appVerifier = window.recaptchaVerifier;
+      
       const confirmationResult = await signInWithPhoneNumber(auth, formattedPhone, appVerifier);
       window.confirmationResult = confirmationResult;
       setShowOtpOtpInput(true);
       toast({ title: "تم إرسال الكود", description: "يرجى إدخال الرمز المرسل لهاتفك." });
-    } catch (error) {
-      console.error(error);
-      toast({ variant: "destructive", title: "خطأ", description: "فشل إرسال كود التحقق." });
+    } catch (error: any) {
+      const err = error as AuthError;
+      if (err.code === 'auth/operation-not-allowed') {
+        setAuthError("خدمة تسجيل الدخول بالهاتف غير مفعلة في Firebase Console. يرجى تفعيل 'Phone' في قسم Authentication.");
+      } else if (err.code === 'auth/invalid-phone-number') {
+        toast({ variant: "destructive", title: "رقم غير صالح", description: "يرجى التأكد من كتابة رقم الهاتف بشكل صحيح." });
+      } else {
+        toast({ variant: "destructive", title: "خطأ", description: "فشل إرسال كود التحقق. حاول مرة أخرى لاحقاً." });
+      }
     } finally {
       setLoading(false);
     }
@@ -94,7 +109,7 @@ export default function LoginPage() {
       toast({ title: "تم تسجيل الدخول", description: "مرحباً بك مجدداً." });
       router.push("/");
     } catch (error) {
-      toast({ variant: "destructive", title: "خطأ", description: "كود التحقق غير صحيح." });
+      toast({ variant: "destructive", title: "خطأ", description: "كود التحقق غير صحيح أو انتهت صلاحيته." });
     } finally {
       setLoading(false);
     }
@@ -126,6 +141,14 @@ export default function LoginPage() {
         </CardHeader>
         
         <CardContent className="space-y-6 px-8">
+          {authError && (
+            <Alert variant="destructive" className="rounded-2xl border-2">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertTitle className="font-bold">تنبيه المطور</AlertTitle>
+              <AlertDescription className="text-xs">{authError}</AlertDescription>
+            </Alert>
+          )}
+
           <Tabs defaultValue="email" className="w-full">
             <TabsList className="grid w-full grid-cols-2 h-12 rounded-xl bg-muted/30 mb-6 p-1">
               <TabsTrigger value="email" className="rounded-lg font-bold data-[state=active]:bg-white data-[state=active]:shadow-sm">البريد الإلكتروني</TabsTrigger>
