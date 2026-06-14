@@ -17,7 +17,8 @@ import {
   Tags,
   Zap,
   ChevronDown,
-  Loader2
+  Loader2,
+  Package
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -46,43 +47,47 @@ export default function POSPage() {
   const [processingOrder, setProcessingOrder] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  // Firestore Data - Optimized
+  // Firestore Data - Optimized with safe references
   const productsQuery = useMemo(() => query(collection(db, 'products'), orderBy('name')), [db]);
   const { data: products, loading } = useCollection(productsQuery);
   
   const categoriesQuery = useMemo(() => collection(db, 'categories'), [db]);
   const { data: categories } = useCollection(categoriesQuery);
 
-  // Filtering
+  // Filtering - Added safety checks for p.name and p.barcode
   const filteredProducts = useMemo(() => {
+    if (!products) return [];
     if (!searchQuery) return products;
     const lowerQuery = searchQuery.toLowerCase();
     return products.filter((p: any) => 
-      p.name.toLowerCase().includes(lowerQuery) || 
-      p.barcode?.includes(lowerQuery)
+      (p.name?.toLowerCase() || "").includes(lowerQuery) || 
+      (p.barcode || "").includes(lowerQuery)
     );
   }, [products, searchQuery]);
 
-  // Calculations
+  // Calculations - Added fallback for missing prices to avoid NaN
   const subtotal = useMemo(() => {
     return cart.reduce((acc, item) => {
-      const price = selectedCustomer.type === 'wholesale' ? (item.wholesalePrice || item.retailPrice) : item.retailPrice;
-      return acc + (price * item.quantity);
+      const retail = item.retailPrice || 0;
+      const wholesale = item.wholesalePrice || retail;
+      const price = selectedCustomer.type === 'wholesale' ? wholesale : retail;
+      return acc + (price * (item.quantity || 1));
     }, 0);
   }, [cart, selectedCustomer.type]);
   
-  const total = subtotal - discount;
+  const total = Math.max(0, subtotal - discount);
 
   // Handlers
   const addToCart = (product: any) => {
-    if (product.stock <= 0) {
+    if (!product) return;
+    if ((product.stock || 0) <= 0) {
       toast({ variant: "destructive", title: "نفذ المخزون", description: "لا يمكن إضافة منتج غير متوفر حالياً." });
       return;
     }
     setCart(prev => {
       const existing = prev.find(item => item.id === product.id);
       if (existing) {
-        if (existing.quantity >= product.stock) {
+        if (existing.quantity >= (product.stock || 0)) {
            toast({ variant: "destructive", title: "تجاوز المخزون", description: "لا يمكن إضافة كمية أكبر من المتوفر." });
            return prev;
         }
@@ -100,7 +105,7 @@ export default function POSPage() {
     setCart(prev => prev.map(item => {
       if (item.id === productId) {
         const newQty = Math.max(1, item.quantity + delta);
-        if (delta > 0 && newQty > item.stock) {
+        if (delta > 0 && newQty > (item.stock || 0)) {
           toast({ variant: "destructive", title: "تجاوز المخزون", description: "وصلت للحد الأقصى للمخزون." });
           return item;
         }
@@ -111,6 +116,7 @@ export default function POSPage() {
   };
 
   const handleCompleteSale = async () => {
+    if (cart.length === 0) return;
     setProcessingOrder(true);
     try {
       const orderData = {
@@ -119,8 +125,8 @@ export default function POSPage() {
         customerType: selectedCustomer.type,
         items: cart.map(item => ({
           productId: item.id,
-          name: item.name,
-          price: selectedCustomer.type === 'wholesale' ? (item.wholesalePrice || item.retailPrice) : item.retailPrice,
+          name: item.name || "منتج غير مسمى",
+          price: selectedCustomer.type === 'wholesale' ? (item.wholesalePrice || item.retailPrice || 0) : (item.retailPrice || 0),
           quantity: item.quantity
         })),
         subtotal,
@@ -165,7 +171,7 @@ export default function POSPage() {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [cart]);
+  }, [cart.length]);
 
   return (
     <div className="flex h-[calc(100vh-80px)] overflow-hidden gap-4 -m-4 md:-m-8 bg-background">
@@ -206,27 +212,27 @@ export default function POSPage() {
                 key={p.id} 
                 className={cn(
                   "group cursor-pointer overflow-hidden rounded-[32px] border-none shadow-sm hover:shadow-xl transition-all duration-300 bg-white dark:bg-card active:scale-95",
-                  p.stock <= 0 && "opacity-60 grayscale"
+                  (p.stock || 0) <= 0 && "opacity-60 grayscale"
                 )}
                 onClick={() => addToCart(p)}
                >
                  <div className="relative aspect-square h-32 w-full overflow-hidden bg-muted/50">
                     <Image 
                       src={p.images?.[0] || `https://picsum.photos/seed/${p.id}/300/300`} 
-                      alt={p.name} 
+                      alt={p.name || "Product"} 
                       fill 
                       className="object-cover group-hover:scale-105 transition-transform duration-500" 
                     />
                     <div className="absolute top-3 left-3">
-                       <Badge variant={p.stock > 10 ? "secondary" : "destructive"} className="rounded-full text-[10px] px-2 font-black shadow-sm">
-                          {p.stock > 0 ? `${p.stock} قطعة` : 'نفذت'}
+                       <Badge variant={(p.stock || 0) > 10 ? "secondary" : "destructive"} className="rounded-full text-[10px] px-2 font-black shadow-sm">
+                          {(p.stock || 0) > 0 ? `${p.stock} قطعة` : 'نفذت'}
                        </Badge>
                     </div>
                  </div>
                  <CardContent className="p-4 space-y-2">
-                    <h3 className="font-bold text-sm leading-tight line-clamp-2 min-h-[2.5rem]">{p.name}</h3>
+                    <h3 className="font-bold text-sm leading-tight line-clamp-2 min-h-[2.5rem]">{p.name || "منتج بدون اسم"}</h3>
                     <div className="flex items-end justify-between">
-                       <p className="text-primary font-black text-lg">{p.retailPrice?.toLocaleString()} <span className="text-[10px]">د.ع</span></p>
+                       <p className="text-primary font-black text-lg">{(p.retailPrice || 0).toLocaleString()} <span className="text-[10px]">د.ع</span></p>
                        <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white transition-all shadow-sm">
                           <Plus className="h-5 w-5" />
                        </div>
@@ -292,16 +298,21 @@ export default function POSPage() {
         {/* Invoice Body (Cart) */}
         <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-muted/10">
            {cart.length > 0 ? (
-             cart.map((item) => (
+             cart.map((item) => {
+               const itemRetail = item.retailPrice || 0;
+               const itemWholesale = item.wholesalePrice || itemRetail;
+               const currentPrice = selectedCustomer.type === 'wholesale' ? itemWholesale : itemRetail;
+
+               return (
                <div key={item.id} className="flex gap-3 p-4 rounded-[24px] bg-white dark:bg-card shadow-sm border border-transparent hover:border-primary/20 transition-all group animate-in slide-in-from-left-4 duration-300">
                   <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-[18px] bg-muted shadow-inner border">
-                     <Image src={item.images?.[0] || `https://picsum.photos/seed/${item.id}/150/150`} alt={item.name} fill className="object-cover" />
+                     <Image src={item.images?.[0] || `https://picsum.photos/seed/${item.id}/150/150`} alt={item.name || "Item"} fill className="object-cover" />
                   </div>
                   <div className="flex-1 flex flex-col justify-between">
-                     <h4 className="text-xs font-black leading-tight line-clamp-1">{item.name}</h4>
+                     <h4 className="text-xs font-black leading-tight line-clamp-1">{item.name || "منتج"}</h4>
                      <div className="flex items-center justify-between mt-1">
                         <span className="text-sm font-black text-primary">
-                          {(selectedCustomer.type === 'wholesale' ? (item.wholesalePrice || item.retailPrice) : item.retailPrice).toLocaleString()} <span className="text-[10px]">د.ع</span>
+                          {currentPrice.toLocaleString()} <span className="text-[10px]">د.ع</span>
                         </span>
                         <div className="flex items-center gap-3 bg-muted/50 rounded-xl p-1 px-2 border">
                            <button onClick={() => updateQuantity(item.id, -1)} className="h-7 w-7 flex items-center justify-center rounded-lg bg-white shadow-sm active:scale-90 transition-transform"><Minus className="h-4 w-4" /></button>
@@ -314,7 +325,7 @@ export default function POSPage() {
                     <Trash2 className="h-5 w-5" />
                   </button>
                </div>
-             ))
+             )})
            ) : (
              <div className="h-full flex flex-col items-center justify-center text-center opacity-20 gap-6">
                 <ShoppingCart className="h-24 w-24" strokeWidth={1} />
@@ -336,7 +347,7 @@ export default function POSPage() {
                     <Input 
                       type="number" 
                       value={discount} 
-                      onChange={(e) => setDiscount(Number(e.target.value))}
+                      onChange={(e) => setDiscount(Number(e.target.value) || 0)}
                       className="h-10 w-24 rounded-xl bg-muted/40 border-none text-sm font-black text-center focus:ring-primary/20"
                     />
                  </div>
