@@ -9,8 +9,8 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 
-// القائمة البيضاء لأرقام الهواتف التي لها صلاحيات المدير
-const ADMIN_PHONES = ['+9647858833838'];
+// القائمة البيضاء لأرقام الهواتف التي لها صلاحيات المدير (كإجراء أمان إضافي)
+const ADMIN_PHONES = ['07858833838', '+9647858833838'];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const { user, profile, loading } = useUser();
@@ -22,10 +22,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       if (!user) {
         router.replace('/login');
       } else {
-        // التحقق من الصلاحيات بناءً على الدور في Firestore أو رقم الهاتف
-        const allowedRoles = ['admin', 'sales_employee', 'workshop_technician', 'warehouse_employee'];
-        const isStaff = profile && allowedRoles.includes(profile.role);
-        const isMasterAdmin = user.phoneNumber && ADMIN_PHONES.includes(user.phoneNumber);
+        // التحقق من الصلاحيات بناءً على الدور في Firestore أو رقم الهاتف الصريح
+        const isMasterAdmin = (profile?.role === 'admin') || (profile?.phoneNumber && ADMIN_PHONES.includes(profile.phoneNumber));
+        const isStaff = profile && ['admin', 'sales_employee', 'workshop_technician', 'warehouse_employee'].includes(profile.role);
 
         if (isStaff || isMasterAdmin) {
           setIsAuthorized(true);

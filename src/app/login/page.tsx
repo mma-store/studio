@@ -1,17 +1,9 @@
 
 'use client';
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useAuth } from "@/firebase";
-import { 
-  signInWithEmailAndPassword, 
-  signInWithPopup, 
-  GoogleAuthProvider, 
-  RecaptchaVerifier, 
-  signInWithPhoneNumber,
-  ConfirmationResult,
-  AuthError
-} from "firebase/auth";
+import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,48 +11,50 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
-import { Chrome, Mail, Lock, Loader2, ArrowRight, Phone, KeyRound, AlertTriangle, ShieldCheck } from "lucide-react";
+import { Chrome, Mail, Lock, Loader2, ArrowRight, Phone, ShieldCheck } from "lucide-react";
 import Link from "next/link";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-
-declare global {
-  interface Window {
-    recaptchaVerifier: RecaptchaVerifier;
-    confirmationResult: ConfirmationResult;
-  }
-}
 
 export default function LoginPage() {
   const auth = useAuth();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
-  const [authError, setAuthError] = useState<string | null>(null);
   
-  // Email Auth State
+  // States
+  const [phoneNumber, setPhoneNumber] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
-  // Phone Auth State
-  const [phoneNumber, setPhoneNumber] = useState("");
-  const [verificationCode, setVerificationCode] = useState("");
-  const [showOtpInput, setShowOtpOtpInput] = useState(false);
-
-  useEffect(() => {
-    if (!window.recaptchaVerifier && typeof window !== 'undefined') {
-      try {
-        window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
-          'size': 'invisible',
-        });
-      } catch (e) {
-        console.error("Recaptcha initialization failed", e);
+  const handlePhonePasswordLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      // تحويل رقم الهاتف لبريد وهمي داخلياً كما في التسجيل
+      const cleanPhone = phoneNumber.replace(/\s/g, '');
+      const fakeEmail = `${cleanPhone}@mma.store`;
+      
+      await signInWithEmailAndPassword(auth, fakeEmail, password);
+      toast({ title: "تم تسجيل الدخول", description: "مرحباً بك مجدداً." });
+      
+      // التوجيه بناءً على ما إذا كان المدير
+      if (cleanPhone === '07858833838') {
+        router.push("/admin");
+      } else {
+        router.push("/");
       }
+    } catch (error: any) {
+      toast({ 
+        variant: "destructive", 
+        title: "خطأ في الدخول", 
+        description: "رقم الهاتف أو كلمة المرور غير صحيحة." 
+      });
+    } finally {
+      setLoading(false);
     }
-  }, [auth]);
+  };
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setAuthError(null);
     try {
       await signInWithEmailAndPassword(auth, email, password);
       toast({ title: "تم تسجيل الدخول", description: "مرحباً بك مجدداً." });
@@ -71,50 +65,6 @@ export default function LoginPage() {
         title: "خطأ في الدخول", 
         description: "تأكد من صحة البريد الإلكتروني وكلمة المرور." 
       });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSendOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setAuthError(null);
-    try {
-      const formattedPhone = phoneNumber.startsWith('+') ? phoneNumber : `+964${phoneNumber.replace(/^0/, '')}`;
-      
-      // ملاحظة: لتجاوز الرمز لـ 07858833838، يجب إضافته في Firebase Console كـ Test Number بكود محدد
-      const appVerifier = window.recaptchaVerifier;
-      const confirmationResult = await signInWithPhoneNumber(auth, formattedPhone, appVerifier);
-      window.confirmationResult = confirmationResult;
-      setShowOtpOtpInput(true);
-      
-      if (formattedPhone === '+9647858833838') {
-         toast({ title: "وضع الاختبار للمدير", description: "يرجى إدخال كود الاختبار المعتمد في المنصة." });
-      } else {
-         toast({ title: "تم إرسال الكود", description: "يرجى إدخال الرمز المرسل لهاتفك." });
-      }
-    } catch (error: any) {
-      const err = error as AuthError;
-      if (err.code === 'auth/operation-not-allowed') {
-        setAuthError("خدمة الهاتف غير مفعلة. يرجى تفعيلها في Firebase Console.");
-      } else {
-        toast({ variant: "destructive", title: "خطأ", description: "فشل إرسال الكود. تأكد من تفعيل الأرقام الاختبارية في Firebase." });
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleVerifyOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      await window.confirmationResult.confirm(verificationCode);
-      toast({ title: "تم تسجيل الدخول", description: "مرحباً بك كمدير للنظام." });
-      router.push("/admin");
-    } catch (error) {
-      toast({ variant: "destructive", title: "خطأ", description: "كود التحقق غير صحيح." });
     } finally {
       setLoading(false);
     }
@@ -132,11 +82,9 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#FDF8F5] p-4 relative overflow-hidden">
-      <div id="recaptcha-container"></div>
-      
-      <Card className="w-full max-w-md rounded-[40px] border-none shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-500 bg-white">
+      <Card className="w-full max-w-md rounded-[40px] border-none shadow-2xl overflow-hidden bg-white">
         <CardHeader className="space-y-4 pt-10 pb-6 text-center">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-primary text-white shadow-lg rotate-3">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-primary text-white shadow-lg">
             <span className="text-3xl font-black italic">M</span>
           </div>
           <div className="space-y-1">
@@ -146,14 +94,6 @@ export default function LoginPage() {
         </CardHeader>
         
         <CardContent className="space-y-6 px-8">
-          {authError && (
-            <Alert variant="destructive" className="rounded-2xl border-2">
-              <AlertTriangle className="h-4 w-4" />
-              <AlertTitle className="font-bold">تنبيه</AlertTitle>
-              <AlertDescription className="text-xs">{authError}</AlertDescription>
-            </Alert>
-          )}
-
           <Tabs defaultValue="phone" className="w-full">
             <TabsList className="grid w-full grid-cols-2 h-12 rounded-xl bg-muted/30 mb-6 p-1">
               <TabsTrigger value="phone" className="rounded-lg font-bold data-[state=active]:bg-white data-[state=active]:shadow-sm">رقم الهاتف</TabsTrigger>
@@ -161,60 +101,40 @@ export default function LoginPage() {
             </TabsList>
 
             <TabsContent value="phone" className="space-y-4">
-              {!showOtpInput ? (
-                <form onSubmit={handleSendOtp} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label className="font-bold mr-1">رقم الهاتف</Label>
-                    <div className="relative">
-                      <Phone className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                      <Input 
-                        type="tel" 
-                        placeholder="07858833838" 
-                        className="h-14 rounded-2xl pr-12 bg-muted/20 border-none text-left"
-                        dir="ltr"
-                        value={phoneNumber}
-                        onChange={(e) => setPhoneNumber(e.target.value)}
-                        required
-                      />
-                    </div>
+              <form onSubmit={handlePhonePasswordLogin} className="space-y-4">
+                <div className="space-y-2">
+                  <Label className="font-bold mr-1">رقم الهاتف</Label>
+                  <div className="relative">
+                    <Phone className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                    <Input 
+                      type="tel" 
+                      placeholder="07XXXXXXXXX" 
+                      className="h-14 rounded-2xl pr-12 bg-muted/20 border-none text-left"
+                      dir="ltr"
+                      value={phoneNumber}
+                      onChange={(e) => setPhoneNumber(e.target.value)}
+                      required
+                    />
                   </div>
-                  
-                  {phoneNumber.includes('07858833838') && (
-                    <Alert className="rounded-2xl bg-blue-50 border-blue-200">
-                       <ShieldCheck className="h-4 w-4 text-blue-600" />
-                       <AlertDescription className="text-[10px] text-blue-700 font-bold leading-relaxed">
-                          هذا الرقم مسجل كـ "مدير للنظام". تأكد من تفعيله في Firebase Console كـ Test Number لتسجيل الدخول الفوري بـ كود ثابت (مثل 123456).
-                       </AlertDescription>
-                    </Alert>
-                  )}
-
-                  <Button type="submit" className="w-full h-14 rounded-2xl font-black text-lg gap-2 shadow-lg" disabled={loading}>
-                    {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : "دخول المدير / المستخدم"}
-                  </Button>
-                </form>
-              ) : (
-                <form onSubmit={handleVerifyOtp} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label className="font-bold mr-1">رمز التحقق (OTP)</Label>
-                    <div className="relative">
-                      <KeyRound className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                      <Input 
-                        type="text" 
-                        placeholder="123456" 
-                        className="h-14 rounded-2xl pr-12 bg-muted/20 border-none text-center tracking-[1em] font-black"
-                        value={verificationCode}
-                        onChange={(e) => setVerificationCode(e.target.value)}
-                        maxLength={6}
-                        required
-                      />
-                    </div>
+                </div>
+                <div className="space-y-2">
+                  <Label className="font-bold mr-1">كلمة المرور</Label>
+                  <div className="relative">
+                    <Lock className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                    <Input 
+                      type="password" 
+                      placeholder="••••••••" 
+                      className="h-14 rounded-2xl pr-12 bg-muted/20 border-none"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                    />
                   </div>
-                  <Button type="submit" className="w-full h-14 rounded-2xl font-black text-lg gap-2 shadow-lg" disabled={loading}>
-                    {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : "تأكيد والدخول"}
-                  </Button>
-                  <Button variant="link" className="w-full" onClick={() => setShowOtpOtpInput(false)}>تغيير الرقم</Button>
-                </form>
-              )}
+                </div>
+                <Button type="submit" className="w-full h-14 rounded-2xl font-black text-lg gap-2 shadow-lg mt-2" disabled={loading}>
+                  {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : "دخول"}
+                </Button>
+              </form>
             </TabsContent>
 
             <TabsContent value="email" className="space-y-4">
@@ -247,7 +167,7 @@ export default function LoginPage() {
                     />
                   </div>
                 </div>
-                <Button type="submit" className="w-full h-14 rounded-2xl font-black text-lg gap-2 shadow-lg" disabled={loading}>
+                <Button type="submit" className="w-full h-14 rounded-2xl font-black text-lg gap-2 shadow-lg mt-2" disabled={loading}>
                   {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : "دخول"}
                 </Button>
               </form>
