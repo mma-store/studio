@@ -47,14 +47,12 @@ export default function POSPage() {
   const [processingOrder, setProcessingOrder] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  // Firestore Data - Optimized with safe references
   const productsQuery = useMemo(() => query(collection(db, 'products'), orderBy('name')), [db]);
   const { data: products, loading } = useCollection(productsQuery);
   
   const categoriesQuery = useMemo(() => collection(db, 'categories'), [db]);
   const { data: categories } = useCollection(categoriesQuery);
 
-  // Filtering - Added safety checks for p.name and p.barcode
   const filteredProducts = useMemo(() => {
     if (!products) return [];
     if (!searchQuery) return products;
@@ -65,7 +63,6 @@ export default function POSPage() {
     );
   }, [products, searchQuery]);
 
-  // Calculations - Added fallback for missing prices to avoid NaN
   const subtotal = useMemo(() => {
     return cart.reduce((acc, item) => {
       const retail = item.retailPrice || 0;
@@ -77,7 +74,6 @@ export default function POSPage() {
   
   const total = Math.max(0, subtotal - discount);
 
-  // Handlers
   const addToCart = (product: any) => {
     if (!product) return;
     if ((product.stock || 0) <= 0) {
@@ -133,7 +129,7 @@ export default function POSPage() {
         discount,
         total,
         paymentMethod: 'cash',
-        createdAt: serverTimestamp(),
+        createdAt: Date.now(),
         status: 'delivered',
         source: 'pos'
       };
@@ -150,7 +146,6 @@ export default function POSPage() {
     }
   };
 
-  // Keyboard Shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'F2') {
@@ -175,7 +170,6 @@ export default function POSPage() {
 
   return (
     <div className="flex h-[calc(100vh-80px)] overflow-hidden gap-4 -m-4 md:-m-8 bg-background">
-      {/* Products Grid (70%) */}
       <div className="flex-1 flex flex-col min-w-0 p-4 md:p-6 lg:p-8">
         <div className="flex gap-4 mb-6">
           <div className="relative flex-1">
@@ -193,7 +187,6 @@ export default function POSPage() {
           </Button>
         </div>
 
-        {/* Categories Tabs */}
         <div className="flex gap-2 overflow-x-auto no-scrollbar mb-6 pb-2">
            <Button variant="default" className="rounded-full font-black px-8">الكل</Button>
            {categories?.map((cat: any) => (
@@ -201,7 +194,6 @@ export default function POSPage() {
            ))}
         </div>
 
-        {/* Products Scrollable Area */}
         <div className="flex-1 overflow-y-auto no-scrollbar pr-1">
            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-10">
              {loading ? (
@@ -249,9 +241,7 @@ export default function POSPage() {
         </div>
       </div>
 
-      {/* Invoice Panel (30%) */}
       <div className="w-[420px] flex flex-col bg-white dark:bg-card border-r shadow-2xl z-20">
-        {/* Invoice Header */}
         <div className="p-6 border-b space-y-4">
            <div className="flex items-center justify-between">
               <h2 className="text-2xl font-black flex items-center gap-2">
@@ -295,7 +285,6 @@ export default function POSPage() {
            </DropdownMenu>
         </div>
 
-        {/* Invoice Body (Cart) */}
         <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-muted/10">
            {cart.length > 0 ? (
              cart.map((item) => {
@@ -334,7 +323,6 @@ export default function POSPage() {
            )}
         </div>
 
-        {/* Invoice Footer */}
         <div className="p-8 bg-white dark:bg-card border-t shadow-[0_-15px_40px_rgba(0,0,0,0.08)] space-y-6">
            <div className="space-y-3">
               <div className="flex items-center justify-between text-sm">
@@ -379,7 +367,6 @@ export default function POSPage() {
         </div>
       </div>
 
-      {/* Checkout Dialog */}
       {isCheckoutOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-in fade-in duration-300">
            <div className="bg-white dark:bg-card w-full max-w-2xl rounded-[48px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-400">
@@ -388,9 +375,9 @@ export default function POSPage() {
                    <h3 className="text-3xl font-black">تأكيد الدفع</h3>
                    <p className="text-primary-foreground/80 font-bold">يرجى التأكد من المبلغ المستلم</p>
                  </div>
-                 <Button variant="ghost" size="icon" className="rounded-full h-12 w-12 hover:bg-white/20 text-white" onClick={() => setIsCheckoutOpen(false)}>
+                 <button className="rounded-full h-12 w-12 hover:bg-white/20 text-white flex items-center justify-center" onClick={() => setIsCheckoutOpen(false)}>
                     <X className="h-8 w-8" />
-                 </Button>
+                 </button>
               </div>
               <div className="p-10 space-y-10">
                  <div className="grid grid-cols-2 gap-10">

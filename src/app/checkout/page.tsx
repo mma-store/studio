@@ -74,10 +74,8 @@ export default function CheckoutPage() {
     };
 
     try {
-      // 1. Save to Firestore
       await addDoc(collection(db, "orders"), orderData);
       
-      // 2. Prepare WhatsApp Message
       const itemsList = cart.map(item => `- ${item.name} (عدد: ${item.quantity})`).join("\n");
       const message = `*طلب جديد من مجمع محمد علاء* 🏍️\n\n` +
                       `*رقم الطلب:* ${orderNumber}\n` +
@@ -88,15 +86,11 @@ export default function CheckoutPage() {
                       `*المجموع الكلي:* ${total.toLocaleString()} د.ع\n\n` +
                       `شكراً لطلبكم! سيتم التواصل معكم لتأكيد الطلب.`;
 
-      // Redirect to WhatsApp (Your number: 07858833838)
       const whatsappUrl = `https://wa.me/9647858833838?text=${encodeURIComponent(message)}`;
       
       toast({ title: "تم بنجاح", description: "تم استلام طلبك، جاري توجيهك للواتساب للتأكيد." });
       
-      // Clear cart and redirect
       clearCart();
-      
-      // Navigate to success/orders and open WhatsApp
       window.open(whatsappUrl, '_blank');
       router.push("/orders");
     } catch (error) {
