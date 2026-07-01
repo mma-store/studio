@@ -1,4 +1,3 @@
-
 'use client';
 
 import { 
@@ -16,7 +15,8 @@ import {
   Search,
   Trash2,
   CheckCircle2,
-  AlertTriangle
+  AlertTriangle,
+  Settings2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -39,7 +39,7 @@ import {
 } from "@/components/ui/select";
 import { useFirestore, useDoc, useCollection } from "@/firebase";
 import { doc, updateDoc, collection, query, where, serverTimestamp } from "firebase/firestore";
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, use } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
@@ -56,8 +56,8 @@ const statusConfig = {
   cancelled: { label: "ملغي", color: "bg-red-100 text-red-700 border-red-200" },
 };
 
-export default function RepairOrderDetailsPage({ params }: { params: { id: string } }) {
-  const { id } = params;
+export default function RepairOrderDetailsPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
   const db = useFirestore();
   const orderRef = useMemo(() => doc(db, 'repairOrders', id), [db, id]);
   const { data: order, loading } = useDoc<any>(orderRef);

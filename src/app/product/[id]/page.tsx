@@ -1,4 +1,3 @@
-
 'use client';
 
 import { Header } from "@/components/layout/header";
@@ -18,7 +17,7 @@ import {
   Tags
 } from "lucide-react";
 import Image from "next/image";
-import { useState, useMemo } from "react";
+import { useState, useMemo, use } from "react";
 import { ProductCard } from "@/components/product-card";
 import { useFirestore, useDoc, useCollection, useUser } from "@/firebase";
 import { doc, collection, query, where, limit } from "firebase/firestore";
@@ -27,8 +26,8 @@ import { cn } from "@/lib/utils";
 import { useCart } from "@/context/cart-context";
 import { toast } from "@/hooks/use-toast";
 
-export default function ProductDetailsPage({ params }: { params: { id: string } }) {
-  const { id } = params;
+export default function ProductDetailsPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
   const db = useFirestore();
   const { user, profile } = useUser();
   const { addToCart } = useCart();
