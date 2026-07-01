@@ -1,4 +1,3 @@
-
 'use client';
 
 import { Header } from "@/components/layout/header";
@@ -80,16 +79,16 @@ export default function ProfilePage() {
   };
 
   const MENU_ITEMS = [
-    { label: "المعلومات الشخصية", icon: User, color: "text-blue-500", bg: "bg-blue-50" },
-    { label: "عناوين التوصيل", icon: MapPin, color: "text-red-500", bg: "bg-red-50" },
-    { label: "تغيير كلمة المرور", icon: Lock, color: "text-orange-500", bg: "bg-orange-50" },
-    { label: "قائمة المفضلة", icon: Heart, color: "text-pink-500", bg: "bg-pink-50" },
-    { label: "الأمان والخصوصية", icon: ShieldCheck, color: "text-green-500", bg: "bg-green-50" },
-    { label: "مركز المساعدة", icon: Headphones, color: "text-purple-500", bg: "bg-purple-50" },
+    { label: "المعلومات الشخصية", icon: User, color: "text-blue-500", bg: "bg-blue-50 dark:bg-blue-500/10" },
+    { label: "عناوين التوصيل", icon: MapPin, color: "text-red-500", bg: "bg-red-50 dark:bg-red-500/10" },
+    { label: "تغيير كلمة المرور", icon: Lock, color: "text-orange-500", bg: "bg-orange-50 dark:bg-orange-500/10" },
+    { label: "قائمة المفضلة", icon: Heart, color: "text-pink-500", bg: "bg-pink-50 dark:bg-pink-500/10" },
+    { label: "الأمان والخصوصية", icon: ShieldCheck, color: "text-green-500", bg: "bg-green-50 dark:bg-green-500/10" },
+    { label: "مركز المساعدة", icon: Headphones, color: "text-purple-500", bg: "bg-purple-50 dark:bg-purple-500/10" },
   ];
 
   if (loading) return (
-    <div className="flex min-h-screen bg-[#FDF8F5]">
+    <div className="flex min-h-screen bg-[#FDF8F5] dark:bg-background">
       <main className="flex-1 pb-24">
         <Header />
         <div className="container p-6 space-y-8 flex flex-col items-center">
@@ -107,7 +106,7 @@ export default function ProfilePage() {
 
   if (!user) {
     return (
-      <div className="flex min-h-screen bg-[#FDF8F5]">
+      <div className="flex min-h-screen bg-[#FDF8F5] dark:bg-background">
         <main className="flex-1 flex flex-col items-center justify-center p-8 text-center gap-6">
            <div className="h-24 w-24 bg-primary/10 rounded-full flex items-center justify-center">
               <User className="h-12 w-12 text-primary" />
@@ -133,13 +132,13 @@ export default function ProfilePage() {
         <div className="container p-6 space-y-8 animate-in fade-in duration-500">
           <div className="flex flex-col items-center gap-4 pt-4">
              <div className="relative group">
-                <Avatar className="h-28 w-28 border-4 border-white shadow-xl">
+                <Avatar className="h-28 w-28 border-4 border-white dark:border-slate-800 shadow-xl">
                   <AvatarImage src={profile?.photoURL || user?.photoURL || ""} />
                   <AvatarFallback className="text-2xl font-black bg-primary/10 text-primary">
                     {profile?.displayName?.[0] || user?.email?.[0]?.toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
-                <label className="absolute bottom-1 right-1 h-8 w-8 bg-primary rounded-full border-4 border-white flex items-center justify-center shadow-lg cursor-pointer hover:scale-110 transition-transform">
+                <label className="absolute bottom-1 right-1 h-8 w-8 bg-primary rounded-full border-4 border-white dark:border-slate-800 flex items-center justify-center shadow-lg cursor-pointer hover:scale-110 transition-transform">
                    {isUploading ? <Loader2 className="h-4 w-4 text-white animate-spin" /> : <Camera className="h-4 w-4 text-white" />}
                    <input type="file" className="hidden" accept="image/*" onChange={handlePhotoUpload} disabled={isUploading} />
                 </label>
@@ -177,7 +176,7 @@ export default function ProfilePage() {
 
           <div className="bg-white dark:bg-card p-4 rounded-[28px] shadow-sm flex items-center justify-between border">
              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 flex items-center justify-center rounded-full bg-orange-100 text-orange-600">
+                <div className="h-10 w-10 flex items-center justify-center rounded-full bg-orange-100 dark:bg-orange-500/10 text-orange-600">
                    {isDarkMode ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
                 </div>
                 <span className="font-bold">الوضع الليلي</span>
@@ -212,9 +211,15 @@ export default function ProfilePage() {
              تسجيل الخروج
           </Button>
           
-          <div className="text-center space-y-1">
-             <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">MMA App Version 1.0.5</p>
-             <p className="text-[10px] text-muted-foreground">صنع بكل حب في العراق ❤️</p>
+          <div className="text-center space-y-2 pt-10 pb-4">
+             <div className="flex items-center justify-center gap-2">
+                <span className="h-px w-8 bg-muted-foreground/20" />
+                <p className="text-[10px] text-muted-foreground font-black uppercase tracking-[0.2em]">MMA Core v1.0.8</p>
+                <span className="h-px w-8 bg-muted-foreground/20" />
+             </div>
+             <p className="text-[11px] text-muted-foreground font-medium flex items-center justify-center gap-1.5 italic">
+                Crafted with excellence by <span className="text-primary font-black not-italic">Hussein Salah</span>
+             </p>
           </div>
         </div>
       </main>

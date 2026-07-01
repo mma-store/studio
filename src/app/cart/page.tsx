@@ -1,4 +1,3 @@
-
 "use client";
 
 import { Header } from "@/components/layout/header";
@@ -16,7 +15,7 @@ export default function CartPage() {
 
   if (cart.length === 0) {
     return (
-      <div className="flex min-h-screen bg-background">
+      <div className="flex min-h-screen bg-[#FDF8F5] dark:bg-background">
         <main className="flex-1 flex flex-col items-center justify-center p-10 text-center gap-6">
           <div className="h-40 w-40 relative">
              <ShoppingBag className="h-full w-full text-muted/30" strokeWidth={1} />
@@ -33,11 +32,11 @@ export default function CartPage() {
   }
 
   return (
-    <div className="flex min-h-screen bg-[#FDF8F5] dark:bg-background">
+    <div className="flex min-h-screen bg-[#FDF8F5] dark:bg-background transition-colors duration-300">
       <main className="flex-1 pb-40">
         <div className="p-6 flex items-center gap-4 bg-white dark:bg-card border-b sticky top-0 z-30">
           <Link href="/">
-             <Button variant="ghost" size="icon" className="rounded-full bg-muted/50">
+             <Button variant="ghost" size="icon" className="rounded-full bg-muted/50 dark:bg-muted/10">
                 <ChevronLeft className="h-6 w-6 rotate-180" />
              </Button>
           </Link>
@@ -46,7 +45,7 @@ export default function CartPage() {
 
         <div className="p-4 space-y-4">
           {cart.map((item) => (
-            <div key={item.id} className="flex gap-4 p-4 rounded-[28px] bg-white dark:bg-card shadow-sm border">
+            <div key={item.id} className="flex gap-4 p-4 rounded-[28px] bg-white dark:bg-card shadow-sm border border-transparent dark:border-border/50">
               <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-2xl bg-muted">
                  <Image src={item.image} alt={item.name} fill className="object-cover" />
               </div>
@@ -79,8 +78,8 @@ export default function CartPage() {
       </main>
 
       {/* Order Summary Floating Card */}
-      <div className="fixed bottom-16 left-0 right-0 p-4 bg-white dark:bg-card border-t rounded-t-[32px] shadow-[0_-10px_40px_rgba(0,0,0,0.05)] z-40 md:bottom-0">
-         <div className="container space-y-4">
+      <div className="fixed bottom-16 left-0 right-0 p-4 bg-white dark:bg-card border-t rounded-t-[32px] shadow-[0_-10px_40px_rgba(0,0,0,0.05)] dark:shadow-[0_-10px_40px_rgba(0,0,0,0.3)] z-40 md:bottom-0">
+         <div className="container max-w-4xl mx-auto space-y-4">
             <div className="flex items-center justify-between text-sm">
                <span className="text-muted-foreground">المجموع الفرعي:</span>
                <span className="font-bold">{subtotal.toLocaleString()} د.ع</span>

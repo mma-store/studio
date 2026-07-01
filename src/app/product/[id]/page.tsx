@@ -1,4 +1,3 @@
-
 'use client';
 
 import { Header } from "@/components/layout/header";
@@ -48,7 +47,7 @@ export default function ProductDetailsPage() {
 
   const isWholesale = profile?.role === 'wholesale_customer';
   const displayPrice = isWholesale ? (product?.wholesalePrice || product?.retailPrice) : product?.retailPrice;
-  const oldPrice = displayPrice ? Math.round(displayPrice * 1.15) : 0; // محاكاة سعر قديم (زيادة 15%) كما في الصورة
+  const oldPrice = displayPrice ? Math.round(displayPrice * 1.15) : 0;
 
   const handleAddToCart = () => {
     if (!product) return;
@@ -88,10 +87,10 @@ export default function ProductDetailsPage() {
   const images = product?.images?.length > 0 ? product.images : ["https://picsum.photos/seed/placeholder/800/800"];
 
   return (
-    <div className="flex min-h-screen bg-[#F8F9FA] dark:bg-background" dir="rtl">
+    <div className="flex min-h-screen bg-[#F8F9FA] dark:bg-background text-foreground transition-colors duration-300" dir="rtl">
       <main className="flex-1 pb-44">
         {/* Header Navigation */}
-        <div className="sticky top-0 z-50 flex items-center justify-between p-4 bg-white/80 backdrop-blur-md border-b">
+        <div className="sticky top-0 z-50 flex items-center justify-between p-4 bg-white/80 dark:bg-card/80 backdrop-blur-md border-b">
            <button onClick={() => router.back()} className="h-10 w-10 flex items-center justify-center rounded-full hover:bg-muted transition-colors">
               <ChevronLeft className="h-6 w-6" />
            </button>
@@ -101,19 +100,19 @@ export default function ProductDetailsPage() {
                  <Heart className={cn("h-5 w-5", isFavorite ? "fill-red-500 text-red-500" : "text-slate-400")} />
               </button>
               <button className="h-10 w-10 flex items-center justify-center rounded-full">
-                 <Share2 className="h-5 w-5 text-slate-600" />
+                 <Share2 className="h-5 w-5 text-slate-600 dark:text-slate-400" />
               </button>
            </div>
         </div>
 
-        <div className="max-w-4xl mx-auto bg-white md:mt-6 md:rounded-[40px] md:shadow-sm overflow-hidden">
+        <div className="max-w-4xl mx-auto bg-white dark:bg-card md:mt-6 md:rounded-[40px] md:shadow-sm overflow-hidden">
           {/* Main Image & Badges */}
-          <div className="relative aspect-square w-full bg-[#f0f0f0] flex items-center justify-center group">
+          <div className="relative aspect-square w-full bg-[#f0f0f0] dark:bg-muted/30 flex items-center justify-center group">
              <Image 
                src={images[activeImage]} 
                alt={product.name} 
                fill 
-               className="object-contain p-8 mix-blend-multiply"
+               className="object-contain p-8 mix-blend-multiply dark:mix-blend-normal"
                priority
              />
              
@@ -149,11 +148,11 @@ export default function ProductDetailsPage() {
           {/* Product Identity Section */}
           <div className="p-6 pt-0 space-y-6">
              <div className="space-y-1">
-                <h1 className="text-xl md:text-3xl font-black leading-tight text-slate-900">{product.name}</h1>
+                <h1 className="text-xl md:text-3xl font-black leading-tight text-slate-900 dark:text-white">{product.name}</h1>
                 <div className="flex items-center gap-2">
                    <div className="flex text-orange-400">
                       {[1, 2, 3, 4].map(s => <Star key={s} className="h-3.5 w-3.5 fill-current" />)}
-                      <Star className="h-3.5 w-3.5 text-slate-200 fill-current" />
+                      <Star className="h-3.5 w-3.5 text-slate-200 dark:text-slate-700 fill-current" />
                    </div>
                    <span className="text-[10px] font-bold text-slate-400">(32 تقييم)</span>
                 </div>
@@ -161,13 +160,13 @@ export default function ProductDetailsPage() {
 
              {/* Brand & ID Boxes */}
              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-[#F8F9FA] p-4 rounded-2xl text-center space-y-1 border">
+                <div className="bg-[#F8F9FA] dark:bg-muted/10 p-4 rounded-2xl text-center space-y-1 border">
                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">الماركة</p>
                    <p className="font-black text-sm uppercase">{product.motorcycleType || "YAMAHA"}</p>
                 </div>
-                <div className="bg-[#F8F9FA] p-4 rounded-2xl text-center space-y-1 border">
+                <div className="bg-[#F8F9FA] dark:bg-muted/10 p-4 rounded-2xl text-center space-y-1 border">
                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">رقم المنتج</p>
-                   <p className="font-black text-sm text-slate-600 truncate">{product.barcode || "YH-NMX155-CLUTCH"}</p>
+                   <p className="font-black text-sm text-slate-600 dark:text-slate-300 truncate">{product.barcode || "YH-NMX155-CLUTCH"}</p>
                 </div>
              </div>
 
@@ -177,11 +176,11 @@ export default function ProductDetailsPage() {
                    <div className="flex items-baseline gap-2">
                       <span className="text-3xl font-black text-primary">{displayPrice?.toLocaleString()}</span>
                       <span className="text-sm font-bold text-slate-400">د.ع</span>
-                      <span className="text-sm font-bold text-slate-300 line-through mr-2">{oldPrice.toLocaleString()}</span>
+                      <span className="text-sm font-bold text-slate-300 dark:text-slate-600 line-through mr-2">{oldPrice.toLocaleString()}</span>
                    </div>
                    <p className="text-[10px] font-bold text-slate-400">السعر شامل الضريبة</p>
                 </div>
-                <div className="flex items-center gap-2 text-emerald-600 font-bold text-xs bg-emerald-50 px-3 py-1.5 rounded-full border border-emerald-100">
+                <div className="flex items-center gap-2 text-emerald-600 font-bold text-xs bg-emerald-50 dark:bg-emerald-500/10 px-3 py-1.5 rounded-full border border-emerald-100 dark:border-emerald-500/20">
                    <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
                    <span>متوفر</span>
                 </div>
@@ -189,8 +188,8 @@ export default function ProductDetailsPage() {
 
              {/* Description Section */}
              <div className="space-y-3 pb-6">
-                <h4 className="font-black text-lg text-slate-800">الوصف والتفاصيل</h4>
-                <p className="text-slate-500 leading-relaxed font-medium text-sm whitespace-pre-line">
+                <h4 className="font-black text-lg text-slate-800 dark:text-slate-100">الوصف والتفاصيل</h4>
+                <p className="text-slate-500 dark:text-slate-400 leading-relaxed font-medium text-sm whitespace-pre-line">
                   {product.description || "هذه القطعة أصلية وعالية الجودة مصممة خصيصاً لدراجات ياماها NMAX لتوفير أفضل أداء وحماية للمحرك."}
                 </p>
              </div>
@@ -218,23 +217,23 @@ export default function ProductDetailsPage() {
       </main>
 
       {/* Modern Sticky Action Bar */}
-      <div className="fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-xl border-t p-4 pb-safe shadow-[0_-20px_50px_rgba(0,0,0,0.08)]">
+      <div className="fixed bottom-0 left-0 right-0 z-50 bg-white/95 dark:bg-card/95 backdrop-blur-xl border-t p-4 pb-safe shadow-[0_-20px_50px_rgba(0,0,0,0.08)]">
          <div className="max-w-4xl mx-auto space-y-4">
             <div className="flex flex-col gap-2">
-               <span className="text-[10px] font-black text-slate-400 mr-2 uppercase">الكمية</span>
+               <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 mr-2 uppercase">الكمية</span>
                <div className="flex items-center gap-4">
                   {/* Quantity Selector */}
-                  <div className="flex items-center justify-between bg-slate-100 rounded-2xl h-14 px-2 w-[140px] border shadow-inner">
+                  <div className="flex items-center justify-between bg-slate-100 dark:bg-muted/20 rounded-2xl h-14 px-2 w-[140px] border shadow-inner">
                      <button 
                       onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                      className="h-10 w-10 flex items-center justify-center rounded-xl bg-white text-slate-900 shadow-sm active:scale-90 transition-transform"
+                      className="h-10 w-10 flex items-center justify-center rounded-xl bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm active:scale-90 transition-transform"
                      >
                         <Minus className="h-4 w-4" />
                      </button>
                      <span className="text-xl font-black w-8 text-center">{quantity}</span>
                      <button 
                       onClick={() => setQuantity(quantity + 1)}
-                      className="h-10 w-10 flex items-center justify-center rounded-xl bg-white text-primary shadow-sm active:scale-90 transition-transform"
+                      className="h-10 w-10 flex items-center justify-center rounded-xl bg-white dark:bg-slate-800 text-primary shadow-sm active:scale-90 transition-transform"
                      >
                         <Plus className="h-4 w-4" />
                      </button>

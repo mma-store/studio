@@ -49,7 +49,7 @@ export default function Home() {
   }, [banners.length]);
 
   return (
-    <div className="flex min-h-screen bg-[#FDF8F5] text-foreground transition-colors">
+    <div className="flex min-h-screen bg-[#FDF8F5] dark:bg-background text-foreground transition-colors duration-300">
       <main className="flex-1 pb-24 overflow-x-hidden">
         <Header />
         
@@ -109,7 +109,7 @@ export default function Home() {
                 Array(6).fill(0).map((_, i) => <Skeleton key={i} className="h-16 w-16 md:h-24 md:w-24 rounded-full shrink-0" />)
               ) : types.map((type: any) => (
                 <div key={type.id} className="flex flex-col items-center gap-2 shrink-0 group cursor-pointer">
-                  <div className="relative h-16 w-16 md:h-24 md:w-24 rounded-full border-2 border-primary/5 p-1 group-hover:border-primary transition-all duration-300 bg-white shadow-sm hover:shadow-md">
+                  <div className="relative h-16 w-16 md:h-24 md:w-24 rounded-full border-2 border-primary/5 p-1 group-hover:border-primary transition-all duration-300 bg-white dark:bg-card shadow-sm hover:shadow-md">
                     <div className="relative h-full w-full overflow-hidden rounded-full">
                       <Image src={type.image || "https://picsum.photos/seed/type/200/200"} alt={type.name} fill className="object-cover transition-transform group-hover:scale-110" />
                     </div>
@@ -132,8 +132,8 @@ export default function Home() {
               {categoriesLoading ? (
                 Array(6).fill(0).map((_, i) => <Skeleton key={i} className="h-28 md:h-36 rounded-2xl" />)
               ) : categories.map((cat: any) => (
-                <Link key={cat.id} href={`/catalog/${cat.id}`} className="group relative h-28 md:h-36 overflow-hidden rounded-3xl shadow-sm border bg-white">
-                  <Image src={cat.image || "https://picsum.photos/seed/cat/300/300"} alt={cat.name} fill className="object-cover opacity-40 group-hover:opacity-60 transition-all duration-500 group-hover:scale-105" />
+                <Link key={cat.id} href={`/catalog/${cat.id}`} className="group relative h-28 md:h-36 overflow-hidden rounded-3xl shadow-sm border bg-white dark:bg-card">
+                  <Image src={cat.image || "https://picsum.photos/seed/cat/300/300"} alt={cat.name} fill className="object-cover opacity-40 dark:opacity-20 group-hover:opacity-60 transition-all duration-500 group-hover:scale-105" />
                   <div className="absolute inset-0 flex items-center justify-center p-4 text-center">
                     <span className="font-black text-sm md:text-base leading-tight drop-shadow-sm group-hover:text-primary transition-colors">{cat.name}</span>
                   </div>
