@@ -1,4 +1,3 @@
-
 'use client';
 
 import { Header } from "@/components/layout/header";
@@ -86,7 +85,9 @@ export default function ProductDetailsPage() {
     );
   }
 
-  const images = product?.images?.length > 0 ? product.images : ["https://picsum.photos/seed/placeholder/800/800"];
+  const rawImages = product?.images || [];
+  const images = rawImages.length > 0 ? rawImages.filter((img: string) => img !== "") : ["https://picsum.photos/seed/placeholder/800/800"];
+  if (images.length === 0) images.push("https://picsum.photos/seed/placeholder/800/800");
 
   return (
     <div className="flex min-h-screen bg-background">
@@ -97,7 +98,7 @@ export default function ProductDetailsPage() {
           {product ? (
             <div className="grid md:grid-cols-2 gap-8 md:p-6">
               <div className="flex flex-col gap-4">
-                 <div className="relative aspect-square w-full overflow-hidden md:rounded-[32px] bg-muted shadow-lg">
+                 <div className="relative aspect-square w-full max-h-[70vh] overflow-hidden md:rounded-[32px] bg-muted shadow-lg">
                    <Image src={images[activeImage]} alt={product.name} fill className="object-cover transition-all duration-500" />
                    <div className="absolute top-4 left-4 flex flex-col gap-2">
                       <button 
@@ -222,7 +223,7 @@ export default function ProductDetailsPage() {
                       name={p.name}
                       category={p.category}
                       price={isWholesale ? (p.wholesalePrice || p.retailPrice).toLocaleString() : p.retailPrice.toLocaleString()}
-                      image={p.images?.[0] || `https://picsum.photos/seed/${p.id}/400/400`}
+                      image={p.images?.[0]}
                     />
                   </div>
                 ))}

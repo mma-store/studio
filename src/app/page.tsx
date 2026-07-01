@@ -54,9 +54,9 @@ export default function Home() {
         <Header />
         
         <div className="container mx-auto space-y-6 md:space-y-10 py-4 px-4 max-w-7xl">
-          {/* Hero Banner Section - Improved Height & Padding */}
+          {/* Hero Banner Section */}
           <section className="relative">
-            <div className="relative aspect-[21/9] sm:aspect-[2.4/1] w-full overflow-hidden rounded-[24px] md:rounded-[40px] shadow-lg bg-muted border">
+            <div className="relative aspect-[16/9] sm:aspect-[2.4/1] w-full overflow-hidden rounded-[24px] md:rounded-[40px] shadow-lg bg-muted border">
               {bannersLoading ? (
                 <Skeleton className="h-full w-full" />
               ) : banners.length > 0 ? (
@@ -69,7 +69,7 @@ export default function Home() {
                     )}
                   >
                     <Image 
-                      src={banner.image} 
+                      src={banner.image || "https://picsum.photos/seed/banner/1200/600"} 
                       alt={banner.title}
                       fill
                       className="object-cover"
@@ -99,7 +99,7 @@ export default function Home() {
             </div>
           </section>
 
-          {/* Motorcycle Types - Horizontal Scroll Optimized */}
+          {/* Motorcycle Types */}
           <section className="space-y-4">
             <h3 className="text-lg md:text-2xl font-black flex items-center gap-3">
               <TrendingUp className="h-6 w-6 text-primary" /> أنواع الدراجات
@@ -111,7 +111,7 @@ export default function Home() {
                 <div key={type.id} className="flex flex-col items-center gap-2 shrink-0 group cursor-pointer">
                   <div className="relative h-16 w-16 md:h-24 md:w-24 rounded-full border-2 border-primary/5 p-1 group-hover:border-primary transition-all duration-300 bg-white shadow-sm hover:shadow-md">
                     <div className="relative h-full w-full overflow-hidden rounded-full">
-                      <Image src={type.image} alt={type.name} fill className="object-cover transition-transform group-hover:scale-110" />
+                      <Image src={type.image || "https://picsum.photos/seed/type/200/200"} alt={type.name} fill className="object-cover transition-transform group-hover:scale-110" />
                     </div>
                   </div>
                   <span className="text-[10px] md:text-xs font-black uppercase tracking-tighter opacity-80 group-hover:opacity-100">{type.name}</span>
@@ -120,7 +120,7 @@ export default function Home() {
             </div>
           </section>
 
-          {/* Categories Grid - Responsive Columns */}
+          {/* Categories Grid */}
           <section className="space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-lg md:text-2xl font-black flex items-center gap-3">
@@ -133,7 +133,7 @@ export default function Home() {
                 Array(6).fill(0).map((_, i) => <Skeleton key={i} className="h-28 md:h-36 rounded-2xl" />)
               ) : categories.map((cat: any) => (
                 <Link key={cat.id} href={`/catalog/${cat.id}`} className="group relative h-28 md:h-36 overflow-hidden rounded-3xl shadow-sm border bg-white">
-                  <Image src={cat.image} alt={cat.name} fill className="object-cover opacity-40 group-hover:opacity-60 transition-all duration-500 group-hover:scale-105" />
+                  <Image src={cat.image || "https://picsum.photos/seed/cat/300/300"} alt={cat.name} fill className="object-cover opacity-40 group-hover:opacity-60 transition-all duration-500 group-hover:scale-105" />
                   <div className="absolute inset-0 flex items-center justify-center p-4 text-center">
                     <span className="font-black text-sm md:text-base leading-tight drop-shadow-sm group-hover:text-primary transition-colors">{cat.name}</span>
                   </div>
@@ -142,7 +142,7 @@ export default function Home() {
             </div>
           </section>
 
-          {/* Featured Products - Horizontal on mobile, Grid on large screens potentially */}
+          {/* Featured Products */}
           <section className="space-y-4">
             <h3 className="text-lg md:text-2xl font-black flex items-center gap-3">
               <Zap className="h-6 w-6 text-primary" /> مختاراتنا المميزة
@@ -165,7 +165,7 @@ export default function Home() {
             </div>
           </section>
 
-          {/* Special Offers - MD3 Style Banner Cards */}
+          {/* Special Offers */}
           <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {offersLoading ? (
               <Skeleton className="h-44 w-full rounded-[32px]" />
@@ -183,7 +183,7 @@ export default function Home() {
             ))}
           </section>
 
-          {/* New Arrivals - Full Grid */}
+          {/* New Arrivals */}
           <section className="space-y-4">
             <h3 className="text-lg md:text-2xl font-black flex items-center gap-3">
               <Star className="h-6 w-6 text-primary" /> أحدث المنتجات المضافة

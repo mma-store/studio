@@ -15,7 +15,7 @@ interface ProductCardProps {
   id: string;
   name: string;
   price: string;
-  image: string;
+  image?: string;
   category: string;
   rating?: number;
   inStock?: boolean;
