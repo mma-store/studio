@@ -9,7 +9,8 @@ import {
   Smartphone,
   CheckCircle2,
   Clock,
-  History
+  History,
+  Loader2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,6 +27,7 @@ import {
 } from "@/components/ui/select";
 import { useState } from "react";
 import { toast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 
 export default function NotificationsPage() {
   const [isSending, setIsSending] = useState(false);
@@ -35,7 +37,7 @@ export default function NotificationsPage() {
     setIsSending(true);
     setTimeout(() => {
       setIsSending(false);
-      toast({ title: "تم الإرسال", description: "جاري إرسال الإشعار إلى كافة المستخدمين المحددين." });
+      toast({ title: "تم الإرسال", description: "جاري إرسال الإشعار إلى كافة المستخدمين المحددين عبر النظام." });
     }, 2000);
   };
 
@@ -139,8 +141,4 @@ export default function NotificationsPage() {
       </div>
     </div>
   );
-}
-
-function Loader2({ className }: any) {
-  return <div className={cn("animate-spin", className)} />;
 }
