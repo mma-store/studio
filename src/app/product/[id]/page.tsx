@@ -18,7 +18,7 @@ import {
   Tags
 } from "lucide-react";
 import Image from "next/image";
-import { useState, useMemo, use } from "react";
+import { useState, useMemo } from "react";
 import { ProductCard } from "@/components/product-card";
 import { useFirestore, useDoc, useCollection, useUser } from "@/firebase";
 import { doc, collection, query, where, limit } from "firebase/firestore";
@@ -26,16 +26,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { useCart } from "@/context/cart-context";
 import { toast } from "@/hooks/use-toast";
+import { useParams } from "next/navigation";
 
-// إضافة وسيط للسماح بالـ Static Export للمسارات الديناميكية
-export async function generateStaticParams() {
-  return [{ id: 'default' }];
-}
-
-export default function ProductDetailsPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
+export default function ProductDetailsPage() {
+  const params = useParams();
+  const id = params?.id as string;
   const db = useFirestore();
-  const { user, profile } = useUser();
+  const { profile } = useUser();
   const { addToCart } = useCart();
   const [quantity, setQuantity] = useState(1);
   const [isFavorite, setIsFavorite] = useState(false);

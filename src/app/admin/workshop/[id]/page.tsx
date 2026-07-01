@@ -40,31 +40,18 @@ import {
 } from "@/components/ui/select";
 import { useFirestore, useDoc, useCollection } from "@/firebase";
 import { doc, updateDoc, collection, query, where, serverTimestamp } from "firebase/firestore";
-import { useMemo, useState, useEffect, use } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
-import Link from "link";
+import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
+import { useParams } from "next/navigation";
 
-// إضافة وسيط للسماح بالـ Static Export للمسارات الديناميكية
-export async function generateStaticParams() {
-  return [{ id: 'default' }];
-}
-
-const statusConfig = {
-  received: { label: "تم الاستلام", color: "bg-blue-100 text-blue-700 border-blue-200" },
-  inspection: { label: "قيد الفحص", color: "bg-yellow-100 text-yellow-700 border-yellow-200" },
-  waiting_parts: { label: "انتظار قطع", color: "bg-orange-100 text-orange-700 border-orange-200" },
-  in_progress: { label: "قيد التصليح", color: "bg-purple-100 text-purple-700 border-purple-200" },
-  quality_check: { label: "فحص الجودة", color: "bg-indigo-100 text-indigo-700 border-indigo-200" },
-  ready: { label: "جاهز للاستلام", color: "bg-green-100 text-green-700 border-green-200" },
-  delivered: { label: "تم التسليم", color: "bg-emerald-100 text-emerald-700 border-emerald-200" },
-  cancelled: { label: "ملغي", color: "bg-red-100 text-red-700 border-red-200" },
-};
-
-export default function RepairOrderDetailsPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
+export default function RepairOrderDetailsPage() {
+  const params = useParams();
+  const id = params?.id as string;
   const db = useFirestore();
+  
   const orderRef = useMemo(() => id && id !== 'default' ? doc(db, 'repairOrders', id) : null, [db, id]);
   const { data: order, loading } = useDoc<any>(orderRef);
   
@@ -73,12 +60,11 @@ export default function RepairOrderDetailsPage({ params }: { params: Promise<{ i
   const [searchTerm, setSearchTerm] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
-  // Load Inventory for spare parts
   const inventoryQuery = useMemo(() => query(collection(db, 'products')), [db]);
   const { data: products } = useCollection(inventoryQuery);
 
   const filteredProducts = products.filter(p => 
-    p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    p.name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
     p.barcode?.includes(searchTerm)
   ).slice(0, 5);
 
@@ -140,17 +126,35 @@ export default function RepairOrderDetailsPage({ params }: { params: Promise<{ i
 
   const notifyCustomer = () => {
     if (!order) return;
-    const statusLabel = statusConfig[order.status as keyof typeof statusConfig]?.label || order.status;
-    const message = `مرحباً ${order.customerName}،
-نود إعلامكم بأن حالة دراجتكم (${order.bikeBrand} ${order.bikeModel}) تحت رقم الطلب ${order.orderNumber} هي الآن: *${statusLabel}*.
-المبلغ الكلي حتى الآن: ${total.toLocaleString()} د.ع.
-شكراً لتعاملكم مع مجمع محمد علاء.`;
+    const statusLabels: any = {
+      received: "تم الاستلام",
+      inspection: "قيد الفحص",
+      waiting_parts: "انتظار قطع",
+      in_progress: "قيد التصليح",
+      quality_check: "فحص الجودة",
+      ready: "جاهز للاستلام",
+      delivered: "تم التسليم",
+      cancelled: "ملغي"
+    };
+    const statusLabel = statusLabels[order.status] || order.status;
+    const message = `مرحباً ${order.customerName}،\nنود إعلامكم بأن حالة دراجتكم (${order.bikeBrand} ${order.bikeModel}) تحت رقم الطلب ${order.orderNumber} هي الآن: *${statusLabel}*.\nالمبلغ الكلي حتى الآن: ${total.toLocaleString()} د.ع.\nشكراً لتعاملكم مع مجمع محمد علاء.`;
     
     window.open(`https://wa.me/${order.phoneNumber}?text=${encodeURIComponent(message)}`, '_blank');
   };
 
   if (loading && id !== 'default') return <div className="p-8"><Skeleton className="h-[600px] rounded-[32px]" /></div>;
   if (!order && id !== 'default') return <div className="p-8 text-center font-bold">لم يتم العثور على أمر التصليح.</div>;
+
+  const statusConfig: any = {
+    received: { label: "تم الاستلام", color: "bg-blue-100 text-blue-700 border-blue-200" },
+    inspection: { label: "قيد الفحص", color: "bg-yellow-100 text-yellow-700 border-yellow-200" },
+    waiting_parts: { label: "انتظار قطع", color: "bg-orange-100 text-orange-700 border-orange-200" },
+    in_progress: { label: "قيد التصليح", color: "bg-purple-100 text-purple-700 border-purple-200" },
+    quality_check: { label: "فحص الجودة", color: "bg-indigo-100 text-indigo-700 border-indigo-200" },
+    ready: { label: "جاهز للاستلام", color: "bg-green-100 text-green-700 border-green-200" },
+    delivered: { label: "تم التسليم", color: "bg-emerald-100 text-emerald-700 border-emerald-200" },
+    cancelled: { label: "ملغي", color: "bg-red-100 text-red-700 border-red-200" },
+  };
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -166,8 +170,8 @@ export default function RepairOrderDetailsPage({ params }: { params: Promise<{ i
                 <>
                   <div className="flex items-center gap-2">
                      <h1 className="text-2xl font-black">{order.orderNumber}</h1>
-                     <Badge className={cn("rounded-full px-3 py-1 font-bold text-[10px]", statusConfig[order.status as keyof typeof statusConfig]?.color)}>
-                        {statusConfig[order.status as keyof typeof statusConfig]?.label}
+                     <Badge className={cn("rounded-full px-3 py-1 font-bold text-[10px]", statusConfig[order.status]?.color)}>
+                        {statusConfig[order.status]?.label}
                      </Badge>
                   </div>
                   <p className="text-xs text-muted-foreground font-medium">آخر تحديث: {order.updatedAt ? new Date(order.updatedAt).toLocaleString() : 'غير محدد'}</p>
@@ -188,9 +192,8 @@ export default function RepairOrderDetailsPage({ params }: { params: Promise<{ i
         </div>
       </div>
 
-      {order ? (
+      {order && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Left Column: Info & Status */}
           <div className="lg:col-span-1 space-y-6">
              <Card className="rounded-[32px] border-none shadow-sm">
                 <CardHeader>
@@ -237,7 +240,7 @@ export default function RepairOrderDetailsPage({ params }: { params: Promise<{ i
                 </CardHeader>
                 <CardContent className="p-0">
                    <div className="flex flex-col">
-                      {Object.entries(statusConfig).map(([key, config]) => (
+                      {Object.entries(statusConfig).map(([key, config]: [string, any]) => (
                         <button 
                           key={key}
                           onClick={() => updateStatus(key)}
@@ -258,7 +261,6 @@ export default function RepairOrderDetailsPage({ params }: { params: Promise<{ i
              </Card>
           </div>
 
-          {/* Right Column: Parts & Costs */}
           <div className="lg:col-span-2 space-y-6">
              <Card className="rounded-[32px] border-none shadow-sm min-h-[400px]">
                 <CardHeader className="flex flex-row items-center justify-between">
@@ -288,7 +290,7 @@ export default function RepairOrderDetailsPage({ params }: { params: Promise<{ i
                              >
                                 <div className="flex items-center gap-3">
                                    <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center font-black text-xs">
-                                      {p.name[0]}
+                                      {p.name?.[0]}
                                    </div>
                                    <div>
                                       <p className="text-sm font-bold">{p.name}</p>
@@ -375,7 +377,7 @@ export default function RepairOrderDetailsPage({ params }: { params: Promise<{ i
              </Card>
           </div>
         </div>
-      ) : <div className="p-20 text-center"><Skeleton className="h-64 w-full rounded-3xl" /></div>}
+      )}
     </div>
   );
 }
