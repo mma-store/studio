@@ -31,6 +31,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
 import { useState } from "react";
 import { toast } from "@/hooks/use-toast";
 
@@ -246,4 +247,3 @@ export default function AdminSettingsPage() {
     </div>
   );
 }
-
