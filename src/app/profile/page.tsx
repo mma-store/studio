@@ -40,7 +40,6 @@ export default function ProfilePage() {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
 
-  // Sync Dark Mode state with HTML class
   useEffect(() => {
     const isDark = document.documentElement.classList.contains('dark');
     setIsDarkMode(isDark);
@@ -211,14 +210,10 @@ export default function ProfilePage() {
              تسجيل الخروج
           </Button>
           
-          <div className="text-center space-y-2 pt-10 pb-4">
-             <div className="flex items-center justify-center gap-2">
-                <span className="h-px w-8 bg-muted-foreground/20" />
-                <p className="text-[10px] text-muted-foreground font-black uppercase tracking-[0.2em]">MMA Core v1.0.8</p>
-                <span className="h-px w-8 bg-muted-foreground/20" />
-             </div>
-             <p className="text-[11px] text-muted-foreground font-medium flex items-center justify-center gap-1.5 italic">
-                Crafted with excellence by <span className="text-primary font-black not-italic">Hussein Salah</span>
+          <div className="text-center pt-16 pb-8 opacity-60">
+             <p className="text-[9px] text-muted-foreground font-black tracking-[0.4em] uppercase mb-1">MMA v1.0.8</p>
+             <p className="text-[11px] font-bold text-muted-foreground">
+                Developed by <span className="text-primary font-black">Hussein Salah</span>
              </p>
           </div>
         </div>
