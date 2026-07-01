@@ -7,21 +7,14 @@ import { Button } from "@/components/ui/button";
 import { Minus, Plus, Trash2, ChevronLeft, ShoppingBag } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { useState } from "react";
-
-const INITIAL_CART = [
-  { id: 1, name: "فلتر زيت هوندا أصلي", price: 25000, qty: 1, image: "https://picsum.photos/seed/p1/200/200" },
-  { id: 2, name: "خوذة رياضية LS2", price: 115000, qty: 1, image: "https://picsum.photos/seed/p2/200/200" },
-];
+import { useCart } from "@/context/cart-context";
 
 export default function CartPage() {
-  const [items, setItems] = useState(INITIAL_CART);
-
-  const subtotal = items.reduce((acc, item) => acc + (item.price * item.qty), 0);
-  const delivery = 5000;
+  const { cart, removeFromCart, updateQuantity, subtotal } = useCart();
+  const delivery = cart.length > 0 ? 5000 : 0;
   const total = subtotal + delivery;
 
-  if (items.length === 0) {
+  if (cart.length === 0) {
     return (
       <div className="flex min-h-screen bg-background">
         <main className="flex-1 flex flex-col items-center justify-center p-10 text-center gap-6">
@@ -40,9 +33,9 @@ export default function CartPage() {
   }
 
   return (
-    <div className="flex min-h-screen bg-[#FDF8F5]">
+    <div className="flex min-h-screen bg-[#FDF8F5] dark:bg-background">
       <main className="flex-1 pb-40">
-        <div className="p-6 flex items-center gap-4 bg-white border-b sticky top-0 z-30">
+        <div className="p-6 flex items-center gap-4 bg-white dark:bg-card border-b sticky top-0 z-30">
           <Link href="/">
              <Button variant="ghost" size="icon" className="rounded-full bg-muted/50">
                 <ChevronLeft className="h-6 w-6 rotate-180" />
@@ -52,8 +45,8 @@ export default function CartPage() {
         </div>
 
         <div className="p-4 space-y-4">
-          {items.map((item) => (
-            <div key={item.id} className="flex gap-4 p-4 rounded-[28px] bg-white shadow-sm">
+          {cart.map((item) => (
+            <div key={item.id} className="flex gap-4 p-4 rounded-[28px] bg-white dark:bg-card shadow-sm border">
               <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-2xl bg-muted">
                  <Image src={item.image} alt={item.name} fill className="object-cover" />
               </div>
@@ -61,7 +54,7 @@ export default function CartPage() {
                  <div className="flex items-start justify-between">
                     <h3 className="font-bold text-sm leading-tight line-clamp-2">{item.name}</h3>
                     <button 
-                      onClick={() => setItems(items.filter(i => i.id !== item.id))}
+                      onClick={() => removeFromCart(item.id)}
                       className="text-muted-foreground hover:text-destructive p-1"
                     >
                        <Trash2 className="h-5 w-5" />
@@ -69,12 +62,12 @@ export default function CartPage() {
                  </div>
                  <div className="flex items-center justify-between mt-2">
                     <span className="text-primary font-black">{item.price.toLocaleString()} د.ع</span>
-                    <div className="flex items-center gap-3 rounded-full bg-muted/50 p-1 px-3">
-                       <button onClick={() => setItems(items.map(i => i.id === item.id ? {...i, qty: Math.max(1, i.qty - 1)} : i))}>
+                    <div className="flex items-center gap-3 rounded-full bg-muted/50 dark:bg-muted/10 p-1 px-3">
+                       <button onClick={() => updateQuantity(item.id, -1)}>
                           <Minus className="h-4 w-4" />
                        </button>
-                       <span className="font-black text-sm">{item.qty}</span>
-                       <button onClick={() => setItems(items.map(i => i.id === item.id ? {...i, qty: i.qty + 1} : i))}>
+                       <span className="font-black text-sm">{item.quantity}</span>
+                       <button onClick={() => updateQuantity(item.id, 1)}>
                           <Plus className="h-4 w-4" />
                        </button>
                     </div>
@@ -86,7 +79,7 @@ export default function CartPage() {
       </main>
 
       {/* Order Summary Floating Card */}
-      <div className="fixed bottom-16 left-0 right-0 p-4 bg-white border-t rounded-t-[32px] shadow-[0_-10px_40px_rgba(0,0,0,0.05)] z-40 md:bottom-0">
+      <div className="fixed bottom-16 left-0 right-0 p-4 bg-white dark:bg-card border-t rounded-t-[32px] shadow-[0_-10px_40px_rgba(0,0,0,0.05)] z-40 md:bottom-0">
          <div className="container space-y-4">
             <div className="flex items-center justify-between text-sm">
                <span className="text-muted-foreground">المجموع الفرعي:</span>

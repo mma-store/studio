@@ -24,11 +24,14 @@ import { useFirestore, useDoc, useCollection, useUser } from "@/firebase";
 import { doc, collection, query, where, limit } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { useCart } from "@/context/cart-context";
+import { toast } from "@/hooks/use-toast";
 
 export default function ProductDetailsPage({ params }: { params: { id: string } }) {
   const { id } = params;
   const db = useFirestore();
   const { user, profile } = useUser();
+  const { addToCart } = useCart();
   const [quantity, setQuantity] = useState(1);
   const [isFavorite, setIsFavorite] = useState(false);
   const [activeImage, setActiveImage] = useState(0);
@@ -44,6 +47,18 @@ export default function ProductDetailsPage({ params }: { params: { id: string } 
 
   const isWholesale = profile?.role === 'wholesale_customer';
   const displayPrice = isWholesale ? (product?.wholesalePrice || product?.retailPrice) : product?.retailPrice;
+
+  const handleAddToCart = () => {
+    if (!product) return;
+    addToCart({
+      id: product.id,
+      name: product.name,
+      price: displayPrice || 0,
+      quantity: quantity,
+      image: product.images?.[0] || "https://picsum.photos/seed/placeholder/300/300"
+    });
+    toast({ title: "تمت الإضافة", description: `تم إضافة ${product.name} إلى سلة التسوق.` });
+  };
 
   if (productLoading) {
     return (
@@ -177,7 +192,10 @@ export default function ProductDetailsPage({ params }: { params: { id: string } 
                     </button>
                   </div>
 
-                  <Button className="w-full h-14 rounded-full text-lg font-black shadow-lg shadow-primary/20 gap-3">
+                  <Button 
+                    onClick={handleAddToCart}
+                    className="w-full h-14 rounded-full text-lg font-black shadow-lg shadow-primary/20 gap-3"
+                  >
                     <ShoppingCart className="h-6 w-6" />
                     إضافة إلى السلة
                   </Button>

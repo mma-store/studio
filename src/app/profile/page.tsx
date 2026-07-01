@@ -1,3 +1,4 @@
+
 'use client';
 
 import { Header } from "@/components/layout/header";
@@ -18,21 +19,60 @@ import {
   Headphones,
   Lock,
   Camera,
-  LayoutDashboard
+  LayoutDashboard,
+  Loader2
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
-import { useState } from "react";
-import { useUser, useAuth } from "@/firebase";
+import { useState, useEffect } from "react";
+import { useUser, useAuth, useFirestore } from "@/firebase";
 import { signOut } from "firebase/auth";
+import { doc, updateDoc } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
+import { uploadToCloudinary } from "@/lib/cloudinary";
+import { toast } from "@/hooks/use-toast";
 
 export default function ProfilePage() {
   const { user, profile, loading } = useUser();
   const auth = useAuth();
+  const db = useFirestore();
   const router = useRouter();
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+
+  // Sync Dark Mode state with HTML class
+  useEffect(() => {
+    const isDark = document.documentElement.classList.contains('dark');
+    setIsDarkMode(isDark);
+  }, []);
+
+  const toggleDarkMode = (checked: boolean) => {
+    setIsDarkMode(checked);
+    if (checked) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  };
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    setIsUploading(true);
+    try {
+      const url = await uploadToCloudinary(file);
+      await updateDoc(doc(db, 'users', user.uid), {
+        photoURL: url
+      });
+      toast({ title: "تم التحديث", description: "تم تغيير صورة الملف الشخصي بنجاح." });
+    } catch (error) {
+      toast({ variant: "destructive", title: "خطأ", description: "فشل رفع الصورة." });
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   const handleLogout = async () => {
     await signOut(auth);
@@ -86,7 +126,7 @@ export default function ProfilePage() {
   const isAdminOrStaff = profile && ['admin', 'sales_employee', 'workshop_technician', 'warehouse_employee'].includes(profile.role);
 
   return (
-    <div className="flex min-h-screen bg-[#FDF8F5]">
+    <div className="flex min-h-screen bg-[#FDF8F5] dark:bg-background transition-colors duration-300">
       <main className="flex-1 pb-24">
         <Header />
         
@@ -99,9 +139,10 @@ export default function ProfilePage() {
                     {profile?.displayName?.[0] || user?.email?.[0]?.toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
-                <div className="absolute bottom-1 right-1 h-8 w-8 bg-primary rounded-full border-4 border-white flex items-center justify-center shadow-lg cursor-pointer hover:scale-110 transition-transform">
-                   <Camera className="h-4 w-4 text-white" />
-                </div>
+                <label className="absolute bottom-1 right-1 h-8 w-8 bg-primary rounded-full border-4 border-white flex items-center justify-center shadow-lg cursor-pointer hover:scale-110 transition-transform">
+                   {isUploading ? <Loader2 className="h-4 w-4 text-white animate-spin" /> : <Camera className="h-4 w-4 text-white" />}
+                   <input type="file" className="hidden" accept="image/*" onChange={handlePhotoUpload} disabled={isUploading} />
+                </label>
              </div>
              <div className="text-center">
                 <h2 className="text-2xl font-black">{profile?.displayName || "مستخدم جديد"}</h2>
@@ -134,21 +175,22 @@ export default function ProfilePage() {
              </Link>
           )}
 
-          <div className="bg-white p-4 rounded-[28px] shadow-sm flex items-center justify-between border">
+          <div className="bg-white dark:bg-card p-4 rounded-[28px] shadow-sm flex items-center justify-between border">
              <div className="flex items-center gap-3">
                 <div className="h-10 w-10 flex items-center justify-center rounded-full bg-orange-100 text-orange-600">
                    {isDarkMode ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
                 </div>
                 <span className="font-bold">الوضع الليلي</span>
              </div>
-             <Switch checked={isDarkMode} onCheckedChange={setIsDarkMode} />
+             <Switch checked={isDarkMode} onCheckedChange={toggleDarkMode} />
           </div>
 
-          <div className="bg-white overflow-hidden rounded-[32px] shadow-sm border">
+          <div className="bg-white dark:bg-card overflow-hidden rounded-[32px] shadow-sm border">
              {MENU_ITEMS.map((item, idx) => (
                <button 
                 key={idx} 
-                className={`w-full flex items-center justify-between p-5 hover:bg-muted/30 transition-colors ${idx !== MENU_ITEMS.length - 1 ? 'border-b border-muted/50' : ''}`}
+                onClick={() => toast({ title: "قريباً", description: `ميزة ${item.label} ستتوفر في التحديث القادم.` })}
+                className={`w-full flex items-center justify-between p-5 hover:bg-muted/30 transition-colors ${idx !== MENU_ITEMS.length - 1 ? 'border-b border-muted/50 dark:border-border' : ''}`}
                >
                   <div className="flex items-center gap-4">
                      <div className={`h-10 w-10 flex items-center justify-center rounded-2xl ${item.bg} ${item.color}`}>
@@ -171,7 +213,7 @@ export default function ProfilePage() {
           </Button>
           
           <div className="text-center space-y-1">
-             <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">MMA App Version 1.0.4</p>
+             <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">MMA App Version 1.0.5</p>
              <p className="text-[10px] text-muted-foreground">صنع بكل حب في العراق ❤️</p>
           </div>
         </div>

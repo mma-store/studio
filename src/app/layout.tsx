@@ -3,6 +3,7 @@ import type {Metadata, Viewport} from 'next';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 import { FirebaseClientProvider } from "@/firebase";
+import { CartProvider } from "@/context/cart-context";
 
 export const metadata: Metadata = {
   title: 'مجمع محمد علاء - MMA',
@@ -37,8 +38,10 @@ export default function RootLayout({
       </head>
       <body className="font-tajawal antialiased selection:bg-primary/20 overflow-x-hidden bg-background">
         <FirebaseClientProvider>
-          {children}
-          <Toaster />
+          <CartProvider>
+            {children}
+            <Toaster />
+          </CartProvider>
         </FirebaseClientProvider>
       </body>
     </html>

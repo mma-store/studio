@@ -4,8 +4,11 @@
 import { Bell, Search, ShoppingCart, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import { useCart } from "@/context/cart-context";
 
 export function Header() {
+  const { totalItems } = useCart();
+
   return (
     <header className="sticky top-0 z-40 w-full border-b bg-background/80 backdrop-blur-md">
       <div className="container flex h-16 items-center justify-between px-4">
@@ -39,9 +42,11 @@ export function Header() {
           <Link href="/cart">
             <Button variant="ghost" size="icon" className="rounded-full relative hover:bg-muted">
               <ShoppingCart className="h-5 w-5" />
-              <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] text-white font-bold">
-                3
-              </span>
+              {totalItems > 0 && (
+                <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] text-white font-bold animate-in zoom-in duration-300">
+                  {totalItems}
+                </span>
+              )}
             </Button>
           </Link>
         </div>
