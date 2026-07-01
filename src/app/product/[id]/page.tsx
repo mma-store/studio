@@ -1,8 +1,6 @@
 
 'use client';
 
-export const dynamic = 'force-dynamic';
-
 import { Header } from "@/components/layout/header";
 import { BottomNav } from "@/components/layout/bottom-nav";
 import { Button } from "@/components/ui/button";

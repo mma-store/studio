@@ -2,11 +2,8 @@
 import type {NextConfig} from 'next';
 
 const nextConfig: NextConfig = {
-  /* تفعيل التصدير الثابت */
-  output: 'export',
-  /* تعطيل تحسين الصور ليتوافق مع التصدير الثابت */
+  /* Next.js default output for Vercel */
   images: {
-    unoptimized: true,
     remotePatterns: [
       {
         protocol: 'https',
