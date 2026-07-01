@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { MapPin, Phone, Truck, Store, CreditCard, ChevronLeft, Loader2, ShoppingCart } from "lucide-react";
+import { MapPin, Phone, Truck, Store, ChevronLeft, Loader2, ShoppingCart } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { useFirestore, useUser } from "@/firebase";
@@ -47,12 +47,15 @@ export default function CheckoutPage() {
 
     setLoading(true);
     const formData = new FormData(e.currentTarget);
+    const customerName = formData.get("customerName") as string;
+    const phoneNumber = formData.get("phoneNumber") as string;
+    const orderNumber = `MMA-${Date.now().toString().slice(-5)}`;
     
     const orderData = {
-      orderNumber: `MMA-${Date.now().toString().slice(-5)}`,
+      orderNumber,
       userId: user.uid,
-      customerName: formData.get("customerName"),
-      phoneNumber: formData.get("phoneNumber"),
+      customerName,
+      phoneNumber,
       deliveryMethod: method,
       address: formData.get("address") || "",
       landmark: formData.get("landmark") || "",
@@ -71,9 +74,30 @@ export default function CheckoutPage() {
     };
 
     try {
+      // 1. Save to Firestore
       await addDoc(collection(db, "orders"), orderData);
-      toast({ title: "تم بنجاح", description: "تم استلام طلبك بنجاح، شكراً لثقتك بنا." });
+      
+      // 2. Prepare WhatsApp Message
+      const itemsList = cart.map(item => `- ${item.name} (عدد: ${item.quantity})`).join("\n");
+      const message = `*طلب جديد من مجمع محمد علاء* 🏍️\n\n` +
+                      `*رقم الطلب:* ${orderNumber}\n` +
+                      `*الاسم:* ${customerName}\n` +
+                      `*الهاتف:* ${phoneNumber}\n` +
+                      `*طريقة الاستلام:* ${method === 'delivery' ? 'توصيل منزلي' : 'استلام من المجمع'}\n` +
+                      `*المنتجات:*\n${itemsList}\n\n` +
+                      `*المجموع الكلي:* ${total.toLocaleString()} د.ع\n\n` +
+                      `شكراً لطلبكم! سيتم التواصل معكم لتأكيد الطلب.`;
+
+      // Redirect to WhatsApp (Your number: 07858833838)
+      const whatsappUrl = `https://wa.me/9647858833838?text=${encodeURIComponent(message)}`;
+      
+      toast({ title: "تم بنجاح", description: "تم استلام طلبك، جاري توجيهك للواتساب للتأكيد." });
+      
+      // Clear cart and redirect
       clearCart();
+      
+      // Navigate to success/orders and open WhatsApp
+      window.open(whatsappUrl, '_blank');
       router.push("/orders");
     } catch (error) {
       toast({ variant: "destructive", title: "خطأ", description: "فشل في إتمام الطلب، حاول مرة أخرى." });

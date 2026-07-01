@@ -4,8 +4,6 @@
 import { 
   Search, 
   Filter, 
-  Eye, 
-  Printer, 
   MessageCircle, 
   MoreVertical,
   Calendar,
@@ -14,7 +12,7 @@ import {
   CheckCircle2,
   Clock,
   XCircle,
-  MoreHorizontal
+  Store
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -77,15 +75,12 @@ export default function OrdersManagementPage() {
 
   const handleWhatsApp = (order: any) => {
     const statusLabel = statusConfig[order.status as keyof typeof statusConfig]?.label || order.status;
-    const itemsList = order.items?.map((i: any) => `- ${i.name} (x${i.quantity})`).join("\n") || "";
-    const message = `مرحباً ${order.customerName}،
-نود إعلامكم بأن حالة طلبكم رقم *${order.orderNumber}* هي الآن: *${statusLabel}*.
-
-المنتجات:
-${itemsList}
-
-المجموع الكلي: ${order.total?.toLocaleString()} د.ع
-شكراً لتعاملكم مع مجمع محمد علاء.`;
+    const itemsList = order.items?.map((i: any) => `- ${i.name} (عدد: ${i.quantity})`).join("\n") || "";
+    const message = `مرحباً ${order.customerName}،\n` +
+                    `نود إعلامكم بأن حالة طلبكم رقم *${order.orderNumber}* هي الآن: *${statusLabel}*.\n\n` +
+                    `المنتجات:\n${itemsList}\n\n` +
+                    `المجموع الكلي: ${order.total?.toLocaleString()} د.ع\n` +
+                    `شكراً لتعاملكم مع مجمع محمد علاء.`;
 
     window.open(`https://wa.me/${order.phoneNumber}?text=${encodeURIComponent(message)}`, '_blank');
   };
@@ -110,10 +105,10 @@ ${itemsList}
             />
          </div>
          <Button variant="outline" className="h-12 rounded-xl border-none shadow-sm bg-white dark:bg-card px-6 gap-2 font-bold">
-            <Calendar className="h-4 w-4" /> التاريخ: اليوم
+            <Calendar className="h-4 w-4" /> اليوم
          </Button>
          <Button variant="outline" className="h-12 rounded-xl border-none shadow-sm bg-white dark:bg-card px-6 gap-2 font-bold">
-            <Filter className="h-4 w-4" /> تصفية الحالة
+            <Filter className="h-4 w-4" /> الفلاتر
          </Button>
       </div>
 
@@ -121,26 +116,24 @@ ${itemsList}
         <Table>
           <TableHeader>
             <TableRow className="border-b bg-muted/30 hover:bg-muted/30">
-              <TableHead className="text-right font-black text-xs uppercase tracking-widest py-5">رقم الطلب</TableHead>
+              <TableHead className="text-right font-black text-xs uppercase tracking-widest py-5 px-6">رقم الطلب</TableHead>
               <TableHead className="text-right font-black text-xs uppercase tracking-widest">العميل</TableHead>
-              <TableHead className="text-right font-black text-xs uppercase tracking-widest">التاريخ</TableHead>
-              <TableHead className="text-right font-black text-xs uppercase tracking-widest">المبلغ الإجمالي</TableHead>
+              <TableHead className="text-right font-black text-xs uppercase tracking-widest">المبلغ</TableHead>
               <TableHead className="text-right font-black text-xs uppercase tracking-widest">طريقة الاستلام</TableHead>
               <TableHead className="text-right font-black text-xs uppercase tracking-widest">الحالة</TableHead>
-              <TableHead className="text-left font-black text-xs uppercase tracking-widest">إجراءات</TableHead>
+              <TableHead className="text-left font-black text-xs uppercase tracking-widest px-6">إجراءات</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
               Array(6).fill(0).map((_, i) => (
                 <TableRow key={i}>
-                  <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                  <TableCell className="px-6"><Skeleton className="h-4 w-24" /></TableCell>
                   <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-20" /></TableCell>
                   <TableCell><Skeleton className="h-4 w-24" /></TableCell>
                   <TableCell><Skeleton className="h-4 w-24" /></TableCell>
                   <TableCell><Skeleton className="h-6 w-24 rounded-full" /></TableCell>
-                  <TableCell><Skeleton className="h-8 w-8 rounded-lg text-left" /></TableCell>
+                  <TableCell className="px-6 text-left"><Skeleton className="h-8 w-8 rounded-lg" /></TableCell>
                 </TableRow>
               ))
             ) : filteredOrders.length > 0 ? (
@@ -151,22 +144,18 @@ ${itemsList}
 
                 return (
                   <TableRow key={order.id} className="hover:bg-muted/5 transition-colors">
-                    <TableCell className="font-black text-sm">{order.orderNumber}</TableCell>
+                    <TableCell className="font-black text-sm px-6">{order.orderNumber}</TableCell>
                     <TableCell>
                        <div className="flex flex-col">
                           <span className="font-bold text-sm">{order.customerName}</span>
                           <span className="text-[10px] text-muted-foreground font-medium">{order.phoneNumber}</span>
                        </div>
                     </TableCell>
-                    <TableCell className="text-muted-foreground text-xs font-medium">
-                       {new Date(order.createdAt).toLocaleDateString("ar-EG")} <br /> 
-                       {new Date(order.createdAt).toLocaleTimeString("ar-EG", { hour: '2-digit', minute: '2-digit' })}
-                    </TableCell>
                     <TableCell className="font-black text-primary">{order.total?.toLocaleString()} د.ع</TableCell>
                     <TableCell>
                        <Badge variant="outline" className="rounded-full gap-1 border-primary/20 text-primary text-[10px] font-bold">
                           {order.deliveryMethod === 'delivery' ? <Truck className="h-3 w-3" /> : <Store className="h-3 w-3" />}
-                          {order.deliveryMethod === 'delivery' ? 'توصيل منزلي' : 'استلام من المجمع'}
+                          {order.deliveryMethod === 'delivery' ? 'توصيل' : 'استلام'}
                        </Badge>
                     </TableCell>
                     <TableCell>
@@ -175,22 +164,22 @@ ${itemsList}
                          {config.label}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-left">
+                    <TableCell className="text-left px-6">
                       <div className="flex items-center justify-end gap-1">
-                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg" onClick={() => handleWhatsApp(order)}>
+                        <Button variant="ghost" size="icon" className="rounded-lg h-8 w-8" onClick={() => handleWhatsApp(order)}>
                           <MessageCircle className="h-4 w-4 text-emerald-600" />
                         </Button>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg"><MoreVertical className="h-4 w-4" /></Button>
+                            <Button variant="ghost" size="icon" className="rounded-lg h-8 w-8"><MoreVertical className="h-4 w-4" /></Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="rounded-2xl p-2 w-48">
-                            <DropdownMenuLabel className="font-bold">تحديث الحالة</DropdownMenuLabel>
+                          <DropdownMenuContent align="end" className="rounded-2xl p-2 w-48 shadow-xl border-none">
+                            <DropdownMenuLabel className="font-black text-[10px] uppercase opacity-50 p-2">تحديث الحالة</DropdownMenuLabel>
                             {Object.entries(statusConfig).map(([key, cfg]) => (
                               <DropdownMenuItem 
                                 key={key}
                                 onClick={() => updateStatus(order.id, key)}
-                                className={cn("rounded-xl gap-2 font-medium cursor-pointer", cfg.color.split(' ')[1])}
+                                className={cn("rounded-xl gap-2 font-bold cursor-pointer text-xs", cfg.color.split(' ')[1])}
                               >
                                 {cfg.label}
                               </DropdownMenuItem>
@@ -204,11 +193,9 @@ ${itemsList}
               })
             ) : (
               <TableRow>
-                <TableCell colSpan={7} className="h-64 text-center">
-                  <div className="flex flex-col items-center justify-center gap-4 text-muted-foreground">
-                    <Package className="h-12 w-12 opacity-20" />
-                    <p className="font-bold text-lg">لا توجد طلبات حالياً</p>
-                  </div>
+                <TableCell colSpan={6} className="h-64 text-center opacity-30">
+                  <Package className="h-16 w-16 mx-auto mb-4" />
+                  <p className="font-black text-xl">لا توجد طلبات حالياً</p>
                 </TableCell>
               </TableRow>
             )}

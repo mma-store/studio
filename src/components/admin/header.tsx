@@ -1,7 +1,7 @@
 
 'use client';
 
-import { Bell, Search, Settings, Sun, Moon, Menu, User, LogOut } from "lucide-react";
+import { Bell, Search, Settings, Sun, Moon, User, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -19,6 +19,7 @@ import { useAuth, useUser } from "@/firebase";
 import { signOut } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { toast } from "@/hooks/use-toast";
+import Link from "next/link";
 
 export function AdminHeader() {
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -66,10 +67,12 @@ export function AdminHeader() {
           {isDarkMode ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
         </Button>
 
-        <Button variant="ghost" size="icon" className="relative rounded-xl hover:bg-muted text-foreground">
-          <Bell className="h-5 w-5" />
-          <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-primary" />
-        </Button>
+        <Link href="/admin/notifications">
+          <Button variant="ghost" size="icon" className="relative rounded-xl hover:bg-muted text-foreground">
+            <Bell className="h-5 w-5" />
+            <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-primary" />
+          </Button>
+        </Link>
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
