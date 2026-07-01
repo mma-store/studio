@@ -17,7 +17,7 @@ import {
   Tags
 } from "lucide-react";
 import Image from "next/image";
-import { useState, useMemo } from "react";
+import { useState, useMemo, React } from "react";
 import { ProductCard } from "@/components/product-card";
 import { useFirestore, useDoc, useCollection, useUser } from "@/firebase";
 import { doc, collection, query, where, limit } from "firebase/firestore";
@@ -80,13 +80,13 @@ export default function ProductDetailsPage() {
   if (!product && id !== 'default') {
     return (
       <div className="flex min-h-screen items-center justify-center">
-        <h2 className="text-xl font-bold">المنتج غير موجود</h2>
+        <h2 className="text-xl font-bold text-muted-foreground font-black">عذراً، المنتج غير موجود 🏍️</h2>
       </div>
     );
   }
 
   const rawImages = product?.images || [];
-  const images = rawImages.length > 0 ? rawImages.filter((img: string) => img !== "") : ["https://picsum.photos/seed/placeholder/800/800"];
+  const images = rawImages.length > 0 ? rawImages.filter((img: string) => img && img.trim() !== "") : ["https://picsum.photos/seed/placeholder/800/800"];
   if (images.length === 0) images.push("https://picsum.photos/seed/placeholder/800/800");
 
   return (
@@ -94,130 +94,160 @@ export default function ProductDetailsPage() {
       <main className="flex-1 pb-24">
         <Header />
         
-        <div className="container p-0 md:p-4">
+        <div className="container mx-auto p-0 md:p-6 lg:p-10 max-w-7xl">
           {product ? (
-            <div className="grid md:grid-cols-2 gap-8 md:p-6">
-              <div className="flex flex-col gap-4">
-                 <div className="relative aspect-square w-full max-h-[70vh] overflow-hidden md:rounded-[32px] bg-muted shadow-lg">
-                   <Image src={images[activeImage]} alt={product.name} fill className="object-cover transition-all duration-500" />
-                   <div className="absolute top-4 left-4 flex flex-col gap-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-16">
+              {/* Product Images Section */}
+              <div className="flex flex-col gap-4 animate-in fade-in slide-in-from-right-4 duration-700">
+                 <div className="relative aspect-square w-full max-h-[50vh] md:max-h-[70vh] overflow-hidden md:rounded-[40px] bg-muted shadow-2xl border border-white/20">
+                   <Image 
+                    src={images[activeImage]} 
+                    alt={product.name} 
+                    fill 
+                    className="object-cover transition-all duration-500 hover:scale-105" 
+                    priority
+                   />
+                   <div className="absolute top-6 left-6 flex flex-col gap-3">
                       <button 
                         onClick={() => setIsFavorite(!isFavorite)}
-                        className="h-10 w-10 flex items-center justify-center rounded-full bg-white/80 backdrop-blur-md shadow-md"
+                        className="h-12 w-12 flex items-center justify-center rounded-full bg-white/90 backdrop-blur-xl shadow-xl hover:bg-white transition-all active:scale-90"
                       >
-                        <Heart className={cn(isFavorite ? "fill-red-500 text-red-500" : "text-muted-foreground")} />
+                        <Heart className={cn("h-6 w-6 transition-colors", isFavorite ? "fill-red-500 text-red-500" : "text-slate-400")} />
                       </button>
-                      <button className="h-10 w-10 flex items-center justify-center rounded-full bg-white/80 backdrop-blur-md shadow-md">
-                        <Share2 className="h-5 w-5 text-muted-foreground" />
+                      <button className="h-12 w-12 flex items-center justify-center rounded-full bg-white/90 backdrop-blur-xl shadow-xl hover:bg-white transition-all active:scale-90">
+                        <Share2 className="h-5 w-5 text-slate-600" />
                       </button>
                    </div>
                  </div>
-                 <div className="flex gap-4 px-4 md:px-0 overflow-x-auto no-scrollbar">
-                   {images.map((img: string, i: number) => (
-                     <button 
-                      key={i} 
-                      onClick={() => setActiveImage(i)}
-                      className={cn(
-                        "relative h-20 w-20 shrink-0 overflow-hidden rounded-2xl border-4 transition-all",
-                        i === activeImage ? 'border-primary' : 'border-transparent'
-                      )}
-                     >
-                       <Image src={img} alt="Thumb" fill className="object-cover" />
-                     </button>
-                   ))}
-                 </div>
+                 
+                 {/* Image Thumbnails */}
+                 {images.length > 1 && (
+                    <div className="flex gap-4 px-6 md:px-0 overflow-x-auto no-scrollbar pb-2">
+                      {images.map((img: string, i: number) => (
+                        <button 
+                          key={i} 
+                          onClick={() => setActiveImage(i)}
+                          className={cn(
+                            "relative h-20 w-20 md:h-24 md:w-24 shrink-0 overflow-hidden rounded-2xl border-4 transition-all duration-300 shadow-sm",
+                            i === activeImage ? 'border-primary ring-4 ring-primary/20 scale-105' : 'border-white hover:border-primary/40'
+                          )}
+                        >
+                          <Image src={img} alt={`Thumb ${i}`} fill className="object-cover" />
+                        </button>
+                      ))}
+                    </div>
+                 )}
               </div>
 
-              <div className="flex flex-col gap-6 p-6 md:p-0">
-                 <div className="space-y-2">
+              {/* Product Info Section */}
+              <div className="flex flex-col gap-8 p-6 md:p-0 animate-in fade-in slide-in-from-left-4 duration-700">
+                 <div className="space-y-4">
                    <div className="flex items-center justify-between">
-                      <Badge variant="secondary" className="bg-primary/10 text-primary border-none font-bold">
-                        {product.motorcycleType || "أصلي"}
+                      <Badge className="bg-primary/10 text-primary border-none font-black px-4 py-1.5 rounded-full text-[10px] md:text-xs uppercase tracking-widest">
+                        {product.category || "إكسسوارات"}
                       </Badge>
-                      <div className="flex items-center gap-1 text-orange-400 font-bold">
+                      <div className="flex items-center gap-1 text-orange-400 font-black bg-orange-50 px-3 py-1 rounded-full text-xs">
                          <Star className="h-4 w-4 fill-current" />
                          <span>4.9</span>
-                         <span className="text-xs text-muted-foreground font-normal">(120 مراجعة)</span>
+                         <span className="text-[10px] text-muted-foreground font-bold mr-1">(120 تقييم)</span>
                       </div>
                    </div>
-                   <h1 className="text-3xl font-black leading-tight text-foreground">{product.name}</h1>
                    
-                   <div className="flex items-center gap-4 pt-2">
+                   <h1 className="text-3xl md:text-5xl font-black leading-tight text-foreground tracking-tight">{product.name}</h1>
+                   
+                   <div className="flex flex-col gap-2 pt-2">
                       <div className="flex items-baseline gap-2">
-                        <span className="text-4xl font-black text-primary">
+                        <span className="text-4xl md:text-6xl font-black text-primary tracking-tighter">
                           {displayPrice?.toLocaleString()}
                         </span>
-                        <span className="text-xl text-muted-foreground font-bold">د.ع</span>
+                        <span className="text-xl md:text-2xl text-muted-foreground font-black">د.ع</span>
                       </div>
                       {isWholesale && (
-                         <Badge variant="outline" className="rounded-full border-primary/20 text-primary gap-1 font-bold h-7">
-                            <Tags className="h-3 w-3" /> سعر الجملة
-                         </Badge>
+                         <div className="flex">
+                           <Badge variant="outline" className="rounded-full border-primary text-primary bg-primary/5 gap-1.5 font-black px-4 py-1">
+                              <Tags className="h-4 w-4" /> سعر الجملة للشركات
+                           </Badge>
+                         </div>
+                      )}
+                      {product.stock <= 5 && product.stock > 0 && (
+                        <p className="text-destructive font-black text-sm animate-pulse">🔥 متبقي {product.stock} قطع فقط!</p>
                       )}
                    </div>
                  </div>
 
-                 <div className="h-px bg-border/50" />
-
                  <div className="space-y-4">
-                    <h4 className="font-bold">الوصف</h4>
-                    <p className="text-muted-foreground leading-relaxed">{product.description}</p>
+                    <h4 className="font-black text-lg md:text-xl flex items-center gap-2">
+                      <div className="h-1.5 w-6 rounded-full bg-primary" /> التفاصيل والوصف
+                    </h4>
+                    <p className="text-muted-foreground leading-relaxed font-medium text-sm md:text-base whitespace-pre-line bg-muted/20 p-6 rounded-[28px] border-2 border-dashed border-muted">
+                      {product.description || "لا يوجد وصف متوفر لهذا المنتج حالياً."}
+                    </p>
                  </div>
 
-                 <div className="grid grid-cols-3 gap-4 py-4">
-                   <div className="flex flex-col items-center gap-2 text-center p-3 rounded-2xl bg-muted/30">
-                     <ShieldCheck className="h-6 w-6 text-green-600" />
-                     <span className="text-[10px] font-bold">ضمان أصلي</span>
+                 <div className="grid grid-cols-3 gap-3 md:gap-6 py-2">
+                   <div className="flex flex-col items-center gap-3 text-center p-4 rounded-[28px] bg-white border shadow-sm transition-transform hover:scale-105">
+                     <div className="h-12 w-12 rounded-2xl bg-green-50 flex items-center justify-center text-green-600 shadow-inner">
+                        <ShieldCheck className="h-7 w-7" />
+                     </div>
+                     <span className="text-[10px] font-black uppercase tracking-tighter opacity-80 leading-tight">ضمان جودة<br/>أصلي 100%</span>
                    </div>
-                   <div className="flex flex-col items-center gap-2 text-center p-3 rounded-2xl bg-muted/30">
-                     <Truck className="h-6 w-6 text-blue-600" />
-                     <span className="text-[10px] font-bold">توصيل سريع</span>
+                   <div className="flex flex-col items-center gap-3 text-center p-4 rounded-[28px] bg-white border shadow-sm transition-transform hover:scale-105">
+                     <div className="h-12 w-12 rounded-2xl bg-blue-50 flex items-center justify-center text-blue-600 shadow-inner">
+                        <Truck className="h-7 w-7" />
+                     </div>
+                     <span className="text-[10px] font-black uppercase tracking-tighter opacity-80 leading-tight">توصيل لكافة<br/>المحافظات</span>
                    </div>
-                   <div className="flex flex-col items-center gap-2 text-center p-3 rounded-2xl bg-muted/30">
-                     <RotateCcw className="h-6 w-6 text-orange-600" />
-                     <span className="text-[10px] font-bold">إرجاع خلال 7 أيام</span>
+                   <div className="flex flex-col items-center gap-3 text-center p-4 rounded-[28px] bg-white border shadow-sm transition-transform hover:scale-105">
+                     <div className="h-12 w-12 rounded-2xl bg-orange-50 flex items-center justify-center text-orange-600 shadow-inner">
+                        <RotateCcw className="h-7 w-7" />
+                     </div>
+                     <span className="text-[10px] font-black uppercase tracking-tighter opacity-80 leading-tight">سهولة التبديل<br/>والإرجاع</span>
                    </div>
                  </div>
 
-                 <div className="flex flex-col sm:flex-row items-center gap-4">
-                    <div className="flex items-center gap-4 rounded-full border-2 border-primary/20 p-1 bg-muted/10 h-14 px-6 w-full sm:w-auto justify-between sm:justify-center">
+                 {/* Action Buttons */}
+                 <div className="sticky bottom-20 md:relative md:bottom-0 flex flex-col sm:flex-row items-center gap-4 bg-white/80 md:bg-transparent backdrop-blur-xl md:backdrop-blur-none p-4 md:p-0 rounded-t-[32px] md:rounded-none shadow-[0_-20px_40px_rgba(0,0,0,0.05)] md:shadow-none z-30">
+                    <div className="flex items-center gap-4 rounded-full border-4 border-primary/5 p-1 bg-muted/30 h-16 px-6 w-full sm:w-auto justify-between sm:justify-center">
                       <button 
                         onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                        className="h-8 w-8 flex items-center justify-center rounded-full bg-white shadow-sm"
+                        className="h-10 w-10 flex items-center justify-center rounded-full bg-white shadow-xl hover:bg-primary hover:text-white transition-all active:scale-90"
                       >
-                        <Minus className="h-4 w-4" />
+                        <Minus className="h-5 w-5" />
                       </button>
-                      <span className="text-xl font-black w-8 text-center">{quantity}</span>
+                      <span className="text-2xl font-black w-10 text-center text-primary">{quantity}</span>
                       <button 
                         onClick={() => setQuantity(quantity + 1)}
-                        className="h-8 w-8 flex items-center justify-center rounded-full bg-primary text-white shadow-sm"
+                        className="h-10 w-10 flex items-center justify-center rounded-full bg-white shadow-xl hover:bg-primary hover:text-white transition-all active:scale-90"
                       >
-                        <Plus className="h-4 w-4" />
+                        <Plus className="h-5 w-5" />
                       </button>
                     </div>
 
                     <Button 
                       onClick={handleAddToCart}
-                      className="w-full h-14 rounded-full text-lg font-black shadow-lg shadow-primary/20 gap-3"
+                      disabled={product.stock === 0}
+                      className="w-full h-16 rounded-full text-xl font-black shadow-2xl shadow-primary/30 gap-3 transition-all hover:scale-[1.02] active:scale-95"
                     >
-                      <ShoppingCart className="h-6 w-6" />
-                      إضافة إلى السلة
+                      <ShoppingCart className="h-7 w-7" />
+                      {product.stock === 0 ? "نفذت الكمية" : "إضافة للسلة الآن"}
                     </Button>
                  </div>
               </div>
             </div>
-          ) : (
-            <div className="p-20 text-center"><Skeleton className="h-64 w-full rounded-3xl" /></div>
-          )}
+          ) : null}
 
+          {/* Related Products Section */}
           {product && (
-            <section className="p-6 space-y-4">
-              <h3 className="text-xl font-black">منتجات قد تعجبك</h3>
-              <div className="flex gap-4 overflow-x-auto no-scrollbar -mx-6 px-6 pb-6">
+            <section className="p-6 md:p-0 md:mt-20 space-y-8">
+              <div className="flex items-center justify-between">
+                <h3 className="text-2xl md:text-3xl font-black tracking-tight">منتجات مشابهة قد تهمك</h3>
+                <Button variant="ghost" className="rounded-full font-black text-primary px-6">عرض الكل</Button>
+              </div>
+              <div className="flex gap-6 overflow-x-auto no-scrollbar -mx-6 px-6 pb-10">
                 {relatedLoading ? (
-                  Array(4).fill(0).map((_, i) => <Skeleton key={i} className="min-w-[180px] h-[250px] rounded-[24px]" />)
+                  Array(4).fill(0).map((_, i) => <Skeleton key={i} className="min-w-[200px] h-[320px] rounded-[32px]" />)
                 ) : relatedProducts.map((p: any) => (
-                  <div key={p.id} className="min-w-[180px]">
+                  <div key={p.id} className="min-w-[200px] md:min-w-[250px]">
                     <ProductCard 
                       id={p.id}
                       name={p.name}
