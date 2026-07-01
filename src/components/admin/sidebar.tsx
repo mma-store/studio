@@ -20,7 +20,9 @@ import {
   Settings,
   ChevronRight,
   LogOut,
-  Monitor
+  Monitor,
+  ShieldCheck,
+  History
 } from "lucide-react";
 
 import {
@@ -31,16 +33,16 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarMenuSub,
-  SidebarMenuSubButton,
-  SidebarMenuSubItem,
   SidebarGroup,
   SidebarGroupLabel,
   SidebarGroupContent,
 } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useAuth } from "@/firebase";
+import { signOut } from "firebase/auth";
+import { toast } from "@/hooks/use-toast";
 
 const ADMIN_MENU = [
   {
@@ -69,16 +71,11 @@ const ADMIN_MENU = [
     ]
   },
   {
-    label: "المبيعات",
+    label: "المبيعات والعملاء",
     items: [
       { title: "الطلبات", icon: ClipboardList, href: "/admin/orders" },
       { title: "العملاء", icon: Users, href: "/admin/customers" },
-    ]
-  },
-  {
-    label: "فريق العمل",
-    items: [
-      { title: "الموظفين", icon: UserSquare2, href: "/admin/employees" },
+      { title: "الموظفين", icon: ShieldCheck, href: "/admin/employees" },
     ]
   },
   {
@@ -91,6 +88,7 @@ const ADMIN_MENU = [
   {
     label: "النظام",
     items: [
+      { title: "سجل العمليات", icon: History, href: "/admin/audit-log" },
       { title: "الإشعارات", icon: Bell, href: "/admin/notifications" },
       { title: "الإعدادات", icon: Settings, href: "/admin/settings" },
     ]
@@ -99,13 +97,25 @@ const ADMIN_MENU = [
 
 export function AdminSidebar() {
   const pathname = usePathname();
+  const auth = useAuth();
+  const router = useRouter();
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      toast({ title: "تم تسجيل الخروج" });
+      router.push("/login");
+    } catch (e) {
+      toast({ variant: "destructive", title: "خطأ في تسجيل الخروج" });
+    }
+  };
 
   return (
     <Sidebar collapsible="icon" className="border-l bg-card dark:bg-card">
       <SidebarHeader className="h-16 flex items-center justify-center border-b px-6">
         <Link href="/admin" className="flex items-center gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary text-white shadow-lg shadow-primary/20">
-            <span className="text-xl font-black">M</span>
+            <span className="text-xl font-black italic">M</span>
           </div>
           <div className="flex flex-col truncate group-data-[collapsible=icon]:hidden">
             <span className="text-sm font-black leading-none">مجمع محمد علاء</span>
@@ -117,7 +127,7 @@ export function AdminSidebar() {
       <SidebarContent className="py-4">
         {ADMIN_MENU.map((group) => (
           <SidebarGroup key={group.label}>
-            <SidebarGroupLabel className="px-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 group-data-[collapsible=icon]:hidden">
+            <SidebarGroupLabel className="px-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 group-data-[collapsible=icon]:hidden mt-4 mb-2">
               {group.label}
             </SidebarGroupLabel>
             <SidebarGroupContent>
@@ -138,7 +148,6 @@ export function AdminSidebar() {
                         <Link href={item.href}>
                           <item.icon className={cn("h-5 w-5", isActive ? "text-white" : "text-muted-foreground")} />
                           <span className="font-bold text-sm group-data-[collapsible=icon]:hidden">{item.title}</span>
-                          {isActive && <div className="mr-auto h-1.5 w-1.5 rounded-full bg-white group-data-[collapsible=icon]:hidden" />}
                         </Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
@@ -153,7 +162,10 @@ export function AdminSidebar() {
       <SidebarFooter className="border-t p-4">
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton className="h-11 px-4 text-destructive hover:bg-destructive/10 hover:text-destructive">
+            <SidebarMenuButton 
+              onClick={handleLogout}
+              className="h-11 px-4 text-destructive hover:bg-destructive/10 hover:text-destructive w-full"
+            >
               <LogOut className="h-5 w-5" />
               <span className="font-bold group-data-[collapsible=icon]:hidden">تسجيل الخروج</span>
             </SidebarMenuButton>
