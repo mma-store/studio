@@ -6,30 +6,36 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { MapPin, Phone, Truck, Store, CreditCard, ChevronLeft, Loader2 } from "lucide-react";
+import { MapPin, Phone, Truck, Store, CreditCard, ChevronLeft, Loader2, ShoppingCart } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { useFirestore, useUser } from "@/firebase";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import { toast } from "@/hooks/use-toast";
-
-// Note: In a real app, cart would come from a global state/context
-const CART_ITEMS_MOCK = [
-  { productId: "p1", name: "فلتر زيت هوندا أصلي", price: 25000, quantity: 1 },
-  { productId: "p2", name: "خوذة رياضية LS2", price: 115000, quantity: 1 },
-];
+import { useCart } from "@/context/cart-context";
 
 export default function CheckoutPage() {
   const db = useFirestore();
   const { user } = useUser();
+  const { cart, subtotal, clearCart } = useCart();
   const router = useRouter();
   const [method, setMethod] = useState("delivery");
   const [loading, setLoading] = useState(false);
 
-  const subtotal = CART_ITEMS_MOCK.reduce((acc, item) => acc + (item.price * item.quantity), 0);
   const deliveryFee = method === "delivery" ? 5000 : 0;
   const total = subtotal + deliveryFee;
+
+  if (cart.length === 0) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center p-8 bg-[#FDF8F5]">
+         <ShoppingCart className="h-20 w-20 opacity-20 mb-4" />
+         <h2 className="text-2xl font-black">السلة فارغة</h2>
+         <p className="text-muted-foreground mb-6">لا يمكنك إتمام الطلب بدون منتجات.</p>
+         <Link href="/"><Button className="rounded-full px-10">العودة للمتجر</Button></Link>
+      </div>
+    );
+  }
 
   async function handlePlaceOrder(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -43,14 +49,21 @@ export default function CheckoutPage() {
     const formData = new FormData(e.currentTarget);
     
     const orderData = {
-      orderNumber: `MMA-${Math.floor(Math.random() * 90000) + 10000}`,
+      orderNumber: `MMA-${Date.now().toString().slice(-5)}`,
       userId: user.uid,
       customerName: formData.get("customerName"),
       phoneNumber: formData.get("phoneNumber"),
       deliveryMethod: method,
       address: formData.get("address") || "",
       landmark: formData.get("landmark") || "",
-      items: CART_ITEMS_MOCK,
+      items: cart.map(item => ({
+         productId: item.id,
+         name: item.name,
+         price: item.price,
+         quantity: item.quantity
+      })),
+      subtotal,
+      deliveryFee,
       total: total,
       status: "pending",
       createdAt: Date.now(),
@@ -60,7 +73,7 @@ export default function CheckoutPage() {
     try {
       await addDoc(collection(db, "orders"), orderData);
       toast({ title: "تم بنجاح", description: "تم استلام طلبك بنجاح، شكراً لثقتك بنا." });
-      // In a real app: clear cart here
+      clearCart();
       router.push("/orders");
     } catch (error) {
       toast({ variant: "destructive", title: "خطأ", description: "فشل في إتمام الطلب، حاول مرة أخرى." });
@@ -78,33 +91,29 @@ export default function CheckoutPage() {
                 <ChevronLeft className="h-6 w-6 rotate-180" />
              </Button>
           </Link>
-          <h1 className="text-2xl font-black">الدفع والشحن</h1>
+          <h1 className="text-2xl font-black">إتمام الطلب</h1>
         </div>
 
         <form id="checkout-form" onSubmit={handlePlaceOrder} className="container p-4 space-y-6">
-          {/* Customer Info */}
-          <section className="bg-white p-6 rounded-[32px] shadow-sm space-y-4">
+          <section className="bg-white p-6 rounded-[28px] shadow-sm border space-y-4">
              <h3 className="text-lg font-black flex items-center gap-2">
-                <Phone className="h-5 w-5 text-primary" />
-                معلومات الاتصال
+                <Phone className="h-5 w-5 text-primary" /> معلومات التواصل
              </h3>
              <div className="grid gap-4">
                 <div className="space-y-2">
-                   <Label className="font-bold mr-1">الاسم الكامل</Label>
-                   <Input name="customerName" required placeholder="أدخل اسمك الكامل" className="rounded-2xl h-12 bg-muted/30 border-none" />
+                   <Label className="font-bold">الاسم الكامل</Label>
+                   <Input name="customerName" required placeholder="مثال: علي محمد" className="rounded-xl h-12 bg-muted/30 border-none" />
                 </div>
                 <div className="space-y-2">
-                   <Label className="font-bold mr-1">رقم الهاتف</Label>
-                   <Input name="phoneNumber" required placeholder="07XXXXXXXXX" className="rounded-2xl h-12 bg-muted/30 border-none text-left" dir="ltr" />
+                   <Label className="font-bold">رقم الهاتف</Label>
+                   <Input name="phoneNumber" required placeholder="07XXXXXXXXX" className="rounded-xl h-12 bg-muted/30 border-none text-left" dir="ltr" />
                 </div>
              </div>
           </section>
 
-          {/* Delivery Method */}
-          <section className="bg-white p-6 rounded-[32px] shadow-sm space-y-4">
+          <section className="bg-white p-6 rounded-[28px] shadow-sm border space-y-4">
              <h3 className="text-lg font-black flex items-center gap-2">
-                <Truck className="h-5 w-5 text-primary" />
-                طريقة الاستلام
+                <Truck className="h-5 w-5 text-primary" /> طريقة الاستلام
              </h3>
              <RadioGroup defaultValue="delivery" className="grid gap-4" onValueChange={setMethod}>
                 <Label
@@ -113,81 +122,53 @@ export default function CheckoutPage() {
                 >
                   <div className="flex items-center gap-3">
                     <Truck className="h-5 w-5" />
-                    <div>
-                      <p className="font-bold">توصيل للمنزل</p>
-                      <p className="text-xs text-muted-foreground">التوصيل خلال 24-48 ساعة</p>
-                    </div>
+                    <div><p className="font-bold">توصيل منزلي</p><p className="text-[10px] text-muted-foreground">خلال 24 ساعة</p></div>
                   </div>
                   <RadioGroupItem value="delivery" id="delivery" />
                 </Label>
-
                 <Label
                   htmlFor="pickup"
                   className={`flex items-center justify-between p-4 rounded-2xl border-2 transition-all cursor-pointer ${method === 'pickup' ? 'border-primary bg-primary/5' : 'border-border'}`}
                 >
                   <div className="flex items-center gap-3">
                     <Store className="h-5 w-5" />
-                    <div>
-                      <p className="font-bold">استلام من المجمع</p>
-                      <p className="text-xs text-muted-foreground">بغداد، شارع الصناعة</p>
-                    </div>
+                    <div><p className="font-bold">استلام من المجمع</p><p className="text-[10px] text-muted-foreground">بغداد، الكرادة</p></div>
                   </div>
                   <RadioGroupItem value="pickup" id="pickup" />
                 </Label>
              </RadioGroup>
           </section>
 
-          {/* Address (If delivery) */}
           {method === 'delivery' && (
-            <section className="bg-white p-6 rounded-[32px] shadow-sm space-y-4 animate-in slide-in-from-top-2">
+            <section className="bg-white p-6 rounded-[28px] shadow-sm border space-y-4">
                <h3 className="text-lg font-black flex items-center gap-2">
-                  <MapPin className="h-5 w-5 text-primary" />
-                  عنوان التوصيل
+                  <MapPin className="h-5 w-5 text-primary" /> عنوان التوصيل
                </h3>
                <div className="space-y-4">
                   <div className="space-y-2">
-                    <Label className="font-bold mr-1">المحافظة / المنطقة</Label>
-                    <Input name="address" required={method === 'delivery'} placeholder="مثال: بغداد، الكرادة" className="rounded-2xl h-12 bg-muted/30 border-none" />
+                    <Label className="font-bold">المنطقة</Label>
+                    <Input name="address" required placeholder="مثال: المنصور، شارع 14 رمضان" className="rounded-xl h-12 bg-muted/30 border-none" />
                   </div>
                   <div className="space-y-2">
-                    <Label className="font-bold mr-1">أقرب نقطة دالة</Label>
-                    <Input name="landmark" placeholder="مثال: قرب ساحة كهرمانة" className="rounded-2xl h-12 bg-muted/30 border-none" />
+                    <Label className="font-bold">أقرب نقطة دالة</Label>
+                    <Input name="landmark" placeholder="مثال: قرب مطعم البركة" className="rounded-xl h-12 bg-muted/30 border-none" />
                   </div>
                </div>
             </section>
           )}
-
-          {/* Payment Method */}
-          <section className="bg-white p-6 rounded-[32px] shadow-sm space-y-4">
-             <h3 className="text-lg font-black flex items-center gap-2">
-                <CreditCard className="h-5 w-5 text-primary" />
-                طريقة الدفع
-             </h3>
-             <div className="flex items-center gap-4 p-4 rounded-2xl bg-primary/5 border-2 border-primary">
-                <div className="h-10 w-10 flex items-center justify-center rounded-full bg-primary text-white">
-                   <span className="font-black text-xs">COD</span>
-                </div>
-                <div>
-                   <p className="font-bold">الدفع عند الاستلام</p>
-                   <p className="text-xs text-muted-foreground">ادفع نقداً عند استلام طلبك</p>
-                </div>
-             </div>
-          </section>
         </form>
       </main>
 
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t rounded-t-[32px] shadow-[0_-10px_40px_rgba(0,0,0,0.05)] z-40">
-         <div className="container">
-            <div className="flex items-center justify-between mb-4">
-               <span className="text-lg font-bold">الإجمالي النهائي:</span>
-               <span className="text-2xl font-black text-primary underline decoration-primary/20 underline-offset-8">
-                  {total.toLocaleString()} د.ع
-               </span>
+      <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t rounded-t-[32px] shadow-2xl z-40">
+         <div className="container space-y-4">
+            <div className="flex items-center justify-between text-xl">
+               <span className="font-black">الإجمالي:</span>
+               <span className="font-black text-primary">{total.toLocaleString()} د.ع</span>
             </div>
             <Button 
               type="submit" 
               form="checkout-form" 
-              className="w-full h-14 rounded-full text-lg font-black shadow-lg shadow-primary/20"
+              className="w-full h-14 rounded-full text-lg font-black shadow-lg"
               disabled={loading}
             >
               {loading ? <Loader2 className="h-6 w-6 animate-spin" /> : "تأكيد الطلب الآن"}

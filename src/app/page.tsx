@@ -26,12 +26,12 @@ export default function Home() {
   const db = useFirestore();
   const [activeBanner, setActiveBanner] = useState(0);
 
-  // Dynamic Queries
-  const bannersQuery = useMemo(() => collection(db, 'banners'), [db]);
+  // Dynamic Queries - No more mock data
+  const bannersQuery = useMemo(() => query(collection(db, 'banners'), where('isActive', '==', true)), [db]);
   const typesQuery = useMemo(() => collection(db, 'motorcycleTypes'), [db]);
-  const categoriesQuery = useMemo(() => collection(db, 'categories'), [db]);
+  const categoriesQuery = useMemo(() => query(collection(db, 'categories'), limit(6)), [db]);
   const featuredQuery = useMemo(() => query(collection(db, 'products'), where('isFeatured', '==', true), limit(6)), [db]);
-  const newArrivalsQuery = useMemo(() => query(collection(db, 'products'), where('isNewArrival', '==', true), limit(4)), [db]);
+  const newArrivalsQuery = useMemo(() => query(collection(db, 'products'), orderBy('createdAt', 'desc'), limit(10)), [db]);
   const offersQuery = useMemo(() => collection(db, 'offers'), [db]);
 
   const { data: banners, loading: bannersLoading } = useCollection(bannersQuery);
@@ -52,21 +52,21 @@ export default function Home() {
 
   return (
     <div className="flex min-h-screen bg-[#FDF8F5] text-foreground">
-      <main className="flex-1 pb-24">
+      <main className="flex-1 pb-24 overflow-x-hidden">
         <Header />
         
-        <div className="container space-y-8 animate-fade-in pb-10">
+        <div className="container space-y-8 animate-fade-in pb-10 max-w-full overflow-x-hidden">
           {/* Hero Banner Section */}
-          <section className="relative px-4 pt-6">
-            <div className="relative h-[220px] md:h-[350px] w-full overflow-hidden rounded-[32px] shadow-2xl transition-all duration-1000 bg-muted">
+          <section className="relative px-4 pt-4">
+            <div className="relative h-[180px] md:h-[400px] w-full overflow-hidden rounded-[28px] shadow-lg bg-muted">
               {bannersLoading ? (
-                <Skeleton className="h-full w-full rounded-[32px]" />
+                <Skeleton className="h-full w-full" />
               ) : banners.length > 0 ? (
                 banners.map((banner: any, idx) => (
                   <div 
                     key={banner.id}
                     className={cn(
-                      "absolute inset-0 transition-opacity duration-1000",
+                      "absolute inset-0 transition-opacity duration-700",
                       idx === activeBanner ? 'opacity-100 z-10' : 'opacity-0 z-0'
                     )}
                   >
@@ -77,34 +77,24 @@ export default function Home() {
                       className="object-cover"
                       priority={idx === 0}
                     />
-                    <div className={cn("absolute inset-0 p-6 flex flex-col justify-center gap-2 bg-gradient-to-r from-black/70 via-black/20 to-transparent")}>
-                      <Badge className="w-fit bg-primary text-white border-none text-[10px] px-3 py-1 rounded-full uppercase tracking-widest">
-                        عرض حصري
-                      </Badge>
-                      <h2 className="text-2xl md:text-5xl font-black text-white max-w-xs leading-tight">
+                    <div className="absolute inset-0 p-5 flex flex-col justify-center gap-1 bg-gradient-to-r from-black/60 via-transparent to-transparent">
+                      <h2 className="text-xl md:text-5xl font-black text-white max-w-[200px] md:max-w-md leading-tight">
                         {banner.title}
                       </h2>
-                      <p className="text-sm md:text-xl text-white/90 max-w-sm">
+                      <p className="text-xs md:text-xl text-white/80 line-clamp-1 md:line-clamp-none">
                         {banner.subtitle}
                       </p>
-                      <Button className="w-fit mt-4 rounded-full bg-white text-black hover:bg-white/90 font-bold px-8 shadow-lg">
-                        اكتشف الآن
-                      </Button>
+                      <Link href={banner.link || "/catalog"}>
+                        <Button size="sm" className="w-fit mt-2 rounded-full font-bold px-6">
+                          تسوق الآن
+                        </Button>
+                      </Link>
                     </div>
                   </div>
                 ))
-              ) : null}
-              {banners.length > 1 && (
-                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex gap-1.5">
-                  {banners.map((_, i) => (
-                    <div 
-                      key={i} 
-                      className={cn(
-                        "h-1.5 rounded-full transition-all duration-300",
-                        i === activeBanner ? 'w-6 bg-primary' : 'w-1.5 bg-white/50'
-                      )} 
-                    />
-                  ))}
+              ) : (
+                <div className="h-full w-full flex items-center justify-center text-muted-foreground bg-muted/20">
+                   <p className="font-bold">أهلاً بك في مجمع محمد علاء</p>
                 </div>
               )}
             </div>
@@ -112,61 +102,42 @@ export default function Home() {
 
           {/* Motorcycle Types */}
           <section className="space-y-4 px-4 overflow-hidden">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <TrendingUp className="h-5 w-5 text-primary" />
-                <h3 className="text-lg font-black tracking-tight">أنواع الدراجات</h3>
-              </div>
-            </div>
-            <div className="flex gap-4 overflow-x-auto no-scrollbar pb-2 -mx-4 px-4">
+            <h3 className="text-lg font-black flex items-center gap-2">
+              <TrendingUp className="h-5 w-5 text-primary" /> أنواع الدراجات
+            </h3>
+            <div className="flex gap-4 overflow-x-auto no-scrollbar pb-2">
               {typesLoading ? (
-                Array(4).fill(0).map((_, i) => (
-                  <div key={i} className="flex flex-col items-center gap-3 shrink-0">
-                    <Skeleton className="h-20 w-20 rounded-full" />
-                    <Skeleton className="h-4 w-12" />
-                  </div>
-                ))
+                Array(5).fill(0).map((_, i) => <Skeleton key={i} className="h-16 w-16 rounded-full shrink-0" />)
               ) : types.map((type: any) => (
-                <div key={type.id} className="flex flex-col items-center gap-3 shrink-0 group cursor-pointer">
-                  <div className="relative h-20 w-20 rounded-full border-2 border-primary/20 p-1 transition-all group-hover:border-primary">
-                    <div className="relative h-full w-full overflow-hidden rounded-full bg-white shadow-inner">
+                <div key={type.id} className="flex flex-col items-center gap-2 shrink-0 group">
+                  <div className="relative h-16 w-16 md:h-20 md:w-20 rounded-full border-2 border-primary/10 p-1 group-hover:border-primary transition-all">
+                    <div className="relative h-full w-full overflow-hidden rounded-full">
                       <Image src={type.image || `https://picsum.photos/seed/${type.id}/200/200`} alt={type.name} fill className="object-cover" />
                     </div>
                   </div>
-                  <span className="text-xs font-bold">{type.name}</span>
+                  <span className="text-[10px] font-black">{type.name}</span>
                 </div>
               ))}
             </div>
           </section>
 
-          {/* Featured Categories Grid */}
+          {/* Featured Categories */}
           <section className="space-y-4 px-4">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Settings2 className="h-5 w-5 text-primary" />
-                <h3 className="text-lg font-black tracking-tight">التصنيفات المميزة</h3>
-              </div>
-              <Link href="/catalog">
-                <Button variant="link" className="text-primary font-bold text-sm">
-                  عرض الكل <ChevronLeft className="h-4 w-4 mr-1" />
-                </Button>
-              </Link>
+              <h3 className="text-lg font-black flex items-center gap-2">
+                <Settings2 className="h-5 w-5 text-primary" /> التصنيفات
+              </h3>
+              <Link href="/catalog" className="text-primary font-black text-xs">عرض الكل</Link>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
               {categoriesLoading ? (
-                Array(4).fill(0).map((_, i) => <Skeleton key={i} className="h-40 rounded-[24px]" />)
+                Array(4).fill(0).map((_, i) => <Skeleton key={i} className="h-28 rounded-2xl" />)
               ) : categories.map((cat: any) => (
                 <Link key={cat.id} href={`/catalog/${cat.id}`}>
-                  <div className="relative h-40 overflow-hidden rounded-[24px] bg-white group cursor-pointer shadow-sm">
-                    <Image 
-                      src={cat.image || `https://picsum.photos/seed/${cat.id}/300/300`} 
-                      alt={cat.name} 
-                      fill 
-                      className="object-cover opacity-80 transition-transform duration-500 group-hover:scale-110"
-                    />
-                    <div className="absolute inset-0 bg-black/20 flex flex-col justify-end p-4">
-                      <h4 className="text-white font-black text-lg">{cat.name}</h4>
-                      <p className="text-white/80 text-[10px] font-medium">{cat.itemsCount} منتج</p>
+                  <div className="relative h-28 overflow-hidden rounded-2xl shadow-sm border bg-white group">
+                    <Image src={cat.image} alt={cat.name} fill className="object-cover opacity-60 group-hover:scale-110 transition-transform" />
+                    <div className="absolute inset-0 flex items-center justify-center p-2 text-center">
+                      <span className="font-black text-sm drop-shadow-md">{cat.name}</span>
                     </div>
                   </div>
                 </Link>
@@ -174,26 +145,22 @@ export default function Home() {
             </div>
           </section>
 
-          {/* Featured Products Scroll */}
+          {/* Featured Products */}
           <section className="space-y-4 px-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Zap className="h-5 w-5 text-primary" />
-                <h3 className="text-lg font-black tracking-tight">منتجات مختارة</h3>
-              </div>
-            </div>
-            <div className="flex gap-5 overflow-x-auto no-scrollbar pb-4 -mx-4 px-4">
+            <h3 className="text-lg font-black flex items-center gap-2">
+              <Zap className="h-5 w-5 text-primary" /> مختاراتنا لك
+            </h3>
+            <div className="flex gap-4 overflow-x-auto no-scrollbar pb-4">
               {featuredLoading ? (
-                Array(4).fill(0).map((_, i) => <Skeleton key={i} className="min-w-[200px] h-[300px] rounded-[24px]" />)
+                Array(3).fill(0).map((_, i) => <Skeleton key={i} className="min-w-[160px] h-60 rounded-3xl" />)
               ) : featuredProducts.map((p: any) => (
-                <div key={p.id} className="min-w-[200px] md:min-w-[250px]">
+                <div key={p.id} className="min-w-[160px] md:min-w-[220px]">
                   <ProductCard 
                     id={p.id}
                     name={p.name}
                     category={p.category}
                     price={p.retailPrice.toLocaleString()}
-                    image={p.images?.[0] || `https://picsum.photos/seed/${p.id}/500/500`}
-                    isNew={p.isNewArrival}
+                    image={p.images?.[0]}
                     inStock={p.stock > 0}
                   />
                 </div>
@@ -201,41 +168,30 @@ export default function Home() {
             </div>
           </section>
 
-          {/* Special Offers Section */}
+          {/* Special Offers */}
           <section className="px-4">
             {offersLoading ? (
-              <Skeleton className="h-[200px] w-full rounded-[32px]" />
+              <Skeleton className="h-40 w-full rounded-3xl" />
             ) : offers.map((offer: any) => (
-              <div key={offer.id} className="relative overflow-hidden rounded-[32px] bg-gradient-to-br from-[#1A1A1A] to-primary p-8 text-white shadow-xl mb-4">
-                <div className="relative z-10 flex flex-col gap-3">
-                  <div className="flex items-center gap-2">
-                    <Tags className="h-5 w-5 text-primary-foreground" />
-                    <span className="text-[10px] font-black uppercase tracking-widest">عرض خاص</span>
-                  </div>
-                  <h3 className="text-3xl font-black max-w-[200px] leading-tight">{offer.title}</h3>
-                  <p className="text-sm text-white/80 max-w-xs">{offer.description}</p>
-                  <Button className="w-fit mt-2 rounded-full bg-white text-primary font-bold hover:bg-white/90">
-                    {offer.buttonText || "اكتشف المزيد"}
-                  </Button>
-                </div>
-                <div className="absolute -bottom-10 -left-10 h-40 w-40 rounded-full bg-primary/20 blur-3xl" />
-                <div className="absolute -top-10 -right-10 h-60 w-60 rounded-full bg-white/10 blur-3xl" />
-                {offer.image && <Image src={offer.image} alt={offer.title} fill className="object-cover opacity-30 -z-10" />}
+              <div key={offer.id} className="relative overflow-hidden rounded-[32px] bg-slate-900 p-8 text-white mb-4">
+                 <div className="relative z-10 space-y-2">
+                    <Badge className="bg-primary border-none">عرض خاص</Badge>
+                    <h3 className="text-2xl font-black">{offer.title}</h3>
+                    <p className="text-sm opacity-80">{offer.description}</p>
+                 </div>
+                 {offer.image && <Image src={offer.image} alt={offer.title} fill className="object-cover opacity-30" />}
               </div>
             ))}
           </section>
 
-          {/* New Arrivals Grid */}
+          {/* New Arrivals */}
           <section className="space-y-4 px-4">
-             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Star className="h-5 w-5 text-primary" />
-                <h3 className="text-lg font-black tracking-tight">أحدث المنتجات</h3>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
+            <h3 className="text-lg font-black flex items-center gap-2">
+              <Star className="h-5 w-5 text-primary" /> أحدث المنتجات
+            </h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {newLoading ? (
-                Array(4).fill(0).map((_, i) => <Skeleton key={i} className="h-[300px] rounded-[24px]" />)
+                Array(4).fill(0).map((_, i) => <Skeleton key={i} className="h-60 rounded-3xl" />)
               ) : newArrivals.map((p: any) => (
                 <ProductCard 
                   key={p.id}
@@ -243,19 +199,13 @@ export default function Home() {
                   name={p.name}
                   category={p.category}
                   price={p.retailPrice.toLocaleString()}
-                  image={p.images?.[0] || `https://picsum.photos/seed/${p.id}/500/500`}
+                  image={p.images?.[0]}
                 />
               ))}
             </div>
-            <Link href="/catalog" className="block w-full">
-              <Button variant="outline" className="w-full rounded-full border-2 border-primary/20 font-bold text-primary py-6">
-                مشاهدة المزيد من المنتجات
-              </Button>
-            </Link>
           </section>
         </div>
       </main>
-
       <BottomNav />
     </div>
   );

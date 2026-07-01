@@ -6,8 +6,7 @@ import {
   Trash2, 
   Image as ImageIcon,
   Loader2,
-  ExternalLink,
-  ToggleLeft
+  ExternalLink
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -46,6 +45,7 @@ export default function BannersPage() {
     try {
       const url = await uploadToCloudinary(file);
       setUploadedImageUrl(url);
+      toast({ title: "تم رفع الصورة" });
     } catch (e) {
       toast({ variant: "destructive", title: "خطأ", description: "فشل رفع الصورة." });
     } finally {
@@ -60,21 +60,21 @@ export default function BannersPage() {
       await addDoc(collection(db, 'banners'), {
         title: formData.get('title'),
         subtitle: formData.get('subtitle'),
-        link: formData.get('link') || "#",
+        link: formData.get('link') || "/catalog",
         image: uploadedImageUrl,
         isActive: true,
         createdAt: Date.now()
       });
       setIsAddOpen(false);
       setUploadedImageUrl("");
-      toast({ title: "تم الإضافة", description: "تم نشر البنر الجديد بنجاح." });
+      toast({ title: "تم الإضافة بنجاح" });
     } catch (e) {
       toast({ variant: "destructive", title: "خطأ", description: "فشل الحفظ." });
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("هل أنت متأكد من حذف هذا البنر؟")) return;
+    if (!confirm("هل تريد حذف هذا البنر؟")) return;
     await deleteDoc(doc(db, 'banners', id));
     toast({ title: "تم الحذف" });
   };
@@ -84,72 +84,70 @@ export default function BannersPage() {
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
+    <div className="space-y-8 p-4">
       <div className="flex justify-between items-center">
-        <div className="space-y-1">
-          <h1 className="text-3xl font-black tracking-tight">البنرات الترويجية</h1>
-          <p className="text-muted-foreground font-medium text-sm">إدارة العروض التي تظهر في السلايدر الرئيسي للتطبيق.</p>
+        <div>
+          <h1 className="text-3xl font-black">إدارة البنرات</h1>
+          <p className="text-muted-foreground text-sm">البنرات التي تظهر في الصفحة الرئيسية.</p>
         </div>
         
         <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
           <DialogTrigger asChild>
-            <Button className="rounded-xl h-11 font-bold gap-2 shadow-lg shadow-primary/20">
-              <Plus className="h-5 w-5" /> إضافة بنر جديد
+            <Button className="rounded-xl font-bold h-11 gap-2 shadow-lg">
+              <Plus className="h-5 w-5" /> إضافة بنر
             </Button>
           </DialogTrigger>
-          <DialogContent className="rounded-[32px] max-w-2xl">
-            <DialogHeader><DialogTitle className="text-2xl font-black">إنشاء بنر ترويجي</DialogTitle></DialogHeader>
-            <form onSubmit={handleAdd} className="space-y-6 pt-4">
-               <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label className="font-bold">العنوان الرئيسي</Label>
-                    <Input name="title" required placeholder="مثال: خصم الصيف" className="rounded-xl h-12 bg-muted/30 border-none" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="font-bold">العنوان الفرعي</Label>
-                    <Input name="subtitle" placeholder="مثال: خصم 20% على الخوذ" className="rounded-xl h-12 bg-muted/30 border-none" />
-                  </div>
+          <DialogContent className="rounded-[28px] max-w-lg">
+            <DialogHeader><DialogTitle className="text-xl font-black">بنر جديد</DialogTitle></DialogHeader>
+            <form onSubmit={handleAdd} className="space-y-5 pt-4">
+               <div className="space-y-2">
+                 <Label className="font-bold">العنوان</Label>
+                 <Input name="title" required placeholder="مثال: خصم 20%" className="rounded-xl h-12 bg-muted/20 border-none" />
                </div>
                <div className="space-y-2">
-                 <Label className="font-bold">رابط التوجيه (اختياري)</Label>
-                 <Input name="link" placeholder="/catalog/category-id" className="rounded-xl h-12 bg-muted/30 border-none text-left" dir="ltr" />
+                 <Label className="font-bold">الوصف</Label>
+                 <Input name="subtitle" placeholder="مثال: على كافة قطع الغيار" className="rounded-xl h-12 bg-muted/20 border-none" />
+               </div>
+               <div className="space-y-2">
+                 <Label className="font-bold">الرابط</Label>
+                 <Input name="link" placeholder="/catalog" className="rounded-xl h-12 bg-muted/20 border-none text-left" dir="ltr" />
                </div>
                <div className="space-y-4">
-                 <Label className="font-bold">صورة البنر (يفضل مقاس عرضي 1200x500)</Label>
-                 <div className="relative aspect-[21/9] rounded-2xl border-2 border-dashed bg-muted/20 overflow-hidden flex items-center justify-center">
+                 <Label className="font-bold">الصورة (1200x500)</Label>
+                 <div className="relative aspect-[2.4/1] rounded-2xl border-2 border-dashed bg-muted/10 overflow-hidden flex items-center justify-center">
                     {uploadedImageUrl ? (
                       <Image src={uploadedImageUrl} alt="Preview" fill className="object-cover" />
                     ) : (
-                      <div className="flex flex-col items-center gap-2 opacity-40">
+                      <div className="flex flex-col items-center gap-2 opacity-30">
                          {isUploading ? <Loader2 className="h-8 w-8 animate-spin" /> : <ImageIcon className="h-10 w-10" />}
-                         <span className="text-xs font-bold">{isUploading ? 'جاري الرفع...' : 'ارفع الصورة'}</span>
+                         <span className="text-xs font-bold">{isUploading ? 'جاري الرفع...' : 'ارفع صورة'}</span>
                       </div>
                     )}
                     <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={handleImageUpload} disabled={isUploading} />
                  </div>
                </div>
                <DialogFooter>
-                 <Button type="submit" disabled={isUploading || !uploadedImageUrl} className="w-full h-14 rounded-2xl font-black text-lg">نشر البنر الآن</Button>
+                 <Button type="submit" disabled={isUploading || !uploadedImageUrl} className="w-full h-12 rounded-xl font-black">نشر البنر</Button>
                </DialogFooter>
             </form>
           </DialogContent>
         </Dialog>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {loading ? (
-          Array(2).fill(0).map((_, i) => <Skeleton key={i} className="h-64 rounded-[32px]" />)
+          Array(2).fill(0).map((_, i) => <Skeleton key={i} className="h-52 rounded-[28px]" />)
         ) : banners.map((banner: any) => (
-          <Card key={banner.id} className="rounded-[32px] border-none shadow-sm overflow-hidden group relative">
-            <div className="relative aspect-[21/9]">
+          <Card key={banner.id} className="rounded-[28px] border-none shadow-sm overflow-hidden group">
+            <div className="relative aspect-[2.4/1]">
                <Image src={banner.image} alt={banner.title} fill className="object-cover" />
-               <div className="absolute inset-0 bg-black/40 flex flex-col justify-end p-8 text-white">
-                  <h3 className="text-2xl font-black">{banner.title}</h3>
-                  <p className="text-sm opacity-90">{banner.subtitle}</p>
+               <div className="absolute inset-0 bg-black/40 flex flex-col justify-end p-6 text-white">
+                  <h3 className="text-xl font-black">{banner.title}</h3>
+                  <p className="text-xs opacity-80">{banner.subtitle}</p>
                </div>
                <div className="absolute top-4 right-4 flex gap-2">
-                  <div className="bg-white/90 backdrop-blur-md rounded-full px-4 py-1.5 flex items-center gap-2 shadow-lg">
-                     <span className="text-[10px] font-black text-black uppercase">الحالة</span>
+                  <div className="bg-white/90 backdrop-blur rounded-full px-3 py-1 flex items-center gap-2 shadow-lg">
+                     <span className="text-[10px] font-black text-black">نشط</span>
                      <Switch checked={banner.isActive} onCheckedChange={() => toggleStatus(banner.id, banner.isActive)} />
                   </div>
                   <Button variant="destructive" size="icon" className="rounded-full shadow-lg h-9 w-9" onClick={() => handleDelete(banner.id)}>
