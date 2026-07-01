@@ -2,7 +2,7 @@
 'use client';
 
 import { useMemo } from "react";
-import { History, User, Clock, ShieldInfo } from "lucide-react";
+import { History, User, Clock, ShieldAlert } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useFirestore, useCollection } from "@/firebase";
 import { collection, query, orderBy, limit } from "firebase/firestore";
@@ -32,7 +32,7 @@ export default function AuditLogPage() {
                 log.action.includes('حذف') ? "bg-red-50 text-red-600" :
                 log.action.includes('إضافة') ? "bg-green-50 text-green-600" : "bg-blue-50 text-blue-600"
               )}>
-                <ShieldInfo className="h-6 w-6" />
+                <ShieldAlert className="h-6 w-6" />
               </div>
               <div className="flex-1 space-y-1">
                 <div className="flex items-center justify-between">
