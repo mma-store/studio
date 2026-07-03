@@ -36,11 +36,16 @@ import { Skeleton } from "@/components/ui/skeleton";
 export default function ReportsPage() {
   const db = useFirestore();
   
-  // جلب البيانات الحقيقية
-  const { data: orders, loading: ordersLoading } = useCollection(query(collection(db, 'orders')));
-  const { data: expenses, loading: expensesLoading } = useCollection(query(collection(db, 'expenses')));
-  const { data: repairs, loading: repairsLoading } = useCollection(query(collection(db, 'repairOrders')));
-  const { data: users } = useCollection(query(collection(db, 'users')));
+  // Memoizing queries to prevent infinite fetch loops
+  const ordersQuery = useMemo(() => query(collection(db, 'orders')), [db]);
+  const expensesQuery = useMemo(() => query(collection(db, 'expenses')), [db]);
+  const repairsQuery = useMemo(() => query(collection(db, 'repairOrders')), [db]);
+  const usersQuery = useMemo(() => query(collection(db, 'users')), [db]);
+
+  const { data: orders, loading: ordersLoading } = useCollection(ordersQuery);
+  const { data: expenses, loading: expensesLoading } = useCollection(expensesQuery);
+  const { data: repairs, loading: repairsLoading } = useCollection(repairsQuery);
+  const { data: users } = useCollection(usersQuery);
 
   // حساب الإحصائيات الحقيقية
   const stats = useMemo(() => {
@@ -49,7 +54,6 @@ export default function ReportsPage() {
     const totalExpenses = expenses.reduce((acc, e: any) => acc + (e.amount || 0), 0);
     const totalDebts = users.reduce((acc, u: any) => acc + (u.currentBalance || 0), 0);
     
-    // محاكاة الأرباح (مثلاً 20% من المبيعات كمتوسط ربح للقطع + أجور اليد)
     const workshopIncome = repairs.reduce((acc, r: any) => acc + (r.laborCost || 0), 0);
     const estimatedProfit = (totalSales * 0.2) + workshopIncome - totalExpenses;
 
@@ -63,20 +67,37 @@ export default function ReportsPage() {
     };
   }, [orders, expenses, repairs, users]);
 
-  // تحضير بيانات الرسم البياني الحقيقية (آخر 7 أيام)
+  // تحضير بيانات الرسم البياني من مبيعات الأسبوع الفعلي
   const chartData = useMemo(() => {
     const days = ['أحد', 'اثنين', 'ثلاثاء', 'أربعاء', 'خميس', 'جمعة', 'سبت'];
-    return days.map((day, i) => {
-      // هنا يمكن تطوير المنطق لفلترة الطلبات حسب اليوم الفعلي
-      return {
-        name: day,
-        sales: Math.random() * 5000000, // استبدالها بفلترة حقيقية لاحقاً
-        profit: Math.random() * 1000000
-      };
+    const salesByDay = new Array(7).fill(0);
+    const profitByDay = new Array(7).fill(0);
+    
+    const now = new Date();
+    const oneWeekAgo = new Date();
+    oneWeekAgo.setDate(now.getDate() - 7);
+
+    orders.forEach((o: any) => {
+      const date = new Date(o.createdAt);
+      if (date >= oneWeekAgo) {
+        const dayIndex = date.getDay(); // 0 is Sunday
+        salesByDay[dayIndex] += (o.total || 0);
+        profitByDay[dayIndex] += (o.total || 0) * 0.2; // Estimated 20% profit margin
+      }
     });
+
+    return days.map((day, i) => ({
+      name: day,
+      sales: salesByDay[i],
+      profit: profitByDay[i]
+    }));
   }, [orders]);
 
-  if (ordersLoading || expensesLoading) return <div className="p-10 text-center"><Loader2 className="h-10 w-10 animate-spin mx-auto opacity-20" /></div>;
+  if (ordersLoading || expensesLoading) return (
+    <div className="flex items-center justify-center min-h-[400px]">
+      <Loader2 className="h-10 w-10 animate-spin text-primary opacity-20" />
+    </div>
+  );
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -128,7 +149,7 @@ export default function ReportsPage() {
         <Card className="rounded-[32px] border-none shadow-sm overflow-hidden bg-white dark:bg-card">
           <CardHeader className="p-8 pb-0">
              <CardTitle className="text-xl font-black">أداء المبيعات الأسبوعي</CardTitle>
-             <CardDescription className="font-medium">مقارنة بين إجمالي المبيعات وصافي الأرباح باليوم.</CardDescription>
+             <CardDescription className="font-medium">مقارنة بين إجمالي المبيعات وصافي الأرباح (آخر 7 أيام فعلياً).</CardDescription>
           </CardHeader>
           <CardContent className="h-[400px] p-8">
             <ResponsiveContainer width="100%" height="100%">
@@ -172,7 +193,9 @@ export default function ReportsPage() {
                  <p className="text-xs font-black uppercase tracking-widest opacity-80">إجمالي الديون</p>
                  <h3 className="text-4xl font-black leading-tight">{stats.totalDebts.toLocaleString()} د.ع</h3>
                  <p className="text-sm opacity-90 font-medium">مبالغ مستحقة على الزبائن بالآجل.</p>
-                 <Button className="mt-4 rounded-full bg-white text-red-600 font-black hover:bg-white/90">مشاهدة قائمة الديون</Button>
+                 <Link href="/admin/finance/debts">
+                    <Button className="mt-4 rounded-full bg-white text-red-600 font-black hover:bg-white/90">مشاهدة قائمة الديون</Button>
+                 </Link>
               </div>
               <DollarSign className="absolute -right-6 -bottom-6 h-32 w-32 opacity-10 group-hover:scale-110 transition-transform" />
            </Card>
@@ -182,7 +205,9 @@ export default function ReportsPage() {
                  <p className="text-xs font-black uppercase tracking-widest opacity-80">إجمالي المصاريف</p>
                  <h3 className="text-4xl font-black leading-tight">{stats.totalExpenses.toLocaleString()} د.ع</h3>
                  <p className="text-sm opacity-90 font-medium">إيجار، رواتب، ونثريات المجمع.</p>
-                 <Button className="mt-4 rounded-full bg-white text-slate-900 font-black hover:bg-white/90">عرض سجل المصاريف</Button>
+                 <Link href="/admin/finance/expenses">
+                    <Button className="mt-4 rounded-full bg-white text-slate-900 font-black hover:bg-white/90">عرض سجل المصاريف</Button>
+                 </Link>
               </div>
               <TrendingDown className="absolute -right-6 -bottom-6 h-32 w-32 opacity-10 group-hover:scale-110 transition-transform" />
            </Card>

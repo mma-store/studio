@@ -197,13 +197,14 @@ export default function POSPage() {
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'credit' | 'partial'>('cash');
   const [printSize, setPrintSize] = useState<'58mm' | '80mm' | 'A4'>('80mm');
 
+  // Memoized Queries
   const productsQuery = useMemo(() => query(collection(db, 'products'), orderBy('name')), [db]);
-  const { data: products, loading } = useCollection(productsQuery);
-  
   const categoriesQuery = useMemo(() => query(collection(db, 'categories'), orderBy('name')), [db]);
-  const { data: categories } = useCollection(categoriesQuery);
+  const allUsersQuery = useMemo(() => query(collection(db, 'users'), orderBy('displayName')), [db]);
 
-  const { data: allUsers } = useCollection(query(collection(db, 'users'), orderBy('displayName')));
+  const { data: products, loading } = useCollection(productsQuery);
+  const { data: categories } = useCollection(categoriesQuery);
+  const { data: allUsers } = useCollection(allUsersQuery);
 
   const filteredProducts = useMemo(() => {
     if (!products) return [];
@@ -355,7 +356,6 @@ export default function POSPage() {
         toast({ title: "تم بنجاح", description: `تم حفظ الطلب برقم ${orderNumber}` });
         setCart([]);
         setIsCheckoutOpen(false);
-        // محاكاة الطباعة
         window.print();
       })
       .catch((err) => errorEmitter.emit('permission-error', new FirestorePermissionError({ path: "orders/pos", operation: "write" })))
@@ -617,4 +617,3 @@ export default function POSPage() {
     </div>
   );
 }
-
