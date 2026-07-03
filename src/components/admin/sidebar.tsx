@@ -119,9 +119,9 @@ export function AdminSidebar() {
 
   return (
     <Sidebar collapsible="icon" className="border-l bg-card">
-      <SidebarHeader className="h-20 flex items-center justify-center border-b px-6">
+      <SidebarHeader className="h-24 flex items-center justify-center border-b px-6">
         <Link href="/admin" className="flex items-center gap-3">
-          <div className="relative h-12 w-28 shrink-0">
+          <div className="relative h-16 w-36 shrink-0">
             <Image 
               src={LOGO_URL} 
               alt="MMA" 

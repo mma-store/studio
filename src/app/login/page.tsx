@@ -83,7 +83,7 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-[#FDF8F5] p-4 relative overflow-hidden">
       <Card className="w-full max-w-md rounded-[40px] border-none shadow-2xl overflow-hidden bg-white">
         <CardHeader className="space-y-4 pt-12 pb-6 text-center">
-          <div className="mx-auto relative h-16 w-40">
+          <div className="mx-auto relative h-20 w-48">
             <Image 
               src={LOGO_URL} 
               alt="مجمع محمد علاء" 

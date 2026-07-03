@@ -100,7 +100,7 @@ export default function PrintPreviewPage() {
           <div className="p-6 md:p-10 text-slate-900 printable-area">
              {/* Header */}
              <div className="text-center space-y-2 mb-8 border-b pb-6">
-                <div className="relative h-16 w-32 mx-auto mb-2">
+                <div className="relative h-20 w-40 mx-auto mb-2">
                   <Image 
                     src={LOGO_URL} 
                     alt="MMA" 
@@ -208,7 +208,7 @@ export default function PrintPreviewPage() {
                       <p className="text-[8px] font-bold">بواسطة: {data.employeeName || 'النظام'}</p>
                       <p className="text-[8px] font-bold opacity-50">تاريخ الطباعة: {new Date().toLocaleString("ar-EG")}</p>
                    </div>
-                   <div className="relative h-10 w-10 bg-slate-100 rounded flex items-center justify-center">
+                   <div className="relative h-12 w-12 bg-slate-100 rounded flex items-center justify-center">
                       <Image src={LOGO_URL} alt="QR" fill className="object-contain p-1" />
                    </div>
                 </div>
