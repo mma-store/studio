@@ -1,3 +1,4 @@
+
 'use client';
 
 import { 
@@ -14,7 +15,8 @@ import {
   X,
   Package,
   Camera,
-  Upload
+  Upload,
+  History
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -92,7 +94,7 @@ export default function ProductsManagementPage() {
       toast({ variant: "destructive", title: "خطأ في الرفع", description: "فشل رفع بعض الصور، يرجى المحاولة لاحقاً." });
     } finally {
       setIsUploading(false);
-      e.target.value = '';
+      if (e.target) e.target.value = '';
     }
   };
 
@@ -116,7 +118,6 @@ export default function ProductsManagementPage() {
       images: uploadedImages,
       status: 'available',
       isFeatured: formData.get('isFeatured') === 'on',
-      isNewArrival: true,
       createdAt: Date.now(),
       updatedAt: Date.now(),
     };
@@ -242,7 +243,6 @@ export default function ProductsManagementPage() {
                            </div>
                          ))}
 
-                         {/* Camera Button */}
                          <button
                            type="button"
                            disabled={isUploading}
@@ -264,7 +264,6 @@ export default function ProductsManagementPage() {
                             />
                          </button>
 
-                         {/* Upload Button */}
                          <button
                            type="button"
                            disabled={isUploading}
@@ -327,9 +326,9 @@ export default function ProductsManagementPage() {
             <TableRow className="border-b bg-muted/30 hover:bg-muted/30">
               <TableHead className="text-right font-black text-xs uppercase tracking-widest py-6 px-6">المنتج والباركود</TableHead>
               <TableHead className="text-right font-black text-xs uppercase tracking-widest">التصنيف</TableHead>
-              <TableHead className="text-right font-black text-xs uppercase tracking-widest">سعر المفرد</TableHead>
+              <TableHead className="text-right font-black text-xs uppercase tracking-widest">الأسعار (تكلفة/مفرد)</TableHead>
               <TableHead className="text-right font-black text-xs uppercase tracking-widest">المخزون</TableHead>
-              <TableHead className="text-right font-black text-xs uppercase tracking-widest">الحالة</TableHead>
+              <TableHead className="text-right font-black text-xs uppercase tracking-widest">آخر تجهيز</TableHead>
               <TableHead className="text-left font-black text-xs uppercase tracking-widest px-6">إجراءات</TableHead>
             </TableRow>
           </TableHeader>
@@ -375,7 +374,12 @@ export default function ProductsManagementPage() {
                   <TableCell>
                     <Badge variant="secondary" className="rounded-full bg-muted/60 text-[10px] font-black px-4 py-1 border-none">{p.category}</Badge>
                   </TableCell>
-                  <TableCell className="font-black text-primary text-base">{(p.retailPrice || 0).toLocaleString()} <span className="text-[10px]">د.ع</span></TableCell>
+                  <TableCell>
+                    <div className="flex flex-col">
+                       <span className="text-primary font-black text-sm">مفرد: {(p.retailPrice || 0).toLocaleString()}</span>
+                       <span className="text-muted-foreground font-bold text-[10px]">تكلفة: {(p.purchasePrice || 0).toLocaleString()}</span>
+                    </div>
+                  </TableCell>
                   <TableCell>
                     <div className="flex flex-col">
                        <span className={cn("font-black text-sm", (p.stock || 0) < 10 ? "text-destructive" : "text-foreground")}>{p.stock || 0} قطعة</span>
@@ -383,12 +387,10 @@ export default function ProductsManagementPage() {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Badge className={cn(
-                      "rounded-full px-4 py-1 border-none font-black text-[10px]",
-                      p.status === 'available' && (p.stock || 0) > 0 ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
-                    )}>
-                       {p.status === 'available' && (p.stock || 0) > 0 ? 'متوفر' : 'نفذت الكمية'}
-                    </Badge>
+                    <div className="flex flex-col">
+                       <span className="text-[10px] font-black">{p.lastPurchaseDate ? new Date(p.lastPurchaseDate).toLocaleDateString("ar-EG") : '-'}</span>
+                       {p.lastPurchasePrice && <span className="text-[9px] text-muted-foreground font-bold">بـ {p.lastPurchasePrice.toLocaleString()} د.ع</span>}
+                    </div>
                   </TableCell>
                   <TableCell className="text-left px-6">
                     <DropdownMenu>
@@ -399,6 +401,7 @@ export default function ProductsManagementPage() {
                         <DropdownMenuLabel className="font-black text-xs uppercase tracking-widest p-3 opacity-50">الإجراءات</DropdownMenuLabel>
                         <DropdownMenuItem className="rounded-xl gap-3 p-3 font-bold cursor-pointer" onClick={() => window.open(`/product/${p.id}`, '_blank')}><Eye className="h-4 w-4 text-blue-500" /> عرض وتفاصيل</DropdownMenuItem>
                         <DropdownMenuItem className="rounded-xl gap-3 p-3 font-bold cursor-pointer"><Edit2 className="h-4 w-4 text-orange-500" /> تعديل البيانات</DropdownMenuItem>
+                        <DropdownMenuItem className="rounded-xl gap-3 p-3 font-bold cursor-pointer text-primary"><History className="h-4 w-4" /> سجل المشتريات</DropdownMenuItem>
                         <DropdownMenuItem 
                           className="rounded-xl gap-3 p-3 font-bold cursor-pointer text-destructive hover:bg-destructive/5"
                           onClick={() => handleDeleteProduct(p.id)}
@@ -417,9 +420,7 @@ export default function ProductsManagementPage() {
                     <Package className="h-24 w-24" strokeWidth={1} />
                     <div className="space-y-1">
                       <p className="font-black text-2xl">لا توجد نتائج بحث</p>
-                      <p className="text-sm font-bold">جرب البحث بكلمة أخرى أو مسح الفلتر</p>
                     </div>
-                    <Button onClick={() => setSearchQuery("")} variant="outline" className="rounded-full font-black px-10">إعادة تعيين</Button>
                   </div>
                 </TableCell>
               </TableRow>
