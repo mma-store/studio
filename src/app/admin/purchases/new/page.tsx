@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useRef, useEffect } from "react";
@@ -15,7 +14,8 @@ import {
   AlertCircle,
   TrendingUp,
   X,
-  ChevronLeft
+  ChevronLeft,
+  Truck
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
