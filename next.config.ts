@@ -35,6 +35,12 @@ const nextConfig: NextConfig = {
         port: '',
         pathname: '/**',
       },
+      {
+        protocol: 'https',
+        hostname: 'up6.cc',
+        port: '',
+        pathname: '/**',
+      },
     ],
   },
   typescript: {
