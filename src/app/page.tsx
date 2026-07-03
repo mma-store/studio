@@ -26,14 +26,12 @@ export default function Home() {
   const [activeBanner, setActiveBanner] = useState(0);
 
   const bannersQuery = useMemo(() => query(collection(db, 'banners'), where('isActive', '==', true)), [db]);
-  const typesQuery = useMemo(() => collection(db, 'motorcycleTypes'), [db]);
   const categoriesQuery = useMemo(() => query(collection(db, 'categories'), limit(6)), [db]);
   const featuredQuery = useMemo(() => query(collection(db, 'products'), where('isFeatured', '==', true), limit(8)), [db]);
   const newArrivalsQuery = useMemo(() => query(collection(db, 'products'), orderBy('createdAt', 'desc'), limit(12)), [db]);
   const offersQuery = useMemo(() => collection(db, 'offers'), [db]);
 
   const { data: banners, loading: bannersLoading } = useCollection(bannersQuery);
-  const { data: types, loading: typesLoading } = useCollection(typesQuery);
   const { data: categories, loading: categoriesLoading } = useCollection(categoriesQuery);
   const { data: featuredProducts, loading: featuredLoading } = useCollection(featuredQuery);
   const { data: newArrivals, loading: newLoading } = useCollection(newArrivalsQuery);
@@ -75,7 +73,7 @@ export default function Home() {
                       className="object-cover"
                       priority={idx === 0}
                     />
-                    {/* Text Overlay - Removed internal gradient background */}
+                    {/* Text Overlay */}
                     <div className="absolute inset-0 p-6 md:p-12 flex flex-col justify-center gap-2 bg-transparent">
                       <h2 className="text-2xl md:text-6xl font-black text-white max-w-[280px] md:max-w-2xl leading-tight drop-shadow-2xl">
                         {banner.title}
@@ -92,27 +90,6 @@ export default function Home() {
                    <p className="font-black text-lg">مجمع محمد علاء للدرجات</p>
                 </div>
               )}
-            </div>
-          </section>
-
-          {/* Motorcycle Types */}
-          <section className="space-y-4">
-            <h3 className="text-lg md:text-2xl font-black flex items-center gap-3">
-              <TrendingUp className="h-6 w-6 text-primary" /> أنواع الدراجات
-            </h3>
-            <div className="flex gap-4 md:gap-8 overflow-x-auto no-scrollbar pb-2 px-1">
-              {typesLoading ? (
-                Array(6).fill(0).map((_, i) => <Skeleton key={i} className="h-16 w-16 md:h-24 md:w-24 rounded-full shrink-0" />)
-              ) : types.map((type: any) => (
-                <div key={type.id} className="flex flex-col items-center gap-2 shrink-0 group cursor-pointer">
-                  <div className="relative h-16 w-16 md:h-24 md:w-24 rounded-full border-2 border-primary/5 p-1 group-hover:border-primary transition-all duration-300 bg-white dark:bg-card shadow-sm hover:shadow-md">
-                    <div className="relative h-full w-full overflow-hidden rounded-full">
-                      <Image src={type.image || "https://picsum.photos/seed/type/200/200"} alt={type.name} fill className="object-cover transition-transform group-hover:scale-110" />
-                    </div>
-                  </div>
-                  <span className="text-[10px] md:text-xs font-black uppercase tracking-tighter opacity-80 group-hover:opacity-100">{type.name}</span>
-                </div>
-              ))}
             </div>
           </section>
 

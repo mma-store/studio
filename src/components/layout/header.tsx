@@ -1,4 +1,3 @@
-
 "use client";
 
 import { Bell, Search, ShoppingCart, Menu, X } from "lucide-react";
@@ -28,7 +27,6 @@ export function Header() {
               <h1 className="text-base font-black tracking-tight text-foreground leading-none">
                 مجمع محمد علاء
               </h1>
-              <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest mt-0.5">Automotive Hub</span>
             </div>
           </Link>
         </div>
