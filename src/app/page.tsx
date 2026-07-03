@@ -56,7 +56,7 @@ export default function Home() {
         <div className="container mx-auto space-y-6 md:space-y-10 py-4 px-4 max-w-7xl">
           {/* Hero Banner Section */}
           <section className="relative">
-            <div className="relative aspect-[16/9] sm:aspect-[2.4/1] w-full overflow-hidden rounded-[24px] md:rounded-[40px] shadow-lg bg-muted border">
+            <div className="relative aspect-[16/9] sm:aspect-[2.4/1] w-full overflow-hidden rounded-[24px] md:rounded-[40px] shadow-xl bg-muted border border-border/50">
               {bannersLoading ? (
                 <Skeleton className="h-full w-full" />
               ) : banners.length > 0 ? (
@@ -75,18 +75,14 @@ export default function Home() {
                       className="object-cover"
                       priority={idx === 0}
                     />
-                    <div className="absolute inset-0 p-6 md:p-12 flex flex-col justify-center gap-2 bg-gradient-to-r from-black/70 via-black/20 to-transparent">
-                      <h2 className="text-2xl md:text-6xl font-black text-white max-w-[280px] md:max-w-2xl leading-tight drop-shadow-xl">
+                    {/* Text Overlay - Removed internal gradient background */}
+                    <div className="absolute inset-0 p-6 md:p-12 flex flex-col justify-center gap-2 bg-transparent">
+                      <h2 className="text-2xl md:text-6xl font-black text-white max-w-[280px] md:max-w-2xl leading-tight drop-shadow-2xl">
                         {banner.title}
                       </h2>
-                      <p className="text-xs md:text-xl text-white/90 font-medium max-w-[200px] md:max-w-lg line-clamp-2">
+                      <p className="text-xs md:text-xl text-white/95 font-black max-w-[200px] md:max-w-lg line-clamp-2 drop-shadow-md">
                         {banner.subtitle}
                       </p>
-                      <Link href={banner.link || "/catalog"}>
-                        <Button size="lg" className="w-fit mt-4 rounded-full font-black px-8 h-10 md:h-14 text-sm md:text-lg shadow-2xl">
-                          اكتشف الآن
-                        </Button>
-                      </Link>
                     </div>
                   </div>
                 ))
