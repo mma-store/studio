@@ -16,7 +16,8 @@ import {
   CreditCard,
   Cloud,
   CheckCircle2,
-  Loader2
+  Loader2,
+  Printer
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -49,6 +50,8 @@ export default function AdminSettingsPage() {
     phone: "07700000000",
     whatsapp: "07700000000",
     address: "بغداد، الكرادة، ساحة كهرمانة",
+    printerName: "POS-80",
+    defaultPrintSize: "80mm",
     notificationsEnabled: true,
     stockAlertsEnabled: true,
   });
@@ -89,9 +92,9 @@ export default function AdminSettingsPage() {
       <Tabs defaultValue="store" className="space-y-8">
         <TabsList className="bg-white dark:bg-card p-1.5 rounded-[24px] h-16 border shadow-sm w-full md:w-fit overflow-x-auto no-scrollbar">
           <TabsTrigger value="store" className="rounded-2xl px-10 font-black text-sm data-[state=active]:bg-primary data-[state=active]:text-white transition-all">معلومات المجمع</TabsTrigger>
+          <TabsTrigger value="printing" className="rounded-2xl px-10 font-black text-sm data-[state=active]:bg-primary data-[state=active]:text-white transition-all">إعدادات الطباعة</TabsTrigger>
           <TabsTrigger value="integrations" className="rounded-2xl px-10 font-black text-sm data-[state=active]:bg-primary data-[state=active]:text-white transition-all">الخدمات السحابية</TabsTrigger>
           <TabsTrigger value="notifications" className="rounded-2xl px-10 font-black text-sm data-[state=active]:bg-primary data-[state=active]:text-white transition-all">الإشعارات</TabsTrigger>
-          <TabsTrigger value="security" className="rounded-2xl px-10 font-black text-sm data-[state=active]:bg-primary data-[state=active]:text-white transition-all">الأمان</TabsTrigger>
         </TabsList>
 
         <TabsContent value="store" className="space-y-8 animate-in slide-in-from-bottom-4">
@@ -140,6 +143,42 @@ export default function AdminSettingsPage() {
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        <TabsContent value="printing" className="space-y-8 animate-in slide-in-from-bottom-4">
+           <Card className="rounded-[40px] border-none shadow-sm max-w-2xl overflow-hidden">
+              <CardHeader className="bg-slate-900 text-white p-8">
+                <CardTitle className="flex items-center gap-3 text-2xl font-black">
+                  <Printer className="h-7 w-7 text-primary" /> إعدادات الطابعات
+                </CardTitle>
+                <CardDescription className="text-slate-400">تحديد الطابعة الافتراضية والقياسات المستخدمة في الفواتير.</CardDescription>
+              </CardHeader>
+              <CardContent className="p-8 space-y-6">
+                 <div className="space-y-2">
+                    <Label className="font-black">اسم الطابعة في النظام (System Printer Name)</Label>
+                    <Input 
+                      value={formData.printerName} 
+                      onChange={(e) => setFormData({...formData, printerName: e.target.value})} 
+                      placeholder="مثلاً: XP-80C أو Thermal-Printer"
+                      className="rounded-xl h-12 bg-muted/30 border-none font-mono"
+                    />
+                 </div>
+                 <div className="space-y-2">
+                    <Label className="font-black">القياس الافتراضي للطباعة</Label>
+                    <div className="grid grid-cols-3 gap-3">
+                       {['58mm', '80mm', 'A4'].map(size => (
+                         <button 
+                          key={size}
+                          onClick={() => setFormData({...formData, defaultPrintSize: size})}
+                          className={`h-12 rounded-xl font-black border-2 transition-all ${formData.defaultPrintSize === size ? 'border-primary bg-primary/5 text-primary' : 'border-muted'}`}
+                         >
+                            {size}
+                         </button>
+                       ))}
+                    </div>
+                 </div>
+              </CardContent>
+           </Card>
         </TabsContent>
 
         <TabsContent value="integrations" className="space-y-8 animate-in slide-in-from-bottom-4">
@@ -199,3 +238,4 @@ export default function AdminSettingsPage() {
     </div>
   );
 }
+
