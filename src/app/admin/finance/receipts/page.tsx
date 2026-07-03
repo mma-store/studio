@@ -36,10 +36,12 @@ import { useFirestore, useCollection, useUser } from "@/firebase";
 import { collection, query, orderBy, addDoc, doc, writeBatch, increment } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/hooks/use-toast";
+import { useRouter } from "next/navigation";
 
 export default function ReceiptVouchersPage() {
   const db = useFirestore();
   const { profile } = useUser();
+  const router = useRouter();
   const [search, setSearch] = useState("");
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -103,6 +105,7 @@ export default function ReceiptVouchersPage() {
       await batch.commit();
       setIsAddOpen(false);
       toast({ title: "تم الحفظ", description: "تم تسجيل وصل القبض وتحديث حساب العميل." });
+      router.push(`/admin/print/receipt/${voucherRef.id}?size=80mm`);
     } catch (e) {
       toast({ variant: "destructive", title: "خطأ", description: "فشل حفظ الوصل." });
     } finally {
@@ -220,7 +223,7 @@ export default function ReceiptVouchersPage() {
                   </TableCell>
                   <TableCell className="text-xs font-medium">{v.employeeName}</TableCell>
                   <TableCell className="text-left px-6">
-                    <Button variant="ghost" size="icon" className="rounded-xl text-primary" onClick={() => window.print()}>
+                    <Button variant="ghost" size="icon" className="rounded-xl text-primary" onClick={() => router.push(`/admin/print/receipt/${v.id}?size=80mm`)}>
                       <Printer className="h-4 w-4" />
                     </Button>
                   </TableCell>

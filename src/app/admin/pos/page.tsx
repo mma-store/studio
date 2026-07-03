@@ -50,6 +50,7 @@ import { errorEmitter } from "@/firebase/error-emitter";
 import { FirestorePermissionError } from "@/firebase/errors";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useRouter } from "next/navigation";
 
 // مكون السلة المستقل
 interface CartViewProps {
@@ -183,6 +184,7 @@ function CartView({ cart, selectedCustomer, customerSearch, setCustomerSearch, s
 export default function POSPage() {
   const db = useFirestore();
   const { profile } = useUser();
+  const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
   const [customerSearch, setCustomerSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -354,9 +356,11 @@ export default function POSPage() {
     batch.commit()
       .then(() => {
         toast({ title: "تم بنجاح", description: `تم حفظ الطلب برقم ${orderNumber}` });
+        const finalOrderId = newOrderRef.id;
         setCart([]);
         setIsCheckoutOpen(false);
-        window.print();
+        // Open Print Preview
+        router.push(`/admin/print/invoice/${finalOrderId}?size=${printSize}`);
       })
       .catch((err) => errorEmitter.emit('permission-error', new FirestorePermissionError({ path: "orders/pos", operation: "write" })))
       .finally(() => setProcessingOrder(false));
@@ -572,7 +576,7 @@ export default function POSPage() {
 
               <div className="grid gap-3">
                  <Button disabled={processingOrder} className="h-14 rounded-xl text-base font-black gap-2" onClick={handleCompleteSale}>
-                    {processingOrder ? <Loader2 className="h-5 w-5 animate-spin" /> : <Printer className="h-5 w-5" />} تأكيد وحفظ وطباعة
+                    {processingOrder ? <Loader2 className="h-5 w-5 animate-spin" /> : <Printer className="h-5 w-5" />} تأكيد وحفظ والطباعة
                  </Button>
               </div>
            </div>
