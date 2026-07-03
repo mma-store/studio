@@ -1,3 +1,4 @@
+
 'use client';
 
 import { Header } from "@/components/layout/header";
@@ -8,7 +9,6 @@ import { Badge } from "@/components/ui/badge";
 import { 
   Zap, 
   Star, 
-  ChevronLeft,
   Settings2,
   TrendingUp,
   Tags
@@ -20,11 +20,16 @@ import { useFirestore, useCollection } from "@/firebase";
 import { collection, query, where, limit, orderBy } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+} from "@/components/ui/carousel";
+import useEmblaCarousel from "embla-carousel-react";
 
 export default function Home() {
   const db = useFirestore();
-  const [activeBanner, setActiveBanner] = useState(0);
-
+  
   const bannersQuery = useMemo(() => query(collection(db, 'banners'), where('isActive', '==', true)), [db]);
   const categoriesQuery = useMemo(() => query(collection(db, 'categories'), limit(6)), [db]);
   const featuredQuery = useMemo(() => query(collection(db, 'products'), where('isFeatured', '==', true), limit(8)), [db]);
@@ -37,57 +42,55 @@ export default function Home() {
   const { data: newArrivals, loading: newLoading } = useCollection(newArrivalsQuery);
   const { data: offers, loading: offersLoading } = useCollection(offersQuery);
 
-  useEffect(() => {
-    if (banners.length > 1) {
-      const timer = setInterval(() => {
-        setActiveBanner((prev) => (prev + 1) % banners.length);
-      }, 5000);
-      return () => clearInterval(timer);
-    }
-  }, [banners.length]);
-
   return (
     <div className="flex min-h-screen bg-[#FDF8F5] dark:bg-background text-foreground transition-colors duration-300">
       <main className="flex-1 pb-24 overflow-x-hidden">
         <Header />
         
         <div className="container mx-auto space-y-6 md:space-y-10 py-4 px-4 max-w-7xl">
-          {/* Hero Banner Section */}
+          {/* Hero Slider Section */}
           <section className="relative">
-            <div className="relative aspect-[16/9] sm:aspect-[2.4/1] w-full overflow-hidden rounded-[24px] md:rounded-[40px] shadow-xl bg-muted border border-border/50">
+            <div className="relative w-full overflow-hidden rounded-[24px] md:rounded-[40px] shadow-2xl bg-muted border border-border/50">
               {bannersLoading ? (
-                <Skeleton className="h-full w-full" />
+                <Skeleton className="aspect-[16/9] sm:aspect-[2.4/1] w-full" />
               ) : banners.length > 0 ? (
-                banners.map((banner: any, idx) => (
-                  <div 
-                    key={banner.id}
-                    className={cn(
-                      "absolute inset-0 transition-all duration-1000 ease-in-out",
-                      idx === activeBanner ? 'opacity-100 scale-100 z-10' : 'opacity-0 scale-105 z-0'
-                    )}
-                  >
-                    <Image 
-                      src={banner.image || "https://picsum.photos/seed/banner/1200/600"} 
-                      alt={banner.title}
-                      fill
-                      className="object-cover"
-                      priority={idx === 0}
-                    />
-                    {/* Text Overlay */}
-                    <div className="absolute inset-0 p-6 md:p-12 flex flex-col justify-center gap-2 bg-transparent">
-                      <h2 className="text-2xl md:text-6xl font-black text-white max-w-[280px] md:max-w-2xl leading-tight drop-shadow-2xl">
-                        {banner.title}
-                      </h2>
-                      <p className="text-xs md:text-xl text-white/95 font-black max-w-[200px] md:max-w-lg line-clamp-2 drop-shadow-md">
-                        {banner.subtitle}
-                      </p>
-                    </div>
-                  </div>
-                ))
+                <Carousel 
+                  opts={{
+                    align: "start",
+                    loop: true,
+                    direction: "rtl"
+                  }}
+                  className="w-full"
+                >
+                  <CarouselContent>
+                    {banners.map((banner: any) => (
+                      <CarouselItem key={banner.id}>
+                        <div className="relative aspect-[16/9] sm:aspect-[2.4/1] w-full overflow-hidden">
+                          <Image 
+                            src={banner.image || "https://picsum.photos/seed/banner/1200/600"} 
+                            alt={banner.title}
+                            fill
+                            className="object-cover"
+                            priority
+                          />
+                          {/* Text Overlay - Clean and Minimal */}
+                          <div className="absolute inset-0 p-6 md:p-12 flex flex-col justify-center gap-2">
+                            <h2 className="text-2xl md:text-6xl font-black text-white max-w-[280px] md:max-w-2xl leading-tight drop-shadow-lg">
+                              {banner.title}
+                            </h2>
+                            <p className="text-xs md:text-xl text-white/90 font-bold max-w-[200px] md:max-w-lg line-clamp-2">
+                              {banner.subtitle}
+                            </p>
+                          </div>
+                        </div>
+                      </CarouselItem>
+                    ))}
+                  </CarouselContent>
+                </Carousel>
               ) : (
-                <div className="h-full w-full flex flex-col items-center justify-center text-muted-foreground bg-muted/20 gap-2">
+                <div className="aspect-[16/9] sm:aspect-[2.4/1] w-full flex flex-col items-center justify-center text-muted-foreground bg-muted/20 gap-2">
                    <Zap className="h-10 w-10 opacity-20" />
-                   <p className="font-black text-lg">مجمع محمد علاء للدرجات</p>
+                   <p className="font-black text-lg">مجمع محمد علاء</p>
                 </div>
               )}
             </div>
