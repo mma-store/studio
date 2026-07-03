@@ -48,6 +48,95 @@ import { errorEmitter } from "@/firebase/error-emitter";
 import { FirestorePermissionError } from "@/firebase/errors";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 
+// منفصل لضمان عدم حدوث رندر لانهائي
+interface CartViewProps {
+  cart: any[];
+  selectedCustomer: any;
+  setSelectedCustomer: (c: any) => void;
+  updateQuantity: (id: string, d: number) => void;
+  removeFromCart: (id: string) => void;
+  total: number;
+  allUsers: any[];
+  onCheckout: () => void;
+}
+
+function CartView({ cart, selectedCustomer, setSelectedCustomer, updateQuantity, removeFromCart, total, allUsers, onCheckout }: CartViewProps) {
+  return (
+    <div className="flex flex-col h-full overflow-hidden">
+      <div className="p-4 border-b space-y-3">
+        <h2 className="text-lg font-black flex items-center gap-2">
+          <ShoppingCart className="h-5 w-5 text-primary" /> الفاتورة
+        </h2>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" className="w-full h-11 rounded-xl justify-between border-primary/20 bg-primary/5 px-3">
+              <div className="flex items-center gap-2 truncate">
+                <User className="h-4 w-4 text-primary" />
+                <span className="text-xs font-bold truncate">{selectedCustomer.name}</span>
+              </div>
+              <ChevronDown className="h-3 w-3 opacity-40" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent className="w-72 rounded-xl" align="start">
+            <DropdownMenuItem onClick={() => setSelectedCustomer({ name: "زبون نقدي", type: 'retail' })}>زبون نقدي عام</DropdownMenuItem>
+            {allUsers?.map((u: any) => (
+              <DropdownMenuItem 
+                key={u.id} 
+                onClick={() => setSelectedCustomer({ id: u.id, name: u.displayName, type: u.role === 'wholesale_customer' ? 'wholesale' : 'retail' })}
+              >
+                {u.displayName} ({u.role === 'wholesale_customer' ? 'جملة' : 'مفرد'})
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-3 space-y-2 bg-muted/5">
+        {cart.length === 0 ? (
+          <div className="h-full flex flex-col items-center justify-center opacity-20">
+            <ShoppingCart className="h-12 w-12 mb-2" />
+            <p className="text-xs font-black">السلة فارغة</p>
+          </div>
+        ) : cart.map((item) => (
+          <div key={item.id} className="flex gap-2 p-2 rounded-xl bg-white dark:bg-card border shadow-sm">
+            <div className="relative h-12 w-12 shrink-0 rounded-lg overflow-hidden border bg-muted">
+              {item.images?.[0] && <Image src={item.images[0]} alt="" fill className="object-cover" />}
+            </div>
+            <div className="flex-1 min-w-0 flex flex-col justify-center">
+              <h4 className="text-[11px] font-black truncate">{item.name}</h4>
+              <div className="flex items-center justify-between mt-1">
+                <span className="text-[11px] font-black text-primary">
+                  {(selectedCustomer.type === 'wholesale' ? (item.wholesalePrice || item.retailPrice) : item.retailPrice).toLocaleString()} د.ع
+                </span>
+                <div className="flex items-center gap-1.5 bg-muted/50 rounded-lg p-0.5">
+                  <button onClick={() => updateQuantity(item.id, -1)} className="h-5 w-5 bg-white rounded shadow-sm flex items-center justify-center text-foreground"><Minus className="h-3 w-3" /></button>
+                  <span className="text-[10px] font-black w-3 text-center">{item.quantity}</span>
+                  <button onClick={() => updateQuantity(item.id, 1)} className="h-5 w-5 bg-primary text-white rounded shadow-sm flex items-center justify-center"><Plus className="h-3 w-3" /></button>
+                </div>
+              </div>
+            </div>
+            <button onClick={() => removeFromCart(item.id)} className="text-destructive/50 hover:text-destructive p-1"><X className="h-4 w-4" /></button>
+          </div>
+        ))}
+      </div>
+
+      <div className="p-4 bg-white dark:bg-card border-t shadow-lg space-y-3">
+        <div className="flex justify-between font-black text-primary text-xl">
+          <span>الإجمالي:</span>
+          <span>{total.toLocaleString()} د.ع</span>
+        </div>
+        <Button 
+          disabled={cart.length === 0} 
+          className="w-full h-12 rounded-xl text-sm font-black gap-2 shadow-lg"
+          onClick={onCheckout}
+        >
+          <Zap className="h-4 w-4" /> إتمام العملية
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 export default function POSPage() {
   const db = useFirestore();
   const { profile } = useUser();
@@ -59,15 +148,16 @@ export default function POSPage() {
   const [processingOrder, setProcessingOrder] = useState(false);
   const [isCartSheetOpen, setIsCartSheetOpen] = useState(false);
   
-  // Financial States
   const [paidAmount, setPaidAmount] = useState<number>(0);
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'credit' | 'partial'>('cash');
 
   const productsQuery = useMemo(() => query(collection(db, 'products'), orderBy('name')), [db]);
   const { data: products, loading } = useCollection(productsQuery);
   
-  const categoriesQuery = useMemo(() => collection(db, 'categories'), [db]);
+  const categoriesQuery = useMemo(() => query(collection(db, 'categories'), orderBy('name')), [db]);
   const { data: categories } = useCollection(categoriesQuery);
+
+  const { data: allUsers } = useCollection(query(collection(db, 'users'), orderBy('displayName')));
 
   const filteredProducts = useMemo(() => {
     if (!products) return [];
@@ -114,11 +204,18 @@ export default function POSPage() {
     setCart(prev => prev.map(item => {
       if (item.id === productId) {
         const newQty = Math.max(1, item.quantity + delta);
-        if (delta > 0 && newQty > item.stock) return item;
+        if (delta > 0 && newQty > item.stock) {
+          toast({ variant: "destructive", title: "تنبيه", description: "الكمية المطلوبة غير متوفرة بالكامل." });
+          return item;
+        }
         return { ...item, quantity: newQty };
       }
       return item;
     }));
+  };
+
+  const removeFromCart = (productId: string) => {
+    setCart(prev => prev.filter(i => i.id !== productId));
   };
 
   const handleOpenCheckout = () => {
@@ -184,90 +281,13 @@ export default function POSPage() {
 
     batch.commit()
       .then(() => {
-        toast({ title: "تم بنجاح" });
+        toast({ title: "تم بنجاح", description: `تم حفظ الطلب برقم ${orderNumber}` });
         setCart([]);
         setIsCheckoutOpen(false);
       })
       .catch((err) => errorEmitter.emit('permission-error', new FirestorePermissionError({ path: "orders/pos", operation: "write" })))
       .finally(() => setProcessingOrder(false));
   };
-
-  const { data: allUsers } = useCollection(query(collection(db, 'users')));
-
-  const CartContent = () => (
-    <div className="flex flex-col h-full overflow-hidden">
-      <div className="p-4 border-b space-y-3">
-        <h2 className="text-lg font-black flex items-center gap-2">
-          <ShoppingCart className="h-5 w-5 text-primary" /> الفاتورة
-        </h2>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" className="w-full h-11 rounded-xl justify-between border-primary/20 bg-primary/5 px-3">
-              <div className="flex items-center gap-2 truncate">
-                <User className="h-4 w-4 text-primary" />
-                <span className="text-xs font-bold truncate">{selectedCustomer.name}</span>
-              </div>
-              <ChevronDown className="h-3 w-3 opacity-40" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent className="w-72 rounded-xl" align="start">
-            <DropdownMenuItem onClick={() => setSelectedCustomer({ name: "زبون نقدي", type: 'retail' })}>زبون نقدي عام</DropdownMenuItem>
-            {allUsers?.map((u: any) => (
-              <DropdownMenuItem 
-                key={u.id} 
-                onClick={() => setSelectedCustomer({ id: u.id, name: u.displayName, type: u.role === 'wholesale_customer' ? 'wholesale' : 'retail' })}
-              >
-                {u.displayName} ({u.role === 'wholesale_customer' ? 'جملة' : 'مفرد'})
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-
-      <div className="flex-1 overflow-y-auto p-3 space-y-2 bg-muted/5">
-        {cart.length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center opacity-20">
-            <ShoppingCart className="h-12 w-12 mb-2" />
-            <p className="text-xs font-black">السلة فارغة</p>
-          </div>
-        ) : cart.map((item) => (
-          <div key={item.id} className="flex gap-2 p-2 rounded-xl bg-white dark:bg-card border shadow-sm">
-            <div className="relative h-12 w-12 shrink-0 rounded-lg overflow-hidden border bg-muted">
-              {item.images?.[0] && <Image src={item.images[0]} alt="" fill className="object-cover" />}
-            </div>
-            <div className="flex-1 min-w-0 flex flex-col justify-center">
-              <h4 className="text-[11px] font-black truncate">{item.name}</h4>
-              <div className="flex items-center justify-between mt-1">
-                <span className="text-[11px] font-black text-primary">
-                  {(selectedCustomer.type === 'wholesale' ? (item.wholesalePrice || item.retailPrice) : item.retailPrice).toLocaleString()} د.ع
-                </span>
-                <div className="flex items-center gap-1.5 bg-muted/50 rounded-lg p-0.5">
-                  <button onClick={() => updateQuantity(item.id, -1)} className="h-5 w-5 bg-white rounded shadow-sm flex items-center justify-center"><Minus className="h-2 w-2" /></button>
-                  <span className="text-[10px] font-black w-3 text-center">{item.quantity}</span>
-                  <button onClick={() => updateQuantity(item.id, 1)} className="h-5 w-5 bg-primary text-white rounded shadow-sm flex items-center justify-center"><Plus className="h-2 w-2" /></button>
-                </div>
-              </div>
-            </div>
-            <button onClick={() => setCart(cart.filter(i => i.id !== item.id))} className="text-destructive/50 hover:text-destructive p-1"><X className="h-4 w-4" /></button>
-          </div>
-        ))}
-      </div>
-
-      <div className="p-4 bg-white dark:bg-card border-t shadow-lg space-y-3">
-        <div className="flex justify-between font-black text-primary text-xl">
-          <span>الإجمالي:</span>
-          <span>{total.toLocaleString()} د.ع</span>
-        </div>
-        <Button 
-          disabled={cart.length === 0} 
-          className="w-full h-12 rounded-xl text-sm font-black gap-2 shadow-lg"
-          onClick={handleOpenCheckout}
-        >
-          <Zap className="h-4 w-4" /> إتمام العملية
-        </Button>
-      </div>
-    </div>
-  );
 
   return (
     <div className="flex flex-col lg:flex-row h-[calc(100vh-64px)] overflow-hidden bg-background -m-4 md:-m-8">
@@ -347,7 +367,16 @@ export default function POSPage() {
 
       {/* Cart Desktop Sidebar */}
       <div className="hidden lg:flex w-[320px] xl:w-[380px] flex-col bg-white dark:bg-card border-r shadow-xl z-20">
-        <CartContent />
+        <CartView 
+          cart={cart}
+          selectedCustomer={selectedCustomer}
+          setSelectedCustomer={setSelectedCustomer}
+          updateQuantity={updateQuantity}
+          removeFromCart={removeFromCart}
+          total={total}
+          allUsers={allUsers || []}
+          onCheckout={handleOpenCheckout}
+        />
       </div>
 
       {/* Mobile Floating Cart Summary */}
@@ -373,7 +402,16 @@ export default function POSPage() {
               <SheetHeader className="p-4 border-b">
                 <SheetTitle className="text-lg font-black text-right">مراجعة الفاتورة</SheetTitle>
               </SheetHeader>
-              <CartContent />
+              <CartView 
+                cart={cart}
+                selectedCustomer={selectedCustomer}
+                setSelectedCustomer={setSelectedCustomer}
+                updateQuantity={updateQuantity}
+                removeFromCart={removeFromCart}
+                total={total}
+                allUsers={allUsers || []}
+                onCheckout={handleOpenCheckout}
+              />
             </SheetContent>
           </Sheet>
           <Button 
@@ -386,7 +424,7 @@ export default function POSPage() {
         </div>
       </div>
 
-      {/* Checkout Dialog - Standard Sizing */}
+      {/* Checkout Dialog */}
       <Dialog open={isCheckoutOpen} onOpenChange={setIsCheckoutOpen}>
         <DialogContent className="rounded-[28px] max-w-lg p-0 overflow-hidden border-none shadow-2xl">
            <div className="p-6 border-b bg-primary text-white flex items-center justify-between">
@@ -402,7 +440,10 @@ export default function POSPage() {
                  ].map((m) => (
                    <button 
                     key={m.id}
-                    onClick={() => { setPaymentMethod(m.id as any); if(m.id !== 'partial') setPaidAmount(m.id === 'cash' ? total : 0); }}
+                    onClick={() => { 
+                      setPaymentMethod(m.id as any); 
+                      if(m.id !== 'partial') setPaidAmount(m.id === 'cash' ? total : 0); 
+                    }}
                     className={cn("p-4 rounded-2xl border-2 transition-all flex flex-col items-center gap-2", paymentMethod === m.id ? "border-primary bg-primary/5 text-primary" : "border-muted opacity-60")}
                    >
                       <m.icon className="h-6 w-6" />
