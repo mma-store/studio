@@ -2,7 +2,13 @@
 'use client';
 
 import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
-import { getFirestore, Firestore } from 'firebase/firestore';
+import { 
+  getFirestore, 
+  Firestore, 
+  initializeFirestore, 
+  persistentLocalCache, 
+  persistentMultipleTabManager 
+} from 'firebase/firestore';
 import { getAuth, Auth } from 'firebase/auth';
 import { firebaseConfig } from './config';
 
@@ -13,7 +19,12 @@ let auth: Auth;
 export function initializeFirebase() {
   if (!getApps().length) {
     app = initializeApp(firebaseConfig);
-    firestore = getFirestore(app);
+    // Enable offline persistence with multi-tab support
+    firestore = initializeFirestore(app, {
+      localCache: persistentLocalCache({
+        tabManager: persistentMultipleTabManager()
+      })
+    });
     auth = getAuth(app);
   } else {
     app = getApps()[0];

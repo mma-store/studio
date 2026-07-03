@@ -11,7 +11,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@/dropdown-menu"; // Note: ensure correct relative path or alias
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useState, useEffect } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -20,6 +20,7 @@ import { signOut } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { toast } from "@/hooks/use-toast";
 import Link from "next/link";
+import { SyncIndicator } from "@/components/layout/sync-indicator";
 
 export function AdminHeader() {
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -53,26 +54,30 @@ export function AdminHeader() {
     <header className="sticky top-0 z-30 flex h-16 w-full items-center justify-between border-b bg-background/80 px-6 backdrop-blur-md">
       <div className="flex items-center gap-4">
         <SidebarTrigger />
-        <div className="relative hidden w-72 md:block">
+        <div className="relative hidden lg:block">
           <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input 
             placeholder="بحث سريع..." 
-            className="h-10 rounded-xl bg-muted/50 pr-10 border-none focus-visible:ring-1 focus-visible:ring-primary/20"
+            className="h-10 w-64 rounded-xl bg-muted/50 pr-10 border-none focus-visible:ring-1 focus-visible:ring-primary/20"
           />
         </div>
       </div>
 
-      <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={toggleTheme} className="rounded-xl hover:bg-muted text-foreground">
-          {isDarkMode ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-        </Button>
-
-        <Link href="/admin/notifications">
-          <Button variant="ghost" size="icon" className="relative rounded-xl hover:bg-muted text-foreground">
-            <Bell className="h-5 w-5" />
-            <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-primary" />
+      <div className="flex items-center gap-4">
+        <SyncIndicator />
+        
+        <div className="flex items-center gap-2 border-r pr-4 mr-2 border-muted">
+          <Button variant="ghost" size="icon" onClick={toggleTheme} className="rounded-xl hover:bg-muted text-foreground">
+            {isDarkMode ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
           </Button>
-        </Link>
+
+          <Link href="/admin/notifications">
+            <Button variant="ghost" size="icon" className="relative rounded-xl hover:bg-muted text-foreground">
+              <Bell className="h-5 w-5" />
+              <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-primary" />
+            </Button>
+          </Link>
+        </div>
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -84,7 +89,7 @@ export function AdminHeader() {
                 </AvatarFallback>
               </Avatar>
               <div className="flex flex-col items-start pr-1 hidden sm:flex text-right">
-                 <span className="text-[10px] font-black uppercase tracking-tighter text-muted-foreground">Admin</span>
+                 <span className="text-[10px] font-black uppercase tracking-tighter text-muted-foreground">الإدارة</span>
                  <span className="text-xs font-bold leading-none text-foreground">{profile?.displayName || 'المدير'}</span>
               </div>
             </Button>
