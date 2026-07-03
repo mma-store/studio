@@ -48,6 +48,13 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from "@/components/ui/select";
 import { useFirestore, useCollection } from "@/firebase";
 import { collection, query, orderBy, addDoc, doc, deleteDoc } from "firebase/firestore";
 import { useMemo, useState, useRef } from "react";
@@ -62,11 +69,16 @@ export default function ProductsManagementPage() {
   const productsQuery = useMemo(() => query(collection(db, 'products'), orderBy('createdAt', 'desc')), [db]);
   const { data: products, loading } = useCollection(productsQuery);
   
+  // Fetch existing categories
+  const categoriesQuery = useMemo(() => query(collection(db, 'categories'), orderBy('name')), [db]);
+  const { data: categories } = useCollection(categoriesQuery);
+  
   const [searchQuery, setSearchQuery] = useState("");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadedImages, setUploadedImages] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<string>("");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -101,6 +113,10 @@ export default function ProductsManagementPage() {
   const handleAddProduct = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (isSaving) return;
+    if (!selectedCategory) {
+      toast({ variant: "destructive", title: "تنبيه", description: "يرجى اختيار القسم أولاً." });
+      return;
+    }
     
     setIsSaving(true);
     const formData = new FormData(e.currentTarget);
@@ -108,7 +124,7 @@ export default function ProductsManagementPage() {
     const productData = {
       name: formData.get('name'),
       barcode: formData.get('barcode'),
-      category: formData.get('category'),
+      category: selectedCategory,
       retailPrice: Number(formData.get('retailPrice')) || 0,
       wholesalePrice: Number(formData.get('wholesalePrice')) || 0,
       purchasePrice: Number(formData.get('purchasePrice')) || 0,
@@ -127,6 +143,7 @@ export default function ProductsManagementPage() {
       toast({ title: "تم الإضافة", description: "تم إضافة المنتج بنجاح." });
       setIsAddDialogOpen(false);
       setUploadedImages([]);
+      setSelectedCategory("");
     } catch (error) {
       toast({ variant: "destructive", title: "خطأ", description: "فشل في حفظ المنتج." });
     } finally {
@@ -162,7 +179,7 @@ export default function ProductsManagementPage() {
                   <Plus className="h-5 w-5" /> إضافة منتج جديد
                 </Button>
              </DialogTrigger>
-             <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto rounded-[32px] p-0">
+             <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto rounded-[32px] p-0 border-none shadow-2xl">
                 <div className="p-8 space-y-6">
                   <DialogHeader>
                     <DialogTitle className="text-3xl font-black text-right">إضافة منتج جديد</DialogTitle>
@@ -173,50 +190,66 @@ export default function ProductsManagementPage() {
                       <div className="space-y-4">
                         <div className="space-y-2">
                           <Label className="font-bold">اسم المنتج</Label>
-                          <Input name="name" required placeholder="مثال: فلتر زيت أصلي" className="rounded-2xl h-14 bg-muted/30 border-none" />
+                          <Input name="name" required placeholder="مثال: فلتر زيت أصلي" className="rounded-2xl h-14 bg-muted/30 border-none px-6 text-lg font-bold" />
                         </div>
                         <div className="space-y-2">
                           <Label className="font-bold">الباركود</Label>
-                          <Input name="barcode" placeholder="697000..." className="rounded-2xl h-14 bg-muted/30 border-none" />
+                          <Input name="barcode" placeholder="697000..." className="rounded-2xl h-14 bg-muted/30 border-none px-6 text-lg" />
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                           <div className="space-y-2">
                             <Label className="font-bold">سعر الشراء</Label>
-                            <Input name="purchasePrice" type="number" required className="rounded-2xl h-14 bg-muted/30 border-none" />
+                            <Input name="purchasePrice" type="number" required className="rounded-2xl h-14 bg-muted/30 border-none text-center font-black text-xl" />
                           </div>
                           <div className="space-y-2">
                             <Label className="font-bold">سعر المفرد</Label>
-                            <Input name="retailPrice" type="number" required className="rounded-2xl h-14 bg-muted/30 border-none" />
+                            <Input name="retailPrice" type="number" required className="rounded-2xl h-14 bg-muted/30 border-none text-center font-black text-xl text-primary" />
                           </div>
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                           <div className="space-y-2">
                             <Label className="font-bold">سعر الجملة</Label>
-                            <Input name="wholesalePrice" type="number" className="rounded-2xl h-14 bg-muted/30 border-none" />
+                            <Input name="wholesalePrice" type="number" className="rounded-2xl h-14 bg-muted/30 border-none text-center font-black text-xl" />
                           </div>
                           <div className="space-y-2">
                             <Label className="font-bold">الكمية المتوفرة</Label>
-                            <Input name="stock" type="number" required className="rounded-2xl h-14 bg-muted/30 border-none" />
+                            <Input name="stock" type="number" required className="rounded-2xl h-14 bg-muted/30 border-none text-center font-black text-xl" />
                           </div>
                         </div>
                       </div>
 
                       <div className="space-y-4">
                         <div className="space-y-2">
-                          <Label className="font-bold">التصنيف</Label>
-                          <Input name="category" required placeholder="مثال: محركات" className="rounded-2xl h-14 bg-muted/30 border-none" />
+                          <Label className="font-bold">القسم (التصنيف)</Label>
+                          <Select value={selectedCategory} onValueChange={setSelectedCategory} required>
+                            <SelectTrigger className="rounded-2xl h-14 bg-muted/30 border-none px-6 text-lg font-bold">
+                              <SelectValue placeholder="اختر قسم المنتج" />
+                            </SelectTrigger>
+                            <SelectContent className="rounded-2xl p-2 shadow-2xl border-none">
+                              {categories.length > 0 ? (
+                                categories.map((cat: any) => (
+                                  <SelectItem key={cat.id} value={cat.name} className="rounded-xl font-bold py-3">
+                                    {cat.name}
+                                  </SelectItem>
+                                ))
+                              ) : (
+                                <p className="p-4 text-center text-xs opacity-50 font-bold">لا يوجد أقسام مضافة</p>
+                              )}
+                            </SelectContent>
+                          </Select>
+                          <p className="text-[10px] text-muted-foreground mr-1 font-bold">يجب أن يكون القسم مضافاً مسبقاً من صفحة الأقسام.</p>
                         </div>
                         <div className="space-y-2">
                           <Label className="font-bold">موقع التخزين</Label>
-                          <Input name="storageLocation" placeholder="مثال: رف A1" className="rounded-2xl h-14 bg-muted/30 border-none" />
+                          <Input name="storageLocation" placeholder="مثال: رف A1" className="rounded-2xl h-14 bg-muted/30 border-none px-6" />
                         </div>
                         <div className="space-y-2">
                           <Label className="font-bold">وصف المنتج</Label>
-                          <Textarea name="description" className="rounded-2xl min-h-[120px] bg-muted/30 border-none p-4" />
+                          <Textarea name="description" placeholder="اكتب تفاصيل إضافية عن المنتج هنا..." className="rounded-2xl min-h-[120px] bg-muted/30 border-none p-6 text-sm font-medium leading-relaxed" />
                         </div>
                         <div className="flex items-center gap-2 p-4 rounded-2xl bg-primary/5 border border-primary/10">
                            <Checkbox name="isFeatured" id="isFeatured" />
-                           <label htmlFor="isFeatured" className="text-sm font-bold cursor-pointer">
+                           <label htmlFor="isFeatured" className="text-sm font-bold cursor-pointer select-none">
                               تمييز المنتج في الواجهة الرئيسية للمتجر
                            </label>
                         </div>
