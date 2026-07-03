@@ -1,8 +1,9 @@
 "use client";
 
-import { Bell, Search, ShoppingCart, Menu, X } from "lucide-react";
+import { Bell, Search, ShoppingCart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import Image from "next/image";
 import { useCart } from "@/context/cart-context";
 import { 
   Sheet, 
@@ -14,19 +15,21 @@ import {
 
 export function Header() {
   const { totalItems } = useCart();
+  const LOGO_URL = "https://up6.cc/2026/07/178308238964931.png";
 
   return (
     <header className="sticky top-0 z-40 w-full border-b bg-background/80 backdrop-blur-md">
       <div className="container flex h-16 items-center justify-between px-4">
         <div className="flex items-center gap-4">
           <Link href="/" className="flex items-center gap-3">
-            <div className="flex h-9 w-14 items-center justify-center rounded-xl bg-primary shadow-lg shadow-primary/20">
-              <span className="text-sm font-black text-white italic tracking-tighter">MMA</span>
-            </div>
-            <div className="flex flex-col">
-              <h1 className="text-base font-black tracking-tight text-foreground leading-none">
-                مجمع محمد علاء
-              </h1>
+            <div className="relative h-10 w-24">
+              <Image 
+                src={LOGO_URL} 
+                alt="مجمع محمد علاء" 
+                fill 
+                className="object-contain"
+                priority
+              />
             </div>
           </Link>
         </div>

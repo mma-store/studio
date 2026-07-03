@@ -1,5 +1,4 @@
-
-'use client';
+"use client";
 
 import { useState } from "react";
 import { useAuth, useFirestore } from "@/firebase";
@@ -13,12 +12,14 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { toast } from "@/hooks/use-toast";
 import { User, Phone, Lock, Loader2, ArrowRight } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
 
 export default function RegisterPage() {
   const auth = useAuth();
   const db = useFirestore();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const LOGO_URL = "https://up6.cc/2026/07/178308238964931.png";
 
   const [formData, setFormData] = useState({
     displayName: "",
@@ -66,8 +67,13 @@ export default function RegisterPage() {
     <div className="min-h-screen flex items-center justify-center bg-[#FDF8F5] p-4 relative overflow-hidden">
       <Card className="w-full max-w-md rounded-[40px] border-none shadow-2xl overflow-hidden bg-white">
         <CardHeader className="space-y-4 pt-12 pb-6 text-center">
-          <div className="mx-auto flex h-14 w-20 items-center justify-center rounded-2xl bg-primary text-white shadow-xl shadow-primary/30">
-            <span className="text-2xl font-black italic tracking-tighter">MMA</span>
+          <div className="mx-auto relative h-16 w-40">
+            <Image 
+              src={LOGO_URL} 
+              alt="مجمع محمد علاء" 
+              fill 
+              className="object-contain"
+            />
           </div>
           <div className="space-y-1">
             <CardTitle className="text-3xl font-black text-foreground">إنشاء حساب جديد</CardTitle>

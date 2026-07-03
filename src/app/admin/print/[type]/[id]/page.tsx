@@ -1,5 +1,4 @@
-
-'use client';
+"use client";
 
 import { useEffect, useState, useMemo } from "react";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
@@ -9,8 +8,8 @@ import { Printer, FileText, ChevronRight, Download, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import Image from "next/image";
 
-// Mapping of types to Firestore collections
 const collectionMap: Record<string, string> = {
   invoice: 'orders',
   purchase: 'purchases',
@@ -26,6 +25,7 @@ export default function PrintPreviewPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const db = useFirestore();
+  const LOGO_URL = "https://up6.cc/2026/07/178308238964931.png";
   
   const type = params?.type as string;
   const id = params?.id as string;
@@ -100,7 +100,14 @@ export default function PrintPreviewPage() {
           <div className="p-6 md:p-10 text-slate-900 printable-area">
              {/* Header */}
              <div className="text-center space-y-2 mb-8 border-b pb-6">
-                <div className="h-10 w-16 bg-primary text-white flex items-center justify-center rounded-xl mx-auto font-black text-xl italic tracking-tighter mb-2">MMA</div>
+                <div className="relative h-16 w-32 mx-auto mb-2">
+                  <Image 
+                    src={LOGO_URL} 
+                    alt="MMA" 
+                    fill 
+                    className="object-contain"
+                  />
+                </div>
                 <h2 className="text-xl font-black">{settings?.storeName || 'مجمع محمد علاء'}</h2>
                 <p className="text-[10px] font-bold text-muted-foreground">{settings?.address || 'العراق - بغداد'}</p>
                 <p className="text-[10px] font-bold text-muted-foreground" dir="ltr">{settings?.phone || '07XXXXXXXXX'}</p>
@@ -201,7 +208,9 @@ export default function PrintPreviewPage() {
                       <p className="text-[8px] font-bold">بواسطة: {data.employeeName || 'النظام'}</p>
                       <p className="text-[8px] font-bold opacity-50">تاريخ الطباعة: {new Date().toLocaleString("ar-EG")}</p>
                    </div>
-                   <div className="h-10 w-10 bg-slate-100 rounded flex items-center justify-center font-black text-[10px]">QR</div>
+                   <div className="relative h-10 w-10 bg-slate-100 rounded flex items-center justify-center">
+                      <Image src={LOGO_URL} alt="QR" fill className="object-contain p-1" />
+                   </div>
                 </div>
              </div>
           </div>

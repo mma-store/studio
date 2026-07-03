@@ -1,20 +1,16 @@
-
-'use client';
+"use client";
 
 import * as React from "react";
 import { 
   LayoutDashboard, 
   ShoppingBag, 
   Layers, 
-  Bike, 
   Box, 
   ClipboardList, 
   Users, 
   Wrench, 
   BarChart3, 
   Image as ImageIcon, 
-  Tags, 
-  Bell, 
   Settings,
   LogOut,
   Monitor,
@@ -43,10 +39,13 @@ import {
 } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/firebase";
 import { signOut } from "firebase/auth";
 import { toast } from "@/hooks/use-toast";
+
+const LOGO_URL = "https://up6.cc/2026/07/178308238964931.png";
 
 const ADMIN_MENU = [
   {
@@ -120,14 +119,15 @@ export function AdminSidebar() {
 
   return (
     <Sidebar collapsible="icon" className="border-l bg-card">
-      <SidebarHeader className="h-16 flex items-center justify-center border-b px-6">
+      <SidebarHeader className="h-20 flex items-center justify-center border-b px-6">
         <Link href="/admin" className="flex items-center gap-3">
-          <div className="flex h-9 w-14 shrink-0 items-center justify-center rounded-xl bg-primary text-white shadow-lg shadow-primary/20">
-            <span className="text-sm font-black italic tracking-tighter">MMA</span>
-          </div>
-          <div className="flex flex-col truncate group-data-[collapsible=icon]:hidden">
-            <span className="text-sm font-black leading-none">مجمع محمد علاء</span>
-            <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">نظام الإدارة</span>
+          <div className="relative h-12 w-28 shrink-0">
+            <Image 
+              src={LOGO_URL} 
+              alt="MMA" 
+              fill 
+              className="object-contain"
+            />
           </div>
         </Link>
       </SidebarHeader>
