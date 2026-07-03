@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from "react";
@@ -160,7 +159,7 @@ export function AdminSidebar() {
                 })}
               </SidebarMenu>
             </SidebarGroupContent>
-          </SidebarGroup> group
+          </SidebarGroup>
         ))}
       </SidebarContent>
 
