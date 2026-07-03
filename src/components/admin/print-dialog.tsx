@@ -16,7 +16,8 @@ import {
   Dialog, 
   DialogContent, 
   DialogHeader, 
-  DialogTitle 
+  DialogTitle,
+  DialogDescription
 } from "@/components/ui/dialog";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -45,18 +46,19 @@ export function PrintDialog({ isOpen, onClose, data, type }: PrintDialogProps) {
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="rounded-[40px] max-w-xl p-0 overflow-hidden border-none shadow-2xl">
-         <div className="p-8 border-b bg-primary text-white flex items-center justify-between">
+         <DialogHeader className="p-8 border-b bg-primary text-white flex flex-row items-center justify-between space-y-0">
             <div className="flex items-center gap-3">
                <div className="h-12 w-12 rounded-2xl bg-white/20 flex items-center justify-center shadow-inner">
                   <Printer className="h-6 w-6" />
                </div>
-               <div>
-                  <h3 className="text-xl font-black">خيارات الطباعة</h3>
+               <div className="text-right">
+                  <DialogTitle className="text-xl font-black">خيارات الطباعة</DialogTitle>
                   <p className="text-[10px] opacity-70 font-bold uppercase tracking-widest">Printer Management System</p>
                </div>
             </div>
-            <button onClick={onClose} className="hover:rotate-90 transition-transform"><X className="h-8 w-8" /></button>
-         </div>
+            <button onClick={onClose} className="hover:rotate-90 transition-transform" aria-label="إغلاق"><X className="h-8 w-8" /></button>
+         </DialogHeader>
+         <DialogDescription className="sr-only">اختر قياس الورق المناسب (A4 أو حراري) لطباعة المستند الحالي.</DialogDescription>
 
          <div className="p-10 space-y-8">
             <div className="grid grid-cols-3 gap-4">

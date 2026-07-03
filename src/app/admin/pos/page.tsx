@@ -35,7 +35,8 @@ import {
   DialogContent, 
   DialogHeader, 
   DialogTitle, 
-  DialogFooter
+  DialogFooter,
+  DialogDescription
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { useFirestore, useCollection, useUser } from "@/firebase";
@@ -48,7 +49,7 @@ import { errorEmitter } from "@/firebase/error-emitter";
 import { FirestorePermissionError } from "@/firebase/errors";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 
-// منفصل لضمان عدم حدوث رندر لانهائي
+// مكون السلة المستقل لمنع رندر لانهائي
 interface CartViewProps {
   cart: any[];
   selectedCustomer: any;
@@ -427,10 +428,12 @@ export default function POSPage() {
       {/* Checkout Dialog */}
       <Dialog open={isCheckoutOpen} onOpenChange={setIsCheckoutOpen}>
         <DialogContent className="rounded-[28px] max-w-lg p-0 overflow-hidden border-none shadow-2xl">
-           <div className="p-6 border-b bg-primary text-white flex items-center justify-between">
-              <h3 className="text-xl font-black">تأكيد الدفع</h3>
-              <button onClick={() => setIsCheckoutOpen(false)}><X className="h-6 w-6" /></button>
-           </div>
+           <DialogHeader className="p-6 border-b bg-primary text-white flex flex-row items-center justify-between space-y-0">
+              <DialogTitle className="text-xl font-black">تأكيد الدفع</DialogTitle>
+              <button onClick={() => setIsCheckoutOpen(false)} aria-label="إغلاق"><X className="h-6 w-6" /></button>
+           </DialogHeader>
+           <DialogDescription className="sr-only">اختر طريقة الدفع ومراجعة إجمالي الفاتورة والمبلغ المتبقي.</DialogDescription>
+           
            <div className="p-6 space-y-6">
               <div className="grid grid-cols-3 gap-3">
                  {[

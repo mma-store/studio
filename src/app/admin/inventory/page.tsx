@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from "react";
@@ -11,7 +12,8 @@ import {
   DialogContent, 
   DialogHeader, 
   DialogTitle, 
-  DialogFooter
+  DialogFooter,
+  DialogDescription
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -196,7 +198,10 @@ export default function InventoryPage() {
 
       <Dialog open={!!editingProduct} onOpenChange={() => setEditingProduct(null)}>
         <DialogContent className="rounded-[32px] max-w-sm">
-          <DialogHeader><DialogTitle className="text-xl font-black">تعديل المخزون</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle className="text-xl font-black">تعديل المخزون</DialogTitle>
+            <DialogDescription className="text-xs">قم بتحديث الكمية الفعلية للمنتج في المخزن حالياً.</DialogDescription>
+          </DialogHeader>
           <div className="space-y-6 py-4">
              <div className="text-center space-y-1">
                 <p className="font-bold text-sm text-muted-foreground">{editingProduct?.name}</p>
