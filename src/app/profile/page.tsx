@@ -211,13 +211,13 @@ export default function ProfilePage() {
              تسجيل الخروج
           </Button>
           
-          <div className="text-center pt-16 pb-8 opacity-60">
+          <div className="text-center pt-16 pb-8 opacity-60" dir="ltr">
              <div className="flex justify-center mb-4">
                 <div className="h-8 w-14 bg-muted rounded-xl flex items-center justify-center font-black italic tracking-tighter text-muted-foreground text-xs">MMA</div>
              </div>
-             <p className="text-[9px] text-muted-foreground font-black tracking-[0.4em] uppercase mb-1">مجمع محمد علاء v2.1</p>
+             <p className="text-[9px] text-muted-foreground font-black tracking-[0.4em] uppercase mb-1">System v2.1</p>
              <p className="text-[11px] font-bold text-muted-foreground">
-                حقوق النظام محفوظة لـ <span className="text-primary">حسين صلاح</span>
+                Developed by <span className="text-primary">Hussein Salah</span>
              </p>
           </div>
         </div>

@@ -136,7 +136,7 @@ export function AdminSidebar() {
       <SidebarContent className="py-4">
         {ADMIN_MENU.map((group) => (
           <SidebarGroup key={group.label}>
-            <SidebarGroupLabel className="px-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 group-data-[collapsible=icon]:hidden mt-4 mb-2">
+            <SidebarGroupLabel className="px-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 group-data-[collapsible=icon]:hidden mt-4 mb-2 text-right">
               {group.label}
             </SidebarGroupLabel>
             <SidebarGroupContent>
@@ -149,7 +149,7 @@ export function AdminSidebar() {
                         asChild 
                         isActive={isActive}
                         className={cn(
-                          "h-11 px-4 transition-all hover:bg-muted",
+                          "h-11 px-4 transition-all hover:bg-muted text-right flex-row-reverse justify-start gap-3",
                           isActive ? "bg-primary text-primary-foreground hover:bg-primary/90" : "text-muted-foreground"
                         )}
                         tooltip={item.title}
@@ -169,15 +169,15 @@ export function AdminSidebar() {
       </SidebarContent>
 
       <SidebarFooter className="border-t p-4 space-y-4">
-        <div className="px-4 py-3 bg-primary/5 rounded-[20px] border border-primary/10 group-data-[collapsible=icon]:hidden">
-           <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest mb-1">حقوق النظام</p>
-           <p className="text-xs font-black text-foreground">تطوير: <span className="text-primary">حسين صلاح</span></p>
+        <div className="px-4 py-3 bg-primary/5 rounded-[20px] border border-primary/10 group-data-[collapsible=icon]:hidden text-left" dir="ltr">
+           <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest mb-1">System Credits</p>
+           <p className="text-xs font-black text-foreground">Developed by: <span className="text-primary">Hussein Salah</span></p>
         </div>
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton 
               onClick={handleLogout}
-              className="h-11 px-4 text-destructive hover:bg-destructive/10 hover:text-destructive w-full"
+              className="h-11 px-4 text-destructive hover:bg-destructive/10 hover:text-destructive w-full flex-row-reverse gap-3"
             >
               <LogOut className="h-5 w-5" />
               <span className="font-bold group-data-[collapsible=icon]:hidden">تسجيل الخروج</span>
