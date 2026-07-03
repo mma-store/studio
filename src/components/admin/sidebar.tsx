@@ -11,20 +11,21 @@ import {
   ClipboardList, 
   Users, 
   Wrench, 
-  UserSquare2, 
-  BadgeDollarSign, 
   BarChart3, 
   Image as ImageIcon, 
   Tags, 
   Bell, 
   Settings,
-  ChevronRight,
   LogOut,
   Monitor,
   ShieldCheck,
   History,
   Receipt,
-  Wallet
+  Wallet,
+  Truck,
+  ArrowLeftRight,
+  Banknote,
+  Coins
 } from "lucide-react";
 
 import {
@@ -52,23 +53,27 @@ const ADMIN_MENU = [
     items: [
       { title: "لوحة التحكم", icon: LayoutDashboard, href: "/admin" },
       { title: "نقطة البيع (POS)", icon: Monitor, href: "/admin/pos" },
-      { title: "التقارير", icon: BarChart3, href: "/admin/reports" },
+      { title: "التقارير المالية", icon: BarChart3, href: "/admin/reports" },
     ]
   },
   {
-    label: "المالية والديون",
+    label: "المالية والحسابات",
     items: [
       { title: "وصلات القبض", icon: Receipt, href: "/admin/finance/receipts" },
+      { title: "سندات الصرف", icon: Banknote, href: "/admin/finance/payments" },
+      { title: "المصاريف العامة", icon: Coins, href: "/admin/finance/expenses" },
       { title: "ديون العملاء", icon: Wallet, href: "/admin/finance/debts" },
+      { title: "الصندوق اليومي", icon: History, href: "/admin/finance/cash-register" },
     ]
   },
   {
-    label: "المتجر",
+    label: "المشتريات والمخزن",
     items: [
       { title: "المنتجات", icon: ShoppingBag, href: "/admin/products" },
-      { title: "الأقسام", icon: Layers, href: "/admin/categories" },
-      { title: "أنواع الدراجات", icon: Bike, href: "/admin/motorcycle-types" },
+      { title: "فواتير الشراء", icon: Truck, href: "/admin/purchases" },
+      { title: "الموردين", icon: Users, href: "/admin/suppliers" },
       { title: "المخزون", icon: Box, href: "/admin/inventory" },
+      { title: "المرتجعات", icon: ArrowLeftRight, href: "/admin/returns" },
     ]
   },
   {
@@ -76,29 +81,21 @@ const ADMIN_MENU = [
     items: [
       { title: "نظرة عامة", icon: LayoutDashboard, href: "/admin/workshop" },
       { title: "أوامر التصليح", icon: Wrench, href: "/admin/workshop/orders" },
-      { title: "إضافة مهمة", icon: ClipboardList, href: "/admin/workshop/new" },
     ]
   },
   {
     label: "المبيعات والعملاء",
     items: [
-      { title: "الطلبات", icon: ClipboardList, href: "/admin/orders" },
+      { title: "طلبات المتجر", icon: ClipboardList, href: "/admin/orders" },
       { title: "العملاء", icon: Users, href: "/admin/customers" },
       { title: "الموظفين", icon: ShieldCheck, href: "/admin/employees" },
     ]
   },
   {
-    label: "التسويق",
-    items: [
-      { title: "البنرات الترويجية", icon: ImageIcon, href: "/admin/banners" },
-      { title: "العروض الخاصة", icon: Tags, href: "/admin/offers" },
-    ]
-  },
-  {
     label: "النظام",
     items: [
+      { title: "البنرات والعروض", icon: ImageIcon, href: "/admin/banners" },
       { title: "سجل العمليات", icon: History, href: "/admin/audit-log" },
-      { title: "الإشعارات", icon: Bell, href: "/admin/notifications" },
       { title: "الإعدادات", icon: Settings, href: "/admin/settings" },
     ]
   }
@@ -112,7 +109,6 @@ export function AdminSidebar() {
   const handleLogout = async () => {
     try {
       await signOut(auth);
-      toast({ title: "تم تسجيل الخروج" });
       router.push("/login");
     } catch (e) {
       toast({ variant: "destructive", title: "خطأ في تسجيل الخروج" });
@@ -120,7 +116,7 @@ export function AdminSidebar() {
   };
 
   return (
-    <Sidebar collapsible="icon" className="border-l bg-card dark:bg-card">
+    <Sidebar collapsible="icon" className="border-l bg-card">
       <SidebarHeader className="h-16 flex items-center justify-center border-b px-6">
         <Link href="/admin" className="flex items-center gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary text-white shadow-lg shadow-primary/20">
@@ -128,7 +124,7 @@ export function AdminSidebar() {
           </div>
           <div className="flex flex-col truncate group-data-[collapsible=icon]:hidden">
             <span className="text-sm font-black leading-none">مجمع محمد علاء</span>
-            <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">الإدارة العليا</span>
+            <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">نظام الإدارة</span>
           </div>
         </Link>
       </SidebarHeader>
@@ -164,7 +160,7 @@ export function AdminSidebar() {
                 })}
               </SidebarMenu>
             </SidebarGroupContent>
-          </SidebarGroup>
+          </SidebarGroup> group
         ))}
       </SidebarContent>
 

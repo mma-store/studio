@@ -13,53 +13,59 @@
         "wholesalePrice": { "type": "number" },
         "stock": { "type": "number" },
         "category": { "type": "string" },
+        "storageLocation": { "type": "string" },
         "status": { "type": "string", "enum": ["available", "out_of_stock", "discontinued"] }
       }
     },
-    "UserProfile": {
-      "title": "UserProfile",
-      "description": "User profile with financial fields",
+    "Supplier": {
+      "title": "Supplier",
+      "description": "Wholesale suppliers of parts",
       "type": "object",
       "properties": {
-        "uid": { "type": "string" },
-        "displayName": { "type": "string" },
-        "phoneNumber": { "type": "string" },
-        "role": { "type": "string" },
-        "currentBalance": { "type": "number", "description": "Current outstanding debt" },
-        "totalPaid": { "type": "number" },
-        "lastPaymentDate": { "type": "number" },
-        "creditLimit": { "type": "number" }
+        "name": { "type": "string" },
+        "phone": { "type": "string" },
+        "address": { "type": "string" },
+        "balance": { "type": "number", "description": "Current debt to supplier" },
+        "createdAt": { "type": "number" }
       }
     },
-    "ReceiptVoucher": {
-      "title": "ReceiptVoucher",
-      "description": "Customer payment record",
+    "PurchaseInvoice": {
+      "title": "PurchaseInvoice",
+      "description": "Invoice for buying inventory from suppliers",
       "type": "object",
       "properties": {
-        "voucherNumber": { "type": "string" },
-        "userId": { "type": "string" },
-        "customerName": { "type": "string" },
+        "invoiceNumber": { "type": "string" },
+        "supplierId": { "type": "string" },
+        "supplierName": { "type": "string" },
+        "items": { "type": "array" },
+        "total": { "type": "number" },
+        "paidAmount": { "type": "number" },
+        "timestamp": { "type": "number" }
+      }
+    },
+    "Expense": {
+      "title": "Expense",
+      "description": "General business expenses",
+      "type": "object",
+      "properties": {
+        "category": { "type": "string" },
         "amount": { "type": "number" },
-        "paymentMethod": { "type": "string", "enum": ["cash", "transfer", "check"] },
-        "referenceInvoice": { "type": "string" },
-        "employeeId": { "type": "string" },
-        "employeeName": { "type": "string" },
         "notes": { "type": "string" },
+        "employeeName": { "type": "string" },
         "timestamp": { "type": "number" }
       }
     },
-    "FinancialTransaction": {
-      "title": "FinancialTransaction",
-      "description": "Ledger entry for all account movements",
+    "CashShift": {
+      "title": "CashShift",
+      "description": "Daily cash register tracking",
       "type": "object",
       "properties": {
-        "userId": { "type": "string" },
-        "type": { "type": "string", "enum": ["sale", "payment", "return", "adjustment"] },
-        "amount": { "type": "number" },
-        "balanceAfter": { "type": "number" },
-        "referenceId": { "type": "string" },
-        "description": { "type": "string" },
-        "timestamp": { "type": "number" }
+        "openingTime": { "type": "number" },
+        "closingTime": { "type": "number" },
+        "openingBalance": { "type": "number" },
+        "expectedBalance": { "type": "number" },
+        "actualBalance": { "type": "number" },
+        "status": { "type": "string", "enum": ["open", "closed"] }
       }
     }
   },
@@ -68,8 +74,13 @@
   },
   "firestore": {
     "/users/{userId}": { "schema": "UserProfile", "description": "Extended user information and financial data" },
-    "/receiptVouchers/{voucherId}": { "schema": "ReceiptVoucher", "description": "Payment records" },
-    "/financialTransactions/{transactionId}": { "schema": "FinancialTransaction", "description": "Ledger for customer accounts" },
+    "/suppliers/{supplierId}": { "schema": "Supplier", "description": "Supplier information" },
+    "/purchases/{purchaseId}": { "schema": "PurchaseInvoice", "description": "Purchase invoices" },
+    "/receiptVouchers/{voucherId}": { "schema": "ReceiptVoucher", "description": "Payment records from customers" },
+    "/paymentVouchers/{voucherId}": { "schema": "PaymentVoucher", "description": "Payment records to suppliers/others" },
+    "/expenses/{expenseId}": { "schema": "Expense", "description": "Business expenses" },
+    "/cashShifts/{shiftId}": { "schema": "CashShift", "description": "Cash register shifts" },
+    "/financialTransactions/{transactionId}": { "schema": "FinancialTransaction", "description": "Ledger for accounts" },
     "/orders/{orderId}": { "schema": "Order", "description": "Sales orders" }
   }
 }
