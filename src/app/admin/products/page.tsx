@@ -12,7 +12,9 @@ import {
   Eye,
   Loader2,
   X,
-  Package
+  Package,
+  Camera,
+  Upload
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -46,7 +48,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useFirestore, useCollection } from "@/firebase";
 import { collection, query, orderBy, addDoc, doc, deleteDoc } from "firebase/firestore";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useRef } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import Image from "next/image";
 import { toast } from "@/hooks/use-toast";
@@ -64,6 +66,9 @@ export default function ProductsManagementPage() {
   const [uploadedImages, setUploadedImages] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+
   const filteredProducts = products.filter((p: any) => 
     (p.name?.toLowerCase() || "").includes(searchQuery.toLowerCase()) || 
     (p.barcode || "").includes(searchQuery)
@@ -78,7 +83,6 @@ export default function ProductsManagementPage() {
     
     try {
       for (let i = 0; i < files.length; i++) {
-        // Upload with built-in compression and retry logic
         const url = await uploadToCloudinary(files[i]);
         newUrls.push(url);
       }
@@ -160,11 +164,11 @@ export default function ProductsManagementPage() {
              <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto rounded-[32px] p-0">
                 <div className="p-8 space-y-6">
                   <DialogHeader>
-                    <DialogTitle className="text-3xl font-black">إضافة منتج جديد</DialogTitle>
-                    <DialogDescription className="text-muted-foreground font-bold">يرجى ملء كافة التفاصيل لضمان ظهور المنتج بشكل صحيح للزبائن.</DialogDescription>
+                    <DialogTitle className="text-3xl font-black text-right">إضافة منتج جديد</DialogTitle>
+                    <DialogDescription className="text-muted-foreground font-bold text-right">يرجى ملء كافة التفاصيل لضمان ظهور المنتج بشكل صحيح للزبائن.</DialogDescription>
                   </DialogHeader>
                   <form onSubmit={handleAddProduct} className="space-y-8 py-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8" dir="rtl">
                       <div className="space-y-4">
                         <div className="space-y-2">
                           <Label className="font-bold">اسم المنتج</Label>
@@ -218,50 +222,82 @@ export default function ProductsManagementPage() {
                       </div>
                     </div>
 
-                    <div className="space-y-4 pt-6 border-t">
+                    <div className="space-y-4 pt-6 border-t" dir="rtl">
                       <div className="flex items-center justify-between">
                          <Label className="font-black text-lg">صور المنتج</Label>
-                         <span className="text-xs text-muted-foreground font-bold">يتم ضغط الصور تلقائياً لتسريع المتجر</span>
+                         <span className="text-xs text-muted-foreground font-bold">يمكنك اختيار ملفات أو التصوير مباشرة</span>
                       </div>
-                      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-4">
+                      
+                      <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-4">
                          {uploadedImages.map((url, i) => (
                            <div key={i} className="relative aspect-square rounded-2xl overflow-hidden border-2 bg-muted shadow-sm group">
                               <Image src={getOptimizedUrl(url, { thumbnail: true })} alt="Uploaded" fill className="object-cover" />
                               <button 
                                 type="button" 
                                 onClick={() => setUploadedImages(prev => prev.filter((_, idx) => idx !== i))}
-                                className="absolute top-1.5 right-1.5 bg-red-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+                                className="absolute top-1.5 right-1.5 bg-red-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow-lg z-10"
                               >
                                 <X className="h-3 w-3" />
                               </button>
                            </div>
                          ))}
-                         <label className={cn(
-                           "aspect-square rounded-2xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer hover:bg-primary/5 transition-all gap-2 text-muted-foreground relative overflow-hidden",
-                           isUploading && "pointer-events-none opacity-50"
-                         )}>
+
+                         {/* Camera Button */}
+                         <button
+                           type="button"
+                           disabled={isUploading}
+                           onClick={() => cameraInputRef.current?.click()}
+                           className={cn(
+                             "aspect-square rounded-2xl border-2 border-dashed border-primary/30 flex flex-col items-center justify-center gap-2 hover:bg-primary/5 transition-all bg-white dark:bg-slate-900 group",
+                             isUploading && "opacity-50 pointer-events-none"
+                           )}
+                         >
+                            <Camera className="h-8 w-8 text-primary group-hover:scale-110 transition-transform" />
+                            <span className="text-[10px] font-black text-primary">تصوير منتج</span>
+                            <input 
+                              type="file" 
+                              ref={cameraInputRef}
+                              accept="image/*" 
+                              capture="environment" 
+                              className="hidden" 
+                              onChange={handleImageUpload} 
+                            />
+                         </button>
+
+                         {/* Upload Button */}
+                         <button
+                           type="button"
+                           disabled={isUploading}
+                           onClick={() => fileInputRef.current?.click()}
+                           className={cn(
+                             "aspect-square rounded-2xl border-2 border-dashed border-muted-foreground/30 flex flex-col items-center justify-center gap-2 hover:bg-muted/10 transition-all bg-white dark:bg-slate-900",
+                             isUploading && "opacity-50 pointer-events-none"
+                           )}
+                         >
                             {isUploading ? (
-                              <div className="flex flex-col items-center gap-2">
-                                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                                <span className="text-[10px] font-black uppercase">جاري الرفع...</span>
-                              </div>
+                              <Loader2 className="h-8 w-8 animate-spin text-primary" />
                             ) : (
-                              <>
-                                <Plus className="h-8 w-8 text-primary/40" />
-                                <span className="text-[10px] font-bold">إضافة صور</span>
-                                <input type="file" multiple accept="image/*" className="hidden" onChange={handleImageUpload} />
-                              </>
+                              <Upload className="h-8 w-8 text-muted-foreground" />
                             )}
-                         </label>
+                            <span className="text-[10px] font-black text-muted-foreground">من الاستوديو</span>
+                            <input 
+                              type="file" 
+                              ref={fileInputRef}
+                              multiple 
+                              accept="image/*" 
+                              className="hidden" 
+                              onChange={handleImageUpload} 
+                            />
+                         </button>
                       </div>
                     </div>
 
-                    <DialogFooter className="pt-8 gap-4 flex-row justify-end">
-                      <Button type="button" variant="ghost" className="rounded-xl h-14 px-8 font-bold" onClick={() => setIsAddDialogOpen(false)}>إلغاء</Button>
+                    <DialogFooter className="pt-8 gap-4 flex-row justify-end" dir="rtl">
                       <Button type="submit" className="rounded-2xl h-14 px-12 shadow-xl shadow-primary/20 font-black text-lg gap-2" disabled={isUploading || isSaving}>
                         {isSaving ? <Loader2 className="h-5 w-5 animate-spin" /> : <Plus className="h-5 w-5" />}
                         حفظ المنتج والنشـر
                       </Button>
+                      <Button type="button" variant="ghost" className="rounded-xl h-14 px-8 font-bold" onClick={() => setIsAddDialogOpen(false)}>إلغاء</Button>
                     </DialogFooter>
                   </form>
                 </div>
@@ -270,7 +306,7 @@ export default function ProductsManagementPage() {
         </div>
       </div>
 
-      <div className="flex flex-col md:flex-row gap-4">
+      <div className="flex flex-col md:flex-row gap-4" dir="rtl">
         <div className="relative flex-1">
           <Search className="absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
           <Input 
@@ -285,7 +321,7 @@ export default function ProductsManagementPage() {
         </Button>
       </div>
 
-      <div className="rounded-[32px] border-none bg-white dark:bg-card shadow-sm overflow-hidden">
+      <div className="rounded-[32px] border-none bg-white dark:bg-card shadow-sm overflow-hidden" dir="rtl">
         <Table>
           <TableHeader>
             <TableRow className="border-b bg-muted/30 hover:bg-muted/30">
@@ -361,7 +397,7 @@ export default function ProductsManagementPage() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="rounded-[24px] p-2 w-52 shadow-2xl border-none">
                         <DropdownMenuLabel className="font-black text-xs uppercase tracking-widest p-3 opacity-50">الإجراءات</DropdownMenuLabel>
-                        <DropdownMenuItem className="rounded-xl gap-3 p-3 font-bold cursor-pointer" onClick={() => router.push(`/product/${p.id}`)}><Eye className="h-4 w-4 text-blue-500" /> عرض وتفاصيل</DropdownMenuItem>
+                        <DropdownMenuItem className="rounded-xl gap-3 p-3 font-bold cursor-pointer" onClick={() => window.open(`/product/${p.id}`, '_blank')}><Eye className="h-4 w-4 text-blue-500" /> عرض وتفاصيل</DropdownMenuItem>
                         <DropdownMenuItem className="rounded-xl gap-3 p-3 font-bold cursor-pointer"><Edit2 className="h-4 w-4 text-orange-500" /> تعديل البيانات</DropdownMenuItem>
                         <DropdownMenuItem 
                           className="rounded-xl gap-3 p-3 font-bold cursor-pointer text-destructive hover:bg-destructive/5"

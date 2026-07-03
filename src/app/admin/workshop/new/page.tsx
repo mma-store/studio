@@ -1,4 +1,3 @@
-
 'use client';
 
 import { 
@@ -11,7 +10,8 @@ import {
   Calendar,
   AlertCircle,
   Loader2,
-  X
+  X,
+  Upload
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,13 +32,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useFirestore } from "@/firebase";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { toast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 import { uploadToCloudinary } from "@/lib/cloudinary";
 import Image from "next/image";
+import { cn } from "@/lib/utils";
 
 export default function NewRepairOrderPage() {
   const db = useFirestore();
@@ -46,10 +47,13 @@ export default function NewRepairOrderPage() {
   const [loading, setLoading] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadedPhotos, setUploadedPhotos] = useState<string[]>([]);
+  
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
-    if (!files) return;
+    if (!files || files.length === 0) return;
 
     setIsUploading(true);
     try {
@@ -61,6 +65,7 @@ export default function NewRepairOrderPage() {
       toast({ variant: "destructive", title: "خطأ", description: "فشل رفع الصور." });
     } finally {
       setIsUploading(false);
+      e.target.value = '';
     }
   };
 
@@ -84,8 +89,8 @@ export default function NewRepairOrderPage() {
       partsUsed: [],
       laborCost: 0,
       totalAmount: 0,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
     };
 
     try {
@@ -100,12 +105,12 @@ export default function NewRepairOrderPage() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="max-w-5xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500" dir="rtl">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
            <Link href="/admin/workshop">
               <Button variant="ghost" size="icon" className="rounded-xl bg-white shadow-sm">
-                <ChevronRight className="h-5 w-5 rotate-180" />
+                <ChevronRight className="h-5 w-5" />
               </Button>
            </Link>
            <div>
@@ -126,7 +131,7 @@ export default function NewRepairOrderPage() {
       <form id="repair-form" onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card className="md:col-span-1 rounded-[32px] border-none shadow-sm h-fit">
            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg font-black">
+              <CardTitle className="flex items-center gap-2 text-lg font-black text-right">
                  <User className="h-5 w-5 text-primary" /> بيانات العميل
               </CardTitle>
            </CardHeader>
@@ -148,7 +153,7 @@ export default function NewRepairOrderPage() {
 
         <Card className="md:col-span-2 rounded-[32px] border-none shadow-sm">
            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg font-black">
+              <CardTitle className="flex items-center gap-2 text-lg font-black text-right">
                  <Bike className="h-5 w-5 text-primary" /> بيانات الدراجة
               </CardTitle>
            </CardHeader>
@@ -174,7 +179,7 @@ export default function NewRepairOrderPage() {
 
         <Card className="md:col-span-3 rounded-[32px] border-none shadow-sm">
            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg font-black">
+              <CardTitle className="flex items-center gap-2 text-lg font-black text-right">
                  <ClipboardList className="h-5 w-5 text-primary" /> تفاصيل المشكلة
               </CardTitle>
            </CardHeader>
@@ -184,27 +189,68 @@ export default function NewRepairOrderPage() {
                  <Textarea name="problemDescription" required placeholder="اكتب تفاصيل العطل أو الصيانة المطلوبة..." className="rounded-2xl bg-muted/30 border-none min-h-[120px]" />
               </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t">
-                 <div className="space-y-4">
-                    <Label className="font-bold block">صور الدراجة عند الاستلام (Cloudinary)</Label>
-                    <div className="flex flex-wrap gap-4">
-                       {uploadedPhotos.map((url, i) => (
-                         <div key={i} className="relative h-24 w-24 rounded-2xl overflow-hidden border bg-muted shadow-sm">
-                            <Image src={url} alt="Bike Status" fill className="object-cover" />
-                            <button 
-                              type="button" 
-                              onClick={() => setUploadedPhotos(prev => prev.filter((_, idx) => idx !== i))}
-                              className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1"
-                            >
-                              <X className="h-3 w-3" />
-                            </button>
-                         </div>
-                       ))}
-                       <label className="h-24 w-24 rounded-2xl border-2 border-dashed border-muted-foreground/20 flex flex-col items-center justify-center text-muted-foreground gap-1 hover:border-primary/50 transition-colors cursor-pointer bg-muted/5">
-                          {isUploading ? <Loader2 className="h-6 w-6 animate-spin" /> : <Camera className="h-6 w-6" />}
-                          <span className="text-[10px] font-bold">إضافة صورة</span>
-                          <input type="file" multiple accept="image/*" className="hidden" onChange={handlePhotoUpload} disabled={isUploading} />
-                       </label>
+              <div className="space-y-4 pt-4 border-t">
+                 <Label className="font-bold block text-right">صور الدراجة عند الاستلام</Label>
+                 <div className="flex flex-wrap gap-4">
+                    {uploadedPhotos.map((url, i) => (
+                      <div key={i} className="relative h-32 w-32 rounded-2xl overflow-hidden border bg-muted shadow-sm group">
+                         <Image src={url} alt="Bike Status" fill className="object-cover" />
+                         <button 
+                           type="button" 
+                           onClick={() => setUploadedPhotos(prev => prev.filter((_, idx) => idx !== i))}
+                           className="absolute top-2 right-2 bg-red-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                         >
+                           <X className="h-4 w-4" />
+                         </button>
+                      </div>
+                    ))}
+
+                    <div className="flex gap-4">
+                       <button
+                         type="button"
+                         disabled={isUploading}
+                         onClick={() => cameraInputRef.current?.click()}
+                         className={cn(
+                           "h-32 w-32 rounded-2xl border-2 border-dashed border-primary/30 flex flex-col items-center justify-center text-primary gap-2 hover:bg-primary/5 transition-all bg-white dark:bg-slate-900 group",
+                           isUploading && "opacity-50 pointer-events-none"
+                         )}
+                       >
+                          <Camera className="h-8 w-8 group-hover:scale-110 transition-transform" />
+                          <span className="text-[10px] font-black">تصوير الحالة</span>
+                          <input 
+                            type="file" 
+                            ref={cameraInputRef}
+                            accept="image/*" 
+                            capture="environment" 
+                            className="hidden" 
+                            onChange={handlePhotoUpload} 
+                          />
+                       </button>
+
+                       <button
+                         type="button"
+                         disabled={isUploading}
+                         onClick={() => fileInputRef.current?.click()}
+                         className={cn(
+                           "h-32 w-32 rounded-2xl border-2 border-dashed border-muted-foreground/30 flex flex-col items-center justify-center text-muted-foreground gap-2 hover:bg-muted/10 transition-all bg-white dark:bg-slate-900",
+                           isUploading && "opacity-50 pointer-events-none"
+                         )}
+                       >
+                          {isUploading ? (
+                            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                          ) : (
+                            <Upload className="h-8 w-8" />
+                          )}
+                          <span className="text-[10px] font-black">من الاستوديو</span>
+                          <input 
+                            type="file" 
+                            ref={fileInputRef}
+                            multiple 
+                            accept="image/*" 
+                            className="hidden" 
+                            onChange={handlePhotoUpload} 
+                          />
+                       </button>
                     </div>
                  </div>
               </div>
