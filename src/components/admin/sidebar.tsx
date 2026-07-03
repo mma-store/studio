@@ -71,6 +71,7 @@ const ADMIN_MENU = [
     label: "المشتريات والمخزن",
     items: [
       { title: "المنتجات", icon: ShoppingBag, href: "/admin/products" },
+      { title: "الأقسام", icon: Layers, href: "/admin/categories" },
       { title: "فواتير الشراء", icon: Truck, href: "/admin/purchases" },
       { title: "الموردين", icon: Users, href: "/admin/suppliers" },
       { title: "المخزون", icon: Box, href: "/admin/inventory" },
