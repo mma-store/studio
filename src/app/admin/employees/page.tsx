@@ -12,7 +12,10 @@ import {
   Loader2,
   Mail,
   Phone,
-  Plus
+  Plus,
+  Edit2,
+  Save,
+  Lock
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -42,7 +45,7 @@ import {
   SelectValue 
 } from "@/components/ui/select";
 import { useFirestore, useCollection } from "@/firebase";
-import { collection, query, where, orderBy, deleteDoc, doc, addDoc } from "firebase/firestore";
+import { collection, query, where, orderBy, deleteDoc, doc, addDoc, updateDoc } from "firebase/firestore";
 import { useMemo, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
@@ -58,7 +61,9 @@ const roleMap = {
 export default function EmployeesPage() {
   const db = useFirestore();
   const [isAddOpen, setIsAddOpen] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [editingEmployee, setEditingEmployee] = useState<any>(null);
 
   const staffQuery = useMemo(() => query(
     collection(db, 'users'), 
@@ -67,23 +72,48 @@ export default function EmployeesPage() {
   ), [db]);
   const { data: staff, loading } = useCollection(staffQuery);
 
+  const normalizePhone = (p: string) => p.replace(/\s/g, '').replace(/^0/, '');
+
   const handleAddEmployee = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsSaving(true);
     const formData = new FormData(e.currentTarget);
+    const phone = normalizePhone(formData.get('phone') as string);
     try {
-      const phone = formData.get('phone') as string;
       await addDoc(collection(db, 'users'), {
         displayName: formData.get('name'),
         email: `${phone}@mma.staff`,
         phoneNumber: phone,
         role: formData.get('role'),
+        tempPassword: formData.get('password'), // كلمة سر مؤقتة ليرسلها الأدمن للموظف
         createdAt: Date.now()
       });
       setIsAddOpen(false);
-      toast({ title: "تمت الإضافة", description: "تم إضافة الموظف بنجاح." });
+      toast({ title: "تمت الإضافة", description: "تم تسجيل الموظف بنجاح. أبلغه بكلمة السر المختارة." });
     } catch (e) {
       toast({ variant: "destructive", title: "خطأ", description: "فشل إضافة الموظف." });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleUpdateEmployee = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!editingEmployee) return;
+    setIsSaving(true);
+    const formData = new FormData(e.currentTarget);
+    try {
+      await updateDoc(doc(db, 'users', editingEmployee.id), {
+        displayName: formData.get('name'),
+        phoneNumber: normalizePhone(formData.get('phone') as string),
+        role: formData.get('role'),
+        updatedAt: Date.now()
+      });
+      setIsEditOpen(false);
+      setEditingEmployee(null);
+      toast({ title: "تم التحديث", description: "تم تعديل بيانات الموظف بنجاح." });
+    } catch (e) {
+      toast({ variant: "destructive", title: "خطأ" });
     } finally {
       setIsSaving(false);
     }
@@ -121,6 +151,10 @@ export default function EmployeesPage() {
                   <Input name="phone" required placeholder="07XXXXXXXXX" className="rounded-xl h-12 bg-muted/20 border-none text-left" dir="ltr" />
                </div>
                <div className="space-y-2">
+                  <Label className="font-bold">كلمة السر (للإبلاغ بها)</Label>
+                  <Input name="password" required type="text" placeholder="مثال: MMA12345" className="rounded-xl h-12 bg-muted/20 border-none text-left font-black" />
+               </div>
+               <div className="space-y-2">
                   <Label className="font-bold">الدور الوظيفي</Label>
                   <Select name="role" defaultValue="sales_employee">
                     <SelectTrigger className="rounded-xl h-12 bg-muted/20 border-none">
@@ -151,7 +185,6 @@ export default function EmployeesPage() {
               <TableHead className="text-right font-black text-xs uppercase py-6 px-6 text-foreground">الموظف</TableHead>
               <TableHead className="text-right font-black text-xs uppercase text-foreground">الدور الوظيفي</TableHead>
               <TableHead className="text-right font-black text-xs uppercase text-foreground">رقم الهاتف</TableHead>
-              <TableHead className="text-right font-black text-xs uppercase text-foreground">تاريخ التعيين</TableHead>
               <TableHead className="text-left font-black text-xs uppercase px-6 text-foreground">إجراءات</TableHead>
             </TableRow>
           </TableHeader>
@@ -162,7 +195,6 @@ export default function EmployeesPage() {
                   <TableCell className="px-6"><Skeleton className="h-12 w-48" /></TableCell>
                   <TableCell><Skeleton className="h-8 w-24 rounded-full" /></TableCell>
                   <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-24" /></TableCell>
                   <TableCell className="px-6 text-left"><Skeleton className="h-8 w-8" /></TableCell>
                 </TableRow>
               ))
@@ -190,24 +222,62 @@ export default function EmployeesPage() {
                     </Badge>
                   </TableCell>
                   <TableCell className="font-bold text-sm" dir="ltr">{member.phoneNumber}</TableCell>
-                  <TableCell className="text-muted-foreground text-xs font-bold">
-                    {new Date(member.createdAt).toLocaleDateString("ar-EG")}
-                  </TableCell>
                   <TableCell className="text-left px-6">
-                    <Button variant="ghost" size="icon" className="rounded-xl text-destructive hover:bg-red-50" onClick={() => handleDelete(member.id)}>
-                      <Trash2 className="h-5 w-5" />
-                    </Button>
+                    <div className="flex items-center justify-end gap-2">
+                       <Button variant="ghost" size="icon" className="rounded-xl text-blue-600 hover:bg-blue-50" onClick={() => { setEditingEmployee(member); setIsEditOpen(true); }}>
+                          <Edit2 className="h-4 w-4" />
+                       </Button>
+                       <Button variant="ghost" size="icon" className="rounded-xl text-destructive hover:bg-red-50" onClick={() => handleDelete(member.id)}>
+                          <Trash2 className="h-4 w-4" />
+                       </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               );
             })) : (
               <TableRow>
-                <TableCell colSpan={5} className="h-48 text-center opacity-30 font-bold">لا يوجد موظفين مضافين حالياً.</TableCell>
+                <TableCell colSpan={4} className="h-48 text-center opacity-30 font-bold">لا يوجد موظفين مضافين حالياً.</TableCell>
               </TableRow>
             )}
           </TableBody>
         </Table>
       </div>
+
+      {/* نافذة تعديل الموظف */}
+      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+        <DialogContent className="rounded-[32px]">
+          <DialogHeader><DialogTitle className="text-2xl font-black">تعديل بيانات الموظف</DialogTitle></DialogHeader>
+          <form onSubmit={handleUpdateEmployee} className="space-y-5 pt-4">
+             <div className="space-y-2">
+                <Label className="font-bold">الاسم الكامل</Label>
+                <Input name="name" defaultValue={editingEmployee?.displayName} required className="rounded-xl h-12 bg-muted/20 border-none" />
+             </div>
+             <div className="space-y-2">
+                <Label className="font-bold">رقم الهاتف</Label>
+                <Input name="phone" defaultValue={editingEmployee?.phoneNumber} required className="rounded-xl h-12 bg-muted/20 border-none text-left" dir="ltr" />
+             </div>
+             <div className="space-y-2">
+                <Label className="font-bold">الدور الوظيفي</Label>
+                <Select name="role" defaultValue={editingEmployee?.role}>
+                  <SelectTrigger className="rounded-xl h-12 bg-muted/20 border-none">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-2xl">
+                     <SelectItem value="admin">مدير نظام</SelectItem>
+                     <SelectItem value="sales_employee">موظف مبيعات</SelectItem>
+                     <SelectItem value="workshop_technician">فني ورشة</SelectItem>
+                     <SelectItem value="warehouse_employee">أمين مخزن</SelectItem>
+                  </SelectContent>
+                </Select>
+             </div>
+             <DialogFooter>
+                <Button type="submit" disabled={isSaving} className="w-full h-14 rounded-2xl font-black text-lg gap-2">
+                  {isSaving ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />} حفظ التغييرات
+                </Button>
+             </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

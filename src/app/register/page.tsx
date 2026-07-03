@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from "react";
@@ -27,36 +28,38 @@ export default function RegisterPage() {
     password: "",
   });
 
+  const normalizePhone = (p: string) => p.replace(/\s/g, '').replace(/^0/, '').replace(/^\+964/, '');
+
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
-      const cleanPhone = formData.phoneNumber.replace(/\s/g, '');
+      const cleanPhone = normalizePhone(formData.phoneNumber);
       const fakeEmail = `${cleanPhone}@mma.store`;
 
-      // 1. البحث عن رقم الهاتف في سجلات الموظفين المضافة مسبقاً
-      const staffQuery = query(collection(db, "users"), where("phoneNumber", "==", cleanPhone));
-      const staffSnapshot = await getDocs(staffQuery);
+      // 1. البحث عن رقم الهاتف في سجلات النظام المضافة مسبقاً (سواء زبون أو موظف)
+      const usersRef = collection(db, "users");
+      const phoneQuery = query(usersRef, where("phoneNumber", "in", [cleanPhone, `0${cleanPhone}`]));
+      const querySnapshot = await getDocs(phoneQuery);
       
       let assignedRole = 'retail_customer'; // الدور الافتراضي
-      
-      // إذا وجدنا رقم الهاتف مسجل مسبقاً، نأخذ الدور الوظيفي المحدد له
-      if (!staffSnapshot.empty) {
-        const existingStaffDoc = staffSnapshot.docs[0];
-        const staffData = existingStaffDoc.data();
-        assignedRole = staffData.role;
+      let existingData: any = null;
+      let existingDocId: string | null = null;
+
+      if (!querySnapshot.empty) {
+        existingDocId = querySnapshot.docs[0].id;
+        existingData = querySnapshot.docs[0].data();
+        assignedRole = existingData.role;
         
         // إذا كان رقم الماستر أدمن
-        if (cleanPhone === '07858833838') {
+        if (cleanPhone === '7858833838') {
           assignedRole = 'admin';
         }
 
-        // نقوم بحذف السجل المؤقت الذي أضافه الأدمن لنستبدله بالسجل الرسمي المرتبط بـ UID
-        if (existingStaffDoc.id !== cleanPhone) { // تجنب حذف السجل إذا كان id هو نفسه الرقم
-           await deleteDoc(doc(db, "users", existingStaffDoc.id));
-        }
-      } else if (cleanPhone === '07858833838') {
+        // حذف السجل المؤقت الذي أضافه الأدمن لنستبدله بالسجل الرسمي المرتبط بـ UID في الخطوة القادمة
+        await deleteDoc(doc(db, "users", existingDocId!));
+      } else if (cleanPhone === '7858833838') {
         assignedRole = 'admin';
       }
 
@@ -65,15 +68,19 @@ export default function RegisterPage() {
       const user = userCredential.user;
 
       // 3. حفظ بيانات المستخدم النهائية مع الدور الوظيفي الصحيح
-      await setDoc(doc(db, "users", user.uid), {
+      const finalUserData = {
         uid: user.uid,
-        displayName: formData.displayName,
+        displayName: formData.displayName || existingData?.displayName,
         phoneNumber: cleanPhone,
         email: fakeEmail,
         role: assignedRole,
+        currentBalance: existingData?.currentBalance || 0,
+        totalPaid: existingData?.totalPaid || 0,
         createdAt: Date.now(),
         lastLogin: Date.now()
-      });
+      };
+
+      await setDoc(doc(db, "users", user.uid), finalUserData);
 
       toast({ 
         title: "تم إنشاء الحساب بنجاح", 
@@ -89,7 +96,7 @@ export default function RegisterPage() {
       toast({ 
         variant: "destructive", 
         title: "خطأ في التسجيل", 
-        description: error.code === 'auth/phone-number-already-exists' ? "رقم الهاتف مسجل مسبقاً" : "فشل إنشاء الحساب، يرجى المحاولة مرة أخرى." 
+        description: error.code === 'auth/email-already-in-use' ? "رقم الهاتف مسجل مسبقاً لمستخدم آخر." : "فشل إنشاء الحساب، يرجى المحاولة مرة أخرى." 
       });
     } finally {
       setLoading(false);

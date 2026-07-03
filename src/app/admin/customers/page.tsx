@@ -12,7 +12,11 @@ import {
   ArrowUpRight,
   Tags,
   BadgeDollarSign,
-  Loader2
+  Loader2,
+  Edit2,
+  Trash2,
+  Save,
+  X
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -49,7 +53,7 @@ import {
   SelectValue 
 } from "@/components/ui/select";
 import { useFirestore, useCollection } from "@/firebase";
-import { collection, query, orderBy, addDoc } from "firebase/firestore";
+import { collection, query, orderBy, addDoc, doc, deleteDoc, updateDoc } from "firebase/firestore";
 import { useMemo, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
@@ -61,24 +65,33 @@ export default function CustomersManagementPage() {
   const { data: customers, loading } = useCollection(customersQuery);
   const [search, setSearch] = useState("");
   const [isAddOpen, setIsAddOpen] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [editingCustomer, setEditingCustomer] = useState<any>(null);
   const [isSaving, setIsSaving] = useState(false);
 
+  // تصفية العملاء فقط (استبعاد الأدمن والموظفين من هذه القائمة)
   const filtered = customers.filter((c: any) => 
-    (c.displayName?.toLowerCase() || "").includes(search.toLowerCase()) ||
-    (c.phoneNumber || "").includes(search)
+    !['admin', 'sales_employee', 'workshop_technician', 'warehouse_employee'].includes(c.role) &&
+    ((c.displayName?.toLowerCase() || "").includes(search.toLowerCase()) ||
+    (c.phoneNumber || "").includes(search))
   );
+
+  const normalizePhone = (p: string) => p.replace(/\s/g, '').replace(/^0/, '');
 
   const handleAddCustomer = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsSaving(true);
     const formData = new FormData(e.currentTarget);
+    const phone = normalizePhone(formData.get('phone') as string);
     try {
       await addDoc(collection(db, 'users'), {
         displayName: formData.get('name'),
-        phoneNumber: formData.get('phone'),
-        email: formData.get('email') || `${formData.get('phone')}@mma.store`,
+        phoneNumber: phone,
+        email: `${phone}@mma.store`,
         role: formData.get('role'),
-        createdAt: Date.now()
+        createdAt: Date.now(),
+        currentBalance: 0,
+        totalPaid: 0
       });
       setIsAddOpen(false);
       toast({ title: "تمت الإضافة", description: "تم إضافة العميل الجديد بنجاح." });
@@ -86,6 +99,38 @@ export default function CustomersManagementPage() {
       toast({ variant: "destructive", title: "خطأ", description: "فشل إضافة العميل." });
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleUpdateCustomer = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!editingCustomer) return;
+    setIsSaving(true);
+    const formData = new FormData(e.currentTarget);
+    try {
+      await updateDoc(doc(db, 'users', editingCustomer.id), {
+        displayName: formData.get('name'),
+        phoneNumber: normalizePhone(formData.get('phone') as string),
+        role: formData.get('role'),
+        updatedAt: Date.now()
+      });
+      setIsEditOpen(false);
+      setEditingCustomer(null);
+      toast({ title: "تم التحديث", description: "تم تعديل بيانات العميل بنجاح." });
+    } catch (e) {
+      toast({ variant: "destructive", title: "خطأ", description: "فشل التحديث." });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDeleteCustomer = async (id: string) => {
+    if (!confirm("هل أنت متأكد من حذف هذا العميل نهائياً؟ سيتم مسح كافة سجلاته.")) return;
+    try {
+      await deleteDoc(doc(db, 'users', id));
+      toast({ title: "تم الحذف", description: "تمت إزالة العميل من النظام." });
+    } catch (e) {
+      toast({ variant: "destructive", title: "خطأ", description: "فشل الحذف." });
     }
   };
 
@@ -146,9 +191,6 @@ export default function CustomersManagementPage() {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <Button variant="outline" className="h-14 rounded-2xl border-none shadow-sm bg-white dark:bg-card px-8 gap-2 font-black">
-           <Filter className="h-5 w-5" /> تصفية النوع
-        </Button>
       </div>
 
       <div className="rounded-[32px] border-none bg-white dark:bg-card shadow-sm overflow-hidden">
@@ -158,8 +200,7 @@ export default function CustomersManagementPage() {
               <TableHead className="text-right font-black text-xs uppercase tracking-widest py-6 px-6">العميل</TableHead>
               <TableHead className="text-right font-black text-xs uppercase tracking-widest">نوع الحساب</TableHead>
               <TableHead className="text-right font-black text-xs uppercase tracking-widest">رقم الهاتف</TableHead>
-              <TableHead className="text-right font-black text-xs uppercase tracking-widest">تاريخ الانضمام</TableHead>
-              <TableHead className="text-right font-black text-xs uppercase tracking-widest">إجمالي المشتريات</TableHead>
+              <TableHead className="text-right font-black text-xs uppercase tracking-widest">الدين الحالي</TableHead>
               <TableHead className="text-left font-black text-xs uppercase tracking-widest px-6">إجراءات</TableHead>
             </TableRow>
           </TableHeader>
@@ -167,10 +208,9 @@ export default function CustomersManagementPage() {
             {loading ? (
               Array(6).fill(0).map((_, i) => (
                 <TableRow key={i}>
-                  <TableCell className="px-6"><div className="flex items-center gap-3"><Skeleton className="h-12 w-12 rounded-full" /><Skeleton className="h-4 w-32" /></div></TableCell>
+                  <TableCell className="px-6"><Skeleton className="h-12 w-48 rounded-full" /></TableCell>
                   <TableCell><Skeleton className="h-6 w-20 rounded-full" /></TableCell>
                   <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-20" /></TableCell>
                   <TableCell><Skeleton className="h-4 w-24" /></TableCell>
                   <TableCell className="px-6 text-left"><Skeleton className="h-8 w-8 rounded-lg" /></TableCell>
                 </TableRow>
@@ -180,7 +220,7 @@ export default function CustomersManagementPage() {
                 <TableRow key={customer.id} className="hover:bg-muted/5 transition-colors group">
                   <TableCell className="px-6 py-4">
                     <div className="flex items-center gap-4">
-                      <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center text-primary font-black text-lg shadow-inner">
+                      <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center text-primary font-black text-lg">
                         {customer.displayName?.[0] || <Users className="h-5 w-5" />}
                       </div>
                       <div className="flex flex-col">
@@ -191,50 +231,68 @@ export default function CustomersManagementPage() {
                   </TableCell>
                   <TableCell>
                     <Badge className={cn(
-                      "rounded-full px-4 py-1 border-none font-black text-[10px] gap-1.5",
+                      "rounded-full px-4 py-1 border-none font-black text-[10px]",
                       customer.role === 'wholesale_customer' ? "bg-orange-100 text-orange-700" : "bg-blue-100 text-blue-700"
                     )}>
-                       {customer.role === 'wholesale_customer' ? <Tags className="h-3 w-3" /> : <Users className="h-3 w-3" />}
                        {customer.role === 'wholesale_customer' ? 'عميل جملة' : 'عميل مفرد'}
                     </Badge>
                   </TableCell>
                   <TableCell className="font-bold text-sm" dir="ltr">{customer.phoneNumber || 'غير مسجل'}</TableCell>
-                  <TableCell className="text-muted-foreground text-xs font-bold">
-                    {customer.createdAt ? new Date(customer.createdAt).toLocaleDateString("ar-EG") : '-'}
-                  </TableCell>
-                  <TableCell className="font-black text-primary">
-                    <div className="flex items-center gap-1">
-                      <BadgeDollarSign className="h-4 w-4 opacity-50" />
-                      {(Math.random() * 500000).toLocaleString(undefined, { maximumFractionDigits: 0 })} د.ع
-                    </div>
-                  </TableCell>
+                  <TableCell className="font-black text-primary">{(customer.currentBalance || 0).toLocaleString()} د.ع</TableCell>
                   <TableCell className="text-left px-6">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="rounded-2xl"><MoreHorizontal className="h-5 w-5" /></Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="rounded-[24px] p-2 w-52 shadow-2xl border-none">
-                        <DropdownMenuItem className="rounded-xl gap-3 p-3 font-bold cursor-pointer"><ArrowUpRight className="h-4 w-4" /> عرض السجل الكامل</DropdownMenuItem>
-                        <DropdownMenuItem className="rounded-xl gap-3 p-3 font-bold cursor-pointer" onClick={() => window.open(`https://wa.me/${customer.phoneNumber}`)}><Phone className="h-4 w-4" /> اتصل الآن</DropdownMenuItem>
-                        <DropdownMenuItem className="rounded-xl gap-3 p-3 font-bold cursor-pointer text-orange-600"><Tags className="h-4 w-4" /> تحويل إلى جملة</DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    <div className="flex items-center justify-end gap-2">
+                       <Button variant="ghost" size="icon" className="rounded-xl text-blue-600 hover:bg-blue-50" onClick={() => { setEditingCustomer(customer); setIsEditOpen(true); }}>
+                          <Edit2 className="h-4 w-4" />
+                       </Button>
+                       <Button variant="ghost" size="icon" className="rounded-xl text-destructive hover:bg-red-50" onClick={() => handleDeleteCustomer(customer.id)}>
+                          <Trash2 className="h-4 w-4" />
+                       </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={6} className="h-64 text-center opacity-30">
-                   <div className="flex flex-col items-center gap-4">
-                      <Users className="h-16 w-16" strokeWidth={1} />
-                      <p className="font-black text-xl">لا يوجد عملاء مطابقين للبحث</p>
-                   </div>
-                </TableCell>
+                <TableCell colSpan={5} className="h-64 text-center opacity-30 font-black">لا يوجد عملاء مضافين حالياً</TableCell>
               </TableRow>
             )}
           </TableBody>
         </Table>
       </div>
+
+      {/* نافذة التعديل */}
+      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+        <DialogContent className="rounded-[32px]">
+          <DialogHeader><DialogTitle className="text-2xl font-black">تعديل بيانات العميل</DialogTitle></DialogHeader>
+          <form onSubmit={handleUpdateCustomer} className="space-y-5 pt-4">
+             <div className="space-y-2">
+                <Label className="font-bold">الاسم الكامل</Label>
+                <Input name="name" defaultValue={editingCustomer?.displayName} required className="rounded-xl h-12 bg-muted/20 border-none" />
+             </div>
+             <div className="space-y-2">
+                <Label className="font-bold">رقم الهاتف</Label>
+                <Input name="phone" defaultValue={editingCustomer?.phoneNumber} required className="rounded-xl h-12 bg-muted/20 border-none text-left" dir="ltr" />
+             </div>
+             <div className="space-y-2">
+                <Label className="font-bold">نوع الحساب</Label>
+                <Select name="role" defaultValue={editingCustomer?.role}>
+                  <SelectTrigger className="rounded-xl h-12 bg-muted/20 border-none">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-2xl">
+                     <SelectItem value="retail_customer">عميل مفرد</SelectItem>
+                     <SelectItem value="wholesale_customer">عميل جملة</SelectItem>
+                  </SelectContent>
+                </Select>
+             </div>
+             <DialogFooter>
+                <Button type="submit" disabled={isSaving} className="w-full h-14 rounded-2xl font-black text-lg gap-2">
+                  {isSaving ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />} حفظ التغييرات
+                </Button>
+             </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
