@@ -1,3 +1,4 @@
+
 "use client";
 
 import { 
@@ -11,7 +12,9 @@ import {
   CheckCircle2,
   Clock,
   XCircle,
-  Store
+  Store,
+  Printer,
+  Edit3
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,11 +35,12 @@ import {
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
 import { useFirestore, useCollection, useUser } from "@/firebase";
-import { collection, query, orderBy, updateDoc, doc, serverTimestamp, writeBatch, increment, addDoc } from "firebase/firestore";
+import { collection, query, orderBy, updateDoc, doc, serverTimestamp, writeBatch, increment } from "firebase/firestore";
 import { useMemo, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
+import { useRouter } from "next/navigation";
 import { errorEmitter } from "@/firebase/error-emitter";
 import { FirestorePermissionError } from "@/firebase/errors";
 
@@ -53,7 +57,9 @@ const statusConfig = {
 export default function OrdersManagementPage() {
   const db = useFirestore();
   const { profile } = useUser();
+  const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
+  
   const ordersQuery = useMemo(() => query(collection(db, 'orders'), orderBy('createdAt', 'desc')), [db]);
   const { data: orders, loading } = useCollection(ordersQuery);
 
@@ -74,7 +80,6 @@ export default function OrdersManagementPage() {
       updatedAt: serverTimestamp()
     });
 
-    // Business Logic: If order was active and now cancelled, restore inventory
     if (newStatus === 'cancelled' && order.status !== 'cancelled') {
       order.items?.forEach((item: any) => {
         if (item.productId) {
@@ -84,65 +89,32 @@ export default function OrdersManagementPage() {
       });
     }
     
-    // Logic: If order was cancelled and now re-activated, deduct inventory again
-    if (order.status === 'cancelled' && newStatus !== 'cancelled') {
-      order.items?.forEach((item: any) => {
-        if (item.productId) {
-          const productRef = doc(db, "products", item.productId);
-          batch.update(productRef, { stock: increment(-item.quantity) });
-        }
-      });
-    }
-
-    // Audit log
-    const auditRef = doc(collection(db, "auditLogs"));
-    batch.set(auditRef, {
-      userId: profile?.uid || "admin",
-      userName: profile?.displayName || "مدير",
-      action: "تحديث حالة طلب",
-      target: order.orderNumber,
-      details: `تغيير الحالة من ${order.status} إلى ${newStatus}`,
-      timestamp: Date.now()
-    });
-
     batch.commit()
       .then(() => toast({ title: "تم التحديث", description: "تم تغيير حالة الطلب بنجاح." }))
-      .catch(async (err) => {
-        const perr = new FirestorePermissionError({ path: orderRef.path, operation: "update" });
-        errorEmitter.emit('permission-error', perr);
-      });
-  };
-
-  const handleWhatsApp = (order: any) => {
-    const statusLabel = statusConfig[order.status as keyof typeof statusConfig]?.label || order.status;
-    const message = `مرحباً ${order.customerName}،\nنود إعلامكم بأن حالة طلبكم رقم *${order.orderNumber}* هي الآن: *${statusLabel}*.\nشكراً لتعاملكم مع مجمع محمد علاء.`;
-    window.open(`https://wa.me/${order.phoneNumber}?text=${encodeURIComponent(message)}`, '_blank');
+      .catch((err) => errorEmitter.emit('permission-error', new FirestorePermissionError({ path: orderRef.path, operation: "update" })));
   };
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <div className="space-y-1">
-          <h1 className="text-3xl font-black tracking-tight">إدارة الطلبات</h1>
-          <p className="text-muted-foreground font-medium text-sm">متابعة حالة المبيعات وتحديث حالات الشحن.</p>
+          <h1 className="text-3xl font-black tracking-tight">سجل القوائم والطلبات</h1>
+          <p className="text-muted-foreground font-medium text-sm">البحث، الطباعة، أو تعديل القوائم السابقة.</p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-         <div className="relative md:col-span-2">
-            <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+         <div className="relative md:col-span-3">
+            <Search className="absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
             <Input 
-              placeholder="البحث برقم الطلب، اسم العميل، أو الهاتف..." 
-              className="h-12 rounded-xl bg-white dark:bg-card pr-10 border-none shadow-sm"
+              placeholder="ابحث برقم القائمة أو اسم الزبون..." 
+              className="h-14 rounded-2xl bg-white dark:bg-card pr-12 border-none shadow-sm text-lg font-bold"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
          </div>
-         <Button variant="outline" className="h-12 rounded-xl border-none shadow-sm bg-white dark:bg-card px-6 gap-2 font-bold">
-            <Calendar className="h-4 w-4" /> اليوم
-         </Button>
-         <Button variant="outline" className="h-12 rounded-xl border-none shadow-sm bg-white dark:bg-card px-6 gap-2 font-bold">
-            <Filter className="h-4 w-4" /> الفلاتر
+         <Button variant="outline" className="h-14 rounded-2xl border-none shadow-sm bg-white dark:bg-card px-6 gap-2 font-black">
+            <Calendar className="h-5 w-5" /> مبيعات اليوم
          </Button>
       </div>
 
@@ -150,12 +122,12 @@ export default function OrdersManagementPage() {
         <Table>
           <TableHeader>
             <TableRow className="border-b bg-muted/30 hover:bg-muted/30">
-              <TableHead className="text-right font-black text-xs uppercase tracking-widest py-5 px-6">رقم الطلب</TableHead>
-              <TableHead className="text-right font-black text-xs uppercase tracking-widest">العميل</TableHead>
-              <TableHead className="text-right font-black text-xs uppercase tracking-widest">المبلغ</TableHead>
-              <TableHead className="text-right font-black text-xs uppercase tracking-widest">طريقة الاستلام</TableHead>
-              <TableHead className="text-right font-black text-xs uppercase tracking-widest">الحالة</TableHead>
-              <TableHead className="text-left font-black text-xs uppercase tracking-widest px-6">إجراءات</TableHead>
+              <TableHead className="text-right font-black text-xs uppercase tracking-widest py-5 px-6 text-foreground">رقم القائمة</TableHead>
+              <TableHead className="text-right font-black text-xs uppercase tracking-widest text-foreground">الزبون</TableHead>
+              <TableHead className="text-right font-black text-xs uppercase tracking-widest text-foreground">المبلغ</TableHead>
+              <TableHead className="text-right font-black text-xs uppercase tracking-widest text-foreground">التاريخ</TableHead>
+              <TableHead className="text-right font-black text-xs uppercase tracking-widest text-foreground">الحالة</TableHead>
+              <TableHead className="text-left font-black text-xs uppercase tracking-widest px-6 text-foreground">إجراءات</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -167,57 +139,59 @@ export default function OrdersManagementPage() {
                   <TableCell><Skeleton className="h-4 w-24" /></TableCell>
                   <TableCell><Skeleton className="h-4 w-24" /></TableCell>
                   <TableCell><Skeleton className="h-6 w-24 rounded-full" /></TableCell>
-                  <TableCell className="px-6 text-left"><Skeleton className="h-8 w-8 rounded-lg" /></TableCell>
+                  <TableCell className="px-6 text-left"><Skeleton className="h-8 w-8" /></TableCell>
                 </TableRow>
               ))
             ) : filteredOrders.length > 0 ? (
               filteredOrders.map((order: any) => {
-                const status = (order.status || 'pending') as keyof typeof statusConfig;
-                const config = statusConfig[status] || statusConfig.pending;
+                const config = statusConfig[order.status as keyof typeof statusConfig] || statusConfig.pending;
                 const Icon = config.icon;
 
                 return (
                   <TableRow key={order.id} className="hover:bg-muted/5 transition-colors">
-                    <TableCell className="font-black text-sm px-6">{order.orderNumber}</TableCell>
+                    <TableCell className="font-black text-sm px-6 text-primary">{order.orderNumber}</TableCell>
                     <TableCell>
                        <div className="flex flex-col">
-                          <span className="font-bold text-sm">{order.customerName}</span>
-                          <span className="text-[10px] text-muted-foreground font-medium">{order.phoneNumber}</span>
+                          <span className="font-black text-sm">{order.customerName}</span>
+                          <span className="text-[10px] text-muted-foreground font-bold">{order.phoneNumber || 'بدون هاتف'}</span>
                        </div>
                     </TableCell>
-                    <TableCell className="font-black text-primary">{order.total?.toLocaleString()} د.ع</TableCell>
-                    <TableCell>
-                       <Badge variant="outline" className="rounded-full gap-1 border-primary/20 text-primary text-[10px] font-bold">
-                          {order.deliveryMethod === 'delivery' ? <Truck className="h-3 w-3" /> : <Store className="h-3 w-3" />}
-                          {order.deliveryMethod === 'delivery' ? 'توصيل' : 'استلام'}
-                       </Badge>
+                    <TableCell className="font-black text-foreground">{order.total?.toLocaleString()} د.ع</TableCell>
+                    <TableCell className="text-[10px] font-black text-muted-foreground">
+                       {new Date(order.createdAt).toLocaleString("ar-EG")}
                     </TableCell>
                     <TableCell>
-                      <Badge className={cn("rounded-full px-3 py-1 border font-bold text-[10px] gap-1.5 shadow-none", config.color)}>
+                      <Badge className={cn("rounded-full px-3 py-1 border font-black text-[9px] gap-1.5 shadow-none", config.color)}>
                          <Icon className="h-3 w-3" />
                          {config.label}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-left px-6">
-                      <div className="flex items-center justify-end gap-1">
-                        <Button variant="ghost" size="icon" className="rounded-lg h-8 w-8" onClick={() => handleWhatsApp(order)}>
-                          <MessageCircle className="h-4 w-4 text-emerald-600" />
+                      <div className="flex items-center justify-end gap-2">
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="rounded-xl h-9 w-9 text-blue-600 hover:bg-blue-50"
+                          onClick={() => router.push(`/admin/print/invoice/${order.id}`)}
+                        >
+                          <Printer className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="rounded-xl h-9 w-9 text-orange-600 hover:bg-orange-50"
+                          onClick={() => router.push(`/admin/pos?edit=${order.id}`)}
+                        >
+                          <Edit3 className="h-4 w-4" />
                         </Button>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="rounded-lg h-8 w-8"><MoreVertical className="h-4 w-4" /></Button>
+                            <Button variant="ghost" size="icon" className="rounded-xl h-9 w-9"><MoreVertical className="h-4 w-4" /></Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="rounded-2xl p-2 w-48 shadow-xl border-none">
-                            <DropdownMenuLabel className="font-black text-[10px] uppercase opacity-50 p-2">تحديث الحالة</DropdownMenuLabel>
-                            {Object.entries(statusConfig).map(([key, cfg]) => (
-                              <DropdownMenuItem 
-                                key={key}
-                                onClick={() => updateStatus(order, key)}
-                                className={cn("rounded-xl gap-2 font-bold cursor-pointer text-xs", cfg.color.split(' ')[1])}
-                              >
-                                {cfg.label}
-                              </DropdownMenuItem>
-                            ))}
+                            <DropdownMenuLabel className="font-black text-[10px] uppercase opacity-50 p-2">خيارات الطلب</DropdownMenuLabel>
+                            <DropdownMenuItem className="rounded-xl gap-2 font-bold cursor-pointer" onClick={() => router.push(`/admin/print/invoice/${order.id}?size=A4`)}>طباعة قياس A4</DropdownMenuItem>
+                            <DropdownMenuItem className="rounded-xl gap-2 font-bold cursor-pointer text-red-600" onClick={() => updateStatus(order, 'cancelled')}>إلغاء القائمة وإرجاع المخزن</DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </div>
@@ -229,7 +203,7 @@ export default function OrdersManagementPage() {
               <TableRow>
                 <TableCell colSpan={6} className="h-64 text-center opacity-30">
                   <Package className="h-16 w-16 mx-auto mb-4" />
-                  <p className="font-black text-xl">لا توجد طلبات حالياً</p>
+                  <p className="font-black text-xl">لا توجد قوائم مطابقة للبحث</p>
                 </TableCell>
               </TableRow>
             )}
@@ -239,3 +213,4 @@ export default function OrdersManagementPage() {
     </div>
   );
 }
+
