@@ -1,4 +1,3 @@
-
 'use client';
 
 import { 
@@ -40,6 +39,7 @@ import {
   DialogTitle,
   DialogTrigger,
   DialogFooter,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -50,7 +50,7 @@ import { useMemo, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import Image from "next/image";
 import { toast } from "@/hooks/use-toast";
-import { uploadToCloudinary } from "@/lib/cloudinary";
+import { uploadToCloudinary, getOptimizedUrl } from "@/lib/cloudinary";
 import { cn } from "@/lib/utils";
 
 export default function ProductsManagementPage() {
@@ -77,18 +77,17 @@ export default function ProductsManagementPage() {
     const newUrls: string[] = [];
     
     try {
-      // الرفع التسلسلي لضمان استقرار الموقع وعدم استهلاك الذاكرة بشكل مفاجئ
       for (let i = 0; i < files.length; i++) {
+        // Upload with built-in compression and retry logic
         const url = await uploadToCloudinary(files[i]);
         newUrls.push(url);
       }
       setUploadedImages(prev => [...prev, ...newUrls]);
       toast({ title: "تم الرفع", description: `تم رفع ${newUrls.length} صور بنجاح.` });
     } catch (error) {
-      toast({ variant: "destructive", title: "خطأ في الرفع", description: "تعذر رفع بعض الصور." });
+      toast({ variant: "destructive", title: "خطأ في الرفع", description: "فشل رفع بعض الصور، يرجى المحاولة لاحقاً." });
     } finally {
       setIsUploading(false);
-      // تصفير الحقل للسماح برفع نفس الملف مجدداً إن لزم الأمر
       e.target.value = '';
     }
   };
@@ -131,7 +130,7 @@ export default function ProductsManagementPage() {
   };
 
   const handleDeleteProduct = async (id: string) => {
-    if (!confirm("هل أنت متأكد من حذف هذا المنتج نهائياً؟")) return;
+    if (!confirm("هل أنت متأكد من حذف هذا المنتج نهائياً؟ سيتم إزالة الروابط الصور من النظام.")) return;
     try {
       await deleteDoc(doc(db, 'products', id));
       toast({ title: "تم الحذف", description: "تم حذف المنتج بنجاح." });
@@ -162,6 +161,7 @@ export default function ProductsManagementPage() {
                 <div className="p-8 space-y-6">
                   <DialogHeader>
                     <DialogTitle className="text-3xl font-black">إضافة منتج جديد</DialogTitle>
+                    <DialogDescription className="text-muted-foreground font-bold">يرجى ملء كافة التفاصيل لضمان ظهور المنتج بشكل صحيح للزبائن.</DialogDescription>
                   </DialogHeader>
                   <form onSubmit={handleAddProduct} className="space-y-8 py-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -221,12 +221,12 @@ export default function ProductsManagementPage() {
                     <div className="space-y-4 pt-6 border-t">
                       <div className="flex items-center justify-between">
                          <Label className="font-black text-lg">صور المنتج</Label>
-                         <span className="text-xs text-muted-foreground font-bold">يمكن رفع عدة صور معاً</span>
+                         <span className="text-xs text-muted-foreground font-bold">يتم ضغط الصور تلقائياً لتسريع المتجر</span>
                       </div>
                       <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-4">
                          {uploadedImages.map((url, i) => (
                            <div key={i} className="relative aspect-square rounded-2xl overflow-hidden border-2 bg-muted shadow-sm group">
-                              <Image src={url} alt="Uploaded" fill className="object-cover" />
+                              <Image src={getOptimizedUrl(url, { thumbnail: true })} alt="Uploaded" fill className="object-cover" />
                               <button 
                                 type="button" 
                                 onClick={() => setUploadedImages(prev => prev.filter((_, idx) => idx !== i))}
@@ -315,12 +315,18 @@ export default function ProductsManagementPage() {
                   <TableCell className="px-6">
                     <div className="flex items-center gap-4 py-2">
                       <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-2xl border-2 bg-muted shadow-sm transition-transform group-hover:scale-105">
-                        <Image 
-                          src={p.images?.[0] || `https://picsum.photos/seed/${p.id}/150/150`} 
-                          alt={p.name} 
-                          fill 
-                          className="object-cover" 
-                        />
+                        {p.images?.[0] ? (
+                          <Image 
+                            src={getOptimizedUrl(p.images[0], { thumbnail: true })} 
+                            alt={p.name} 
+                            fill 
+                            className="object-cover" 
+                          />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center bg-muted">
+                            <ImageIcon className="h-5 w-5 opacity-20" />
+                          </div>
+                        )}
                       </div>
                       <div className="flex flex-col gap-0.5">
                         <span className="font-black text-sm leading-tight line-clamp-1">{p.name}</span>
@@ -355,7 +361,7 @@ export default function ProductsManagementPage() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="rounded-[24px] p-2 w-52 shadow-2xl border-none">
                         <DropdownMenuLabel className="font-black text-xs uppercase tracking-widest p-3 opacity-50">الإجراءات</DropdownMenuLabel>
-                        <DropdownMenuItem className="rounded-xl gap-3 p-3 font-bold cursor-pointer"><Eye className="h-4 w-4 text-blue-500" /> عرض وتفاصيل</DropdownMenuItem>
+                        <DropdownMenuItem className="rounded-xl gap-3 p-3 font-bold cursor-pointer" onClick={() => router.push(`/product/${p.id}`)}><Eye className="h-4 w-4 text-blue-500" /> عرض وتفاصيل</DropdownMenuItem>
                         <DropdownMenuItem className="rounded-xl gap-3 p-3 font-bold cursor-pointer"><Edit2 className="h-4 w-4 text-orange-500" /> تعديل البيانات</DropdownMenuItem>
                         <DropdownMenuItem 
                           className="rounded-xl gap-3 p-3 font-bold cursor-pointer text-destructive hover:bg-destructive/5"
@@ -388,4 +394,3 @@ export default function ProductsManagementPage() {
     </div>
   );
 }
-

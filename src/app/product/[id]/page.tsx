@@ -12,7 +12,8 @@ import {
   ShoppingCart, 
   Star,
   ChevronLeft,
-  Check
+  Check,
+  ImageIcon
 } from "lucide-react";
 import Image from "next/image";
 import { useState, useMemo, useEffect } from "react";
@@ -24,6 +25,7 @@ import { cn } from "@/lib/utils";
 import { useCart } from "@/context/cart-context";
 import { toast } from "@/hooks/use-toast";
 import { useParams, useRouter } from "next/navigation";
+import { getOptimizedUrl } from "@/lib/cloudinary";
 
 export default function ProductDetailsPage() {
   const params = useParams();
@@ -56,7 +58,7 @@ export default function ProductDetailsPage() {
       name: product.name,
       price: displayPrice || 0,
       quantity: quantity,
-      image: product.images?.[0] || "https://picsum.photos/seed/placeholder/300/300"
+      image: product.images?.[0] || ""
     });
     toast({ title: "تمت الإضافة", description: `تم إضافة ${product.name} إلى السلة.` });
   };
@@ -84,7 +86,7 @@ export default function ProductDetailsPage() {
     );
   }
 
-  const images = product?.images?.length > 0 ? product.images : ["https://picsum.photos/seed/placeholder/800/800"];
+  const images = product?.images?.length > 0 ? product.images : [];
 
   return (
     <div className="flex min-h-screen bg-[#F8F9FA] dark:bg-background text-foreground transition-colors duration-300" dir="rtl">
@@ -107,14 +109,18 @@ export default function ProductDetailsPage() {
 
         <div className="max-w-4xl mx-auto bg-white dark:bg-card md:mt-6 md:rounded-[40px] md:shadow-sm overflow-hidden">
           {/* Main Image & Badges */}
-          <div className="relative aspect-square w-full bg-[#f0f0f0] dark:bg-muted/30 flex items-center justify-center group">
-             <Image 
-               src={images[activeImage]} 
-               alt={product.name} 
-               fill 
-               className="object-contain p-8 mix-blend-multiply dark:mix-blend-normal"
-               priority
-             />
+          <div className="relative aspect-square w-full bg-[#f8f8f8] dark:bg-muted/30 flex items-center justify-center group">
+             {images.length > 0 ? (
+               <Image 
+                src={getOptimizedUrl(images[activeImage], { width: 1000 })} 
+                alt={product.name} 
+                fill 
+                className="object-contain p-8 mix-blend-multiply dark:mix-blend-normal"
+                priority
+               />
+             ) : (
+               <ImageIcon className="h-20 w-20 opacity-10" />
+             )}
              
              {/* Discount Badge */}
              <div className="absolute top-6 right-6 h-12 w-12 rounded-full bg-red-500 text-white flex items-center justify-center font-black text-sm shadow-lg animate-pulse">
@@ -122,9 +128,11 @@ export default function ProductDetailsPage() {
              </div>
 
              {/* Image Counter */}
-             <div className="absolute bottom-6 left-6 bg-black/40 backdrop-blur-md text-white px-3 py-1 rounded-lg text-[10px] font-bold">
-                {activeImage + 1}/{images.length}
-             </div>
+             {images.length > 0 && (
+               <div className="absolute bottom-6 left-6 bg-black/40 backdrop-blur-md text-white px-3 py-1 rounded-lg text-[10px] font-bold">
+                  {activeImage + 1}/{images.length}
+               </div>
+             )}
           </div>
 
           {/* Thumbnails */}
@@ -139,7 +147,7 @@ export default function ProductDetailsPage() {
                       i === activeImage ? 'border-primary ring-2 ring-primary/10' : 'border-transparent opacity-60'
                     )}
                   >
-                    <Image src={img} alt={`Thumb ${i}`} fill className="object-cover" />
+                    <Image src={getOptimizedUrl(img, { thumbnail: true })} alt={`Thumb ${i}`} fill className="object-cover" />
                   </button>
                 ))}
              </div>
@@ -162,11 +170,11 @@ export default function ProductDetailsPage() {
              <div className="grid grid-cols-2 gap-4">
                 <div className="bg-[#F8F9FA] dark:bg-muted/10 p-4 rounded-2xl text-center space-y-1 border">
                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">الماركة</p>
-                   <p className="font-black text-sm uppercase">{product.motorcycleType || "YAMAHA"}</p>
+                   <p className="font-black text-sm uppercase">{product.category || "YAMAHA"}</p>
                 </div>
                 <div className="bg-[#F8F9FA] dark:bg-muted/10 p-4 rounded-2xl text-center space-y-1 border">
-                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">رقم المنتج</p>
-                   <p className="font-black text-sm text-slate-600 dark:text-slate-300 truncate">{product.barcode || "YH-NMX155-CLUTCH"}</p>
+                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">الباركود</p>
+                   <p className="font-black text-sm text-slate-600 dark:text-slate-300 truncate">{product.barcode || "---"}</p>
                 </div>
              </div>
 
@@ -180,9 +188,12 @@ export default function ProductDetailsPage() {
                    </div>
                    <p className="text-[10px] font-bold text-slate-400">السعر شامل الضريبة</p>
                 </div>
-                <div className="flex items-center gap-2 text-emerald-600 font-bold text-xs bg-emerald-50 dark:bg-emerald-500/10 px-3 py-1.5 rounded-full border border-emerald-100 dark:border-emerald-500/20">
-                   <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                   <span>متوفر</span>
+                <div className={cn(
+                  "flex items-center gap-2 font-bold text-xs px-3 py-1.5 rounded-full border",
+                  product.stock > 0 ? "text-emerald-600 bg-emerald-50 border-emerald-100" : "text-red-600 bg-red-50 border-red-100"
+                )}>
+                   <div className={cn("h-2 w-2 rounded-full", product.stock > 0 ? "bg-emerald-500 animate-pulse" : "bg-red-500")} />
+                   <span>{product.stock > 0 ? "متوفر" : "نفذت الكمية"}</span>
                 </div>
              </div>
 
@@ -190,7 +201,7 @@ export default function ProductDetailsPage() {
              <div className="space-y-3 pb-6">
                 <h4 className="font-black text-lg text-slate-800 dark:text-slate-100">الوصف والتفاصيل</h4>
                 <p className="text-slate-500 dark:text-slate-400 leading-relaxed font-medium text-sm whitespace-pre-line">
-                  {product.description || "هذه القطعة أصلية وعالية الجودة مصممة خصيصاً لدراجات ياماها NMAX لتوفير أفضل أداء وحماية للمحرك."}
+                  {product.description || "لا يوجد وصف متوفر لهذا المنتج حالياً."}
                 </p>
              </div>
           </div>
@@ -242,11 +253,11 @@ export default function ProductDetailsPage() {
                   {/* Add to Cart Button */}
                   <Button 
                     onClick={handleAddToCart}
-                    disabled={product.stock === 0}
+                    disabled={product.stock <= 0}
                     className="flex-1 h-14 rounded-2xl text-base font-black shadow-2xl shadow-primary/20 gap-3 active:scale-95 transition-all bg-primary"
                   >
                     <ShoppingCart className="h-5 w-5" />
-                    {product.stock === 0 ? "نفذت الكمية" : "أضف إلى الطلب"}
+                    {product.stock <= 0 ? "نفذت الكمية" : "أضف إلى الطلب"}
                   </Button>
                </div>
             </div>
