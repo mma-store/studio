@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useMemo } from "react";
 import { 
   Search, 
   Barcode, 
@@ -15,7 +15,9 @@ import {
   Loader2,
   Package,
   Zap,
-  Printer
+  Printer,
+  CreditCard,
+  Banknote
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,8 +29,16 @@ import {
   DropdownMenuItem, 
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogFooter
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import { useFirestore, useCollection, useUser } from "@/firebase";
-import { collection, query, orderBy, writeBatch, doc, increment } from "firebase/firestore";
+import { collection, query, orderBy, writeBatch, doc, increment, getDoc } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
@@ -43,9 +53,12 @@ export default function POSPage() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [cart, setCart] = useState<any[]>([]);
   const [selectedCustomer, setSelectedCustomer] = useState<{ name: string; type: 'retail' | 'wholesale'; id?: string }>({ name: "زبون نقدي", type: 'retail' });
-  const [discount, setDiscount] = useState(0);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [processingOrder, setProcessingOrder] = useState(false);
+  
+  // Financial States
+  const [paidAmount, setPaidAmount] = useState<number>(0);
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'credit' | 'partial'>('cash');
 
   const productsQuery = useMemo(() => query(collection(db, 'products'), orderBy('name')), [db]);
   const { data: products, loading } = useCollection(productsQuery);
@@ -56,11 +69,7 @@ export default function POSPage() {
   const filteredProducts = useMemo(() => {
     if (!products) return [];
     let filtered = products;
-    
-    if (selectedCategory) {
-      filtered = filtered.filter((p: any) => p.category === selectedCategory);
-    }
-    
+    if (selectedCategory) filtered = filtered.filter((p: any) => p.category === selectedCategory);
     if (searchQuery) {
       const lowerQuery = searchQuery.toLowerCase();
       filtered = filtered.filter((p: any) => 
@@ -68,7 +77,6 @@ export default function POSPage() {
         (p.barcode || "").includes(lowerQuery)
       );
     }
-    
     return filtered;
   }, [products, searchQuery, selectedCategory]);
 
@@ -81,7 +89,7 @@ export default function POSPage() {
     }, 0);
   }, [cart, selectedCustomer.type]);
   
-  const total = Math.max(0, subtotal - discount);
+  const total = subtotal;
 
   const addToCart = (product: any) => {
     if ((product.stock || 0) <= 0) {
@@ -112,14 +120,27 @@ export default function POSPage() {
     }));
   };
 
+  const handleOpenCheckout = () => {
+    setPaidAmount(total);
+    setPaymentMethod('cash');
+    setIsCheckoutOpen(true);
+  };
+
   const handleCompleteSale = async () => {
     if (cart.length === 0) return;
+    if (paymentMethod !== 'cash' && selectedCustomer.name === "زبون نقدي") {
+      toast({ variant: "destructive", title: "خطأ", description: "يجب اختيار عميل مسجل لإتمام عملية البيع بالآجل." });
+      return;
+    }
+
     setProcessingOrder(true);
     const batch = writeBatch(db);
-    
     const orderNumber = `POS-${Date.now().toString().slice(-6)}`;
+    const unpaidAmount = total - paidAmount;
+
     const orderData = {
       orderNumber,
+      userId: selectedCustomer.id || null,
       customerName: selectedCustomer.name,
       customerType: selectedCustomer.type,
       items: cart.map(item => ({
@@ -128,40 +149,59 @@ export default function POSPage() {
         price: selectedCustomer.type === 'wholesale' ? (item.wholesalePrice || item.retailPrice) : item.retailPrice,
         quantity: item.quantity
       })),
-      subtotal,
-      discount,
       total,
+      paidAmount,
+      unpaidAmount,
       createdAt: Date.now(),
       status: 'delivered',
-      source: 'pos'
+      source: 'pos',
+      paymentMethod
     };
 
     const newOrderRef = doc(collection(db, "orders"));
     batch.set(newOrderRef, orderData);
 
+    // Update Product Inventory
     cart.forEach(item => {
       const productRef = doc(db, "products", item.id);
-      batch.update(productRef, { 
-        stock: increment(-item.quantity),
-        updatedAt: Date.now()
-      });
+      batch.update(productRef, { stock: increment(-item.quantity) });
     });
 
+    // Handle Customer Account Update if Credit/Partial
+    if (selectedCustomer.id && unpaidAmount > 0) {
+      const userRef = doc(db, "users", selectedCustomer.id);
+      batch.update(userRef, {
+        currentBalance: increment(unpaidAmount),
+        updatedAt: Date.now()
+      });
+
+      // Register Transaction
+      const transactionRef = doc(collection(db, "financialTransactions"));
+      batch.set(transactionRef, {
+        userId: selectedCustomer.id,
+        type: 'sale',
+        amount: unpaidAmount,
+        referenceId: newOrderRef.id,
+        description: `فاتورة رقم ${orderNumber}`,
+        timestamp: Date.now()
+      });
+    }
+
+    // Audit log
     const auditRef = doc(collection(db, "auditLogs"));
     batch.set(auditRef, {
       userId: profile?.uid || "pos",
       userName: profile?.displayName || "نقطة بيع",
       action: "إتمام عملية بيع POS",
       target: orderNumber,
-      details: `إجمالي المبلغ: ${total.toLocaleString()} د.ع`,
+      details: `إجمالي: ${total}, واصل: ${paidAmount}, متبقي: ${unpaidAmount}`,
       timestamp: Date.now()
     });
 
     batch.commit()
       .then(() => {
-        toast({ title: "تم بنجاح", description: "تم تسجيل البيع وتحديث المخزون." });
+        toast({ title: "تم بنجاح", description: "تم تسجيل البيع وتحديث الحسابات." });
         setCart([]);
-        setDiscount(0);
         setIsCheckoutOpen(false);
       })
       .catch(async (err) => {
@@ -170,6 +210,10 @@ export default function POSPage() {
       })
       .finally(() => setProcessingOrder(false));
   };
+
+  // Customers Query for Selection
+  const usersQuery = useMemo(() => query(collection(db, 'users')), [db]);
+  const { data: allUsers } = useCollection(usersQuery);
 
   return (
     <div className="flex flex-col lg:flex-row h-[calc(100vh-64px)] overflow-hidden bg-background -m-4 md:-m-8">
@@ -255,16 +299,25 @@ export default function POSPage() {
                           <User className="h-5 w-5" />
                        </div>
                        <div className="text-right">
-                          <p className="text-[10px] uppercase font-black opacity-60">نوع العميل</p>
-                          <p className="text-base">{selectedCustomer.name}</p>
+                          <p className="text-[10px] uppercase font-black opacity-60">العميل الحالي</p>
+                          <p className="text-base truncate max-w-[150px]">{selectedCustomer.name}</p>
                        </div>
                     </div>
                     <ChevronDown className="h-4 w-4 opacity-40" />
                  </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-80 rounded-2xl p-2" align="end">
-                 <DropdownMenuItem className="rounded-xl h-14 font-bold cursor-pointer" onClick={() => setSelectedCustomer({ name: "زبون نقدي", type: 'retail' })}>زبون نقدي (مفرد)</DropdownMenuItem>
-                 <DropdownMenuItem className="rounded-xl h-14 font-bold cursor-pointer text-primary" onClick={() => setSelectedCustomer({ name: "عميل جملة (VIP)", type: 'wholesale' })}>عميل جملة (VIP)</DropdownMenuItem>
+              <DropdownMenuContent className="w-80 rounded-2xl p-2 max-h-[400px] overflow-y-auto" align="end">
+                 <DropdownMenuItem className="rounded-xl h-14 font-bold cursor-pointer" onClick={() => setSelectedCustomer({ name: "زبون نقدي", type: 'retail' })}>زبون نقدي (عام)</DropdownMenuItem>
+                 <div className="h-px bg-muted my-1" />
+                 {allUsers?.map((u: any) => (
+                    <DropdownMenuItem 
+                      key={u.id} 
+                      className="rounded-xl h-14 font-bold cursor-pointer" 
+                      onClick={() => setSelectedCustomer({ id: u.id, name: u.displayName, type: u.role === 'wholesale_customer' ? 'wholesale' : 'retail' })}
+                    >
+                      {u.displayName} ({u.role === 'wholesale_customer' ? 'جملة' : 'مفرد'})
+                    </DropdownMenuItem>
+                 ))}
               </DropdownMenuContent>
            </DropdownMenu>
         </div>
@@ -273,7 +326,7 @@ export default function POSPage() {
            {cart.map((item) => (
              <div key={item.id} className="flex gap-3 p-3 rounded-2xl bg-white dark:bg-card shadow-sm border border-transparent hover:border-primary/10 transition-all">
                 <div className="relative h-16 w-16 shrink-0 rounded-xl overflow-hidden border">
-                   <Image src={item.images?.[0] || ""} alt="" fill className="object-cover" />
+                   <Image src={item.images?.[0] || "https://picsum.photos/seed/p/100/100"} alt="" fill className="object-cover" />
                 </div>
                 <div className="flex-1 min-w-0 space-y-1">
                    <h4 className="text-xs font-black truncate">{item.name}</h4>
@@ -295,39 +348,77 @@ export default function POSPage() {
 
         <div className="p-8 bg-white dark:bg-card border-t shadow-lg shrink-0 space-y-6">
            <div className="space-y-2">
-              <div className="flex justify-between font-bold text-muted-foreground"><span>المجموع:</span><span>{subtotal.toLocaleString()} د.ع</span></div>
               <div className="flex justify-between font-black text-primary text-3xl"><span>الإجمالي:</span><span>{total.toLocaleString()} د.ع</span></div>
            </div>
            <Button 
             disabled={cart.length === 0} 
             className="w-full h-20 rounded-3xl text-2xl font-black gap-4 shadow-xl active:scale-95"
-            onClick={() => setIsCheckoutOpen(true)}
+            onClick={handleOpenCheckout}
            >
-              <Zap className="h-8 w-8" /> إتمام البيع
+              <Zap className="h-8 w-8" /> إتمام العملية
            </Button>
         </div>
       </div>
 
-      {isCheckoutOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-           <div className="bg-white dark:bg-card w-full max-w-lg rounded-[40px] shadow-2xl overflow-hidden">
-              <div className="p-8 border-b bg-primary text-white flex items-center justify-between">
-                 <h3 className="text-2xl font-black">تأكيد العملية</h3>
-                 <button onClick={() => setIsCheckoutOpen(false)}><X className="h-8 w-8" /></button>
+      <Dialog open={isCheckoutOpen} onOpenChange={setIsCheckoutOpen}>
+        <DialogContent className="rounded-[40px] max-w-xl p-0 overflow-hidden border-none shadow-2xl">
+           <div className="p-8 border-b bg-primary text-white flex items-center justify-between">
+              <h3 className="text-2xl font-black">طريقة الدفع</h3>
+              <button onClick={() => setIsCheckoutOpen(false)}><X className="h-8 w-8" /></button>
+           </div>
+           <div className="p-10 space-y-8">
+              <div className="grid grid-cols-3 gap-4">
+                 <button 
+                  onClick={() => { setPaymentMethod('cash'); setPaidAmount(total); }}
+                  className={cn("p-6 rounded-3xl border-2 transition-all flex flex-col items-center gap-3", paymentMethod === 'cash' ? "border-primary bg-primary/5 text-primary" : "border-muted")}
+                 >
+                    <Banknote className="h-8 w-8" />
+                    <span className="font-black text-xs">نقدي (كامل)</span>
+                 </button>
+                 <button 
+                  onClick={() => { setPaymentMethod('credit'); setPaidAmount(0); }}
+                  className={cn("p-6 rounded-3xl border-2 transition-all flex flex-col items-center gap-3", paymentMethod === 'credit' ? "border-primary bg-primary/5 text-primary" : "border-muted")}
+                 >
+                    <CreditCard className="h-8 w-8" />
+                    <span className="font-black text-xs">بالآجل</span>
+                 </button>
+                 <button 
+                  onClick={() => setPaymentMethod('partial')}
+                  className={cn("p-6 rounded-3xl border-2 transition-all flex flex-col items-center gap-3", paymentMethod === 'partial' ? "border-primary bg-primary/5 text-primary" : "border-muted")}
+                 >
+                    <Plus className="h-8 w-8" />
+                    <span className="font-black text-xs">واصل جزئي</span>
+                 </button>
               </div>
-              <div className="p-10 space-y-8 text-center">
-                 <p className="text-sm font-bold opacity-60 uppercase">المبلغ الإجمالي</p>
-                 <p className="text-6xl font-black text-primary">{total.toLocaleString()} <span className="text-xl">د.ع</span></p>
-                 <div className="grid gap-4">
-                    <Button disabled={processingOrder} className="h-18 rounded-2xl text-xl font-black gap-3" onClick={handleCompleteSale}>
-                       {processingOrder ? <Loader2 className="h-6 w-6 animate-spin" /> : <Printer className="h-6 w-6" />} تأكيد وطباعة
-                    </Button>
-                    <Button variant="ghost" onClick={() => setIsCheckoutOpen(false)}>إلغاء</Button>
-                 </div>
+
+              {paymentMethod === 'partial' && (
+                <div className="space-y-4 animate-in slide-in-from-top-2">
+                   <Label className="font-black text-lg">المبلغ الواصل</Label>
+                   <Input 
+                    type="number" 
+                    value={paidAmount} 
+                    onChange={(e) => setPaidAmount(Number(e.target.value))}
+                    className="h-16 rounded-2xl text-3xl font-black text-center bg-muted/20 border-none"
+                   />
+                </div>
+              )}
+
+              <div className="bg-muted/30 p-6 rounded-[32px] space-y-3">
+                 <div className="flex justify-between font-bold"><span>المجموع:</span><span>{total.toLocaleString()} د.ع</span></div>
+                 <div className="flex justify-between font-black text-green-600"><span>الواصل:</span><span>{paidAmount.toLocaleString()} د.ع</span></div>
+                 <div className="h-px bg-muted" />
+                 <div className="flex justify-between font-black text-red-600"><span>المتبقي (ذمة):</span><span>{(total - paidAmount).toLocaleString()} د.ع</span></div>
+              </div>
+
+              <div className="grid gap-4">
+                 <Button disabled={processingOrder} className="h-18 rounded-2xl text-xl font-black gap-3" onClick={handleCompleteSale}>
+                    {processingOrder ? <Loader2 className="h-6 w-6 animate-spin" /> : <Printer className="h-6 w-6" />} تأكيد وحفظ
+                 </Button>
+                 <Button variant="ghost" className="font-bold" onClick={() => setIsCheckoutOpen(false)}>إلغاء</Button>
               </div>
            </div>
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

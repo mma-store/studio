@@ -12,75 +12,64 @@
         "retailPrice": { "type": "number" },
         "wholesalePrice": { "type": "number" },
         "stock": { "type": "number" },
-        "description": { "type": "string" },
-        "motorcycleType": { "type": "string" },
         "category": { "type": "string" },
-        "storageLocation": { "type": "string" },
-        "images": { "type": "array", "items": { "type": "string" } },
-        "isFeatured": { "type": "boolean" },
-        "isSpecialOffer": { "type": "boolean" },
-        "isNewArrival": { "type": "boolean" },
-        "status": { "type": "string", "enum": ["available", "out_of_stock", "discontinued"] },
-        "createdAt": { "type": "number" },
-        "updatedAt": { "type": "number" }
-      },
-      "required": ["name", "retailPrice", "stock", "category"]
-    },
-    "RepairOrder": {
-      "title": "RepairOrder",
-      "description": "Motorcycle workshop repair orders",
-      "type": "object",
-      "properties": {
-        "orderNumber": { "type": "string" },
-        "customerName": { "type": "string" },
-        "phoneNumber": { "type": "string" },
-        "bikeBrand": { "type": "string" },
-        "bikeModel": { "type": "string" },
-        "status": { "type": "string", "enum": ["received", "inspection", "waiting_parts", "in_progress", "quality_check", "ready", "delivered", "cancelled"] },
-        "partsUsed": { "type": "array" },
-        "laborCost": { "type": "number" },
-        "totalAmount": { "type": "number" },
-        "createdAt": { "type": "number" }
-      }
-    },
-    "AuditLog": {
-      "title": "AuditLog",
-      "description": "System audit logs for tracking changes",
-      "type": "object",
-      "properties": {
-        "userId": { "type": "string" },
-        "userName": { "type": "string" },
-        "action": { "type": "string" },
-        "target": { "type": "string" },
-        "details": { "type": "string" },
-        "timestamp": { "type": "number" }
+        "status": { "type": "string", "enum": ["available", "out_of_stock", "discontinued"] }
       }
     },
     "UserProfile": {
       "title": "UserProfile",
-      "description": "Extended user information",
+      "description": "User profile with financial fields",
       "type": "object",
       "properties": {
         "uid": { "type": "string" },
-        "email": { "type": "string" },
         "displayName": { "type": "string" },
-        "role": { "type": "string", "enum": ["admin", "sales_employee", "workshop_technician", "warehouse_employee", "retail_customer", "wholesale_customer"] },
-        "createdAt": { "type": "number" }
+        "phoneNumber": { "type": "string" },
+        "role": { "type": "string" },
+        "currentBalance": { "type": "number", "description": "Current outstanding debt" },
+        "totalPaid": { "type": "number" },
+        "lastPaymentDate": { "type": "number" },
+        "creditLimit": { "type": "number" }
+      }
+    },
+    "ReceiptVoucher": {
+      "title": "ReceiptVoucher",
+      "description": "Customer payment record",
+      "type": "object",
+      "properties": {
+        "voucherNumber": { "type": "string" },
+        "userId": { "type": "string" },
+        "customerName": { "type": "string" },
+        "amount": { "type": "number" },
+        "paymentMethod": { "type": "string", "enum": ["cash", "transfer", "check"] },
+        "referenceInvoice": { "type": "string" },
+        "employeeId": { "type": "string" },
+        "employeeName": { "type": "string" },
+        "notes": { "type": "string" },
+        "timestamp": { "type": "number" }
+      }
+    },
+    "FinancialTransaction": {
+      "title": "FinancialTransaction",
+      "description": "Ledger entry for all account movements",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "type": { "type": "string", "enum": ["sale", "payment", "return", "adjustment"] },
+        "amount": { "type": "number" },
+        "balanceAfter": { "type": "number" },
+        "referenceId": { "type": "string" },
+        "description": { "type": "string" },
+        "timestamp": { "type": "number" }
       }
     }
   },
   "auth": {
-    "providers": ["google", "password", "phone"]
+    "providers": ["google", "password"]
   },
   "firestore": {
-    "/products/{productId}": { "schema": "Product", "description": "Collection of products" },
-    "/repairOrders/{orderId}": { "schema": "RepairOrder", "description": "Collection of workshop repair orders" },
-    "/categories/{categoryId}": { "schema": "Category", "description": "Collection of categories" },
-    "/users/{userId}": { "schema": "UserProfile", "description": "Collection of users" },
-    "/orders/{orderId}": { "schema": "Order", "description": "Collection of orders" },
-    "/auditLogs/{logId}": { "schema": "AuditLog", "description": "System audit logs" },
-    "/motorcycleTypes/{typeId}": { "schema": "Category", "description": "Motorcycle Types" },
-    "/banners/{bannerId}": { "schema": "Category", "description": "Marketing Banners" },
-    "/offers/{offerId}": { "schema": "Category", "description": "Marketing Offers" }
+    "/users/{userId}": { "schema": "UserProfile", "description": "Extended user information and financial data" },
+    "/receiptVouchers/{voucherId}": { "schema": "ReceiptVoucher", "description": "Payment records" },
+    "/financialTransactions/{transactionId}": { "schema": "FinancialTransaction", "description": "Ledger for customer accounts" },
+    "/orders/{orderId}": { "schema": "Order", "description": "Sales orders" }
   }
 }

@@ -22,7 +22,9 @@ import {
   LogOut,
   Monitor,
   ShieldCheck,
-  History
+  History,
+  Receipt,
+  Wallet
 } from "lucide-react";
 
 import {
@@ -51,6 +53,13 @@ const ADMIN_MENU = [
       { title: "لوحة التحكم", icon: LayoutDashboard, href: "/admin" },
       { title: "نقطة البيع (POS)", icon: Monitor, href: "/admin/pos" },
       { title: "التقارير", icon: BarChart3, href: "/admin/reports" },
+    ]
+  },
+  {
+    label: "المالية والديون",
+    items: [
+      { title: "وصلات القبض", icon: Receipt, href: "/admin/finance/receipts" },
+      { title: "ديون العملاء", icon: Wallet, href: "/admin/finance/debts" },
     ]
   },
   {
@@ -133,7 +142,7 @@ export function AdminSidebar() {
             <SidebarGroupContent>
               <SidebarMenu>
                 {group.items.map((item) => {
-                  const isActive = pathname === item.href;
+                  const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
                   return (
                     <SidebarMenuItem key={item.title}>
                       <SidebarMenuButton 
