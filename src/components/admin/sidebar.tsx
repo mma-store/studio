@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from "react";
@@ -24,7 +25,8 @@ import {
   Truck,
   ArrowLeftRight,
   Banknote,
-  Coins
+  Coins,
+  Database
 } from "lucide-react";
 
 import {
@@ -95,6 +97,7 @@ const ADMIN_MENU = [
     items: [
       { title: "البنرات والعروض", icon: ImageIcon, href: "/admin/banners" },
       { title: "سجل العمليات", icon: History, href: "/admin/audit-log" },
+      { title: "النسخ الاحتياطي", icon: Database, href: "/admin/settings/backup" },
       { title: "الإعدادات", icon: Settings, href: "/admin/settings" },
     ]
   }
