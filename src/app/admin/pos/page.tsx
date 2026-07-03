@@ -90,7 +90,7 @@ function CartView({ cart, selectedCustomer, customerSearch, setCustomerSearch, s
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" className="w-full h-12 rounded-xl justify-between border-primary/20 bg-primary/5 px-3">
+            <Button variant="outline" className="w-full h-11 rounded-xl justify-between border-primary/20 bg-primary/5 px-3">
               <div className="flex items-center gap-2 truncate">
                 <User className="h-4 w-4 text-primary" />
                 <div className="flex flex-col items-start">
@@ -278,8 +278,8 @@ export default function POSPage() {
     try {
       const docRef = await addDoc(collection(db, 'users'), {
         displayName: formData.get('name'),
-        phoneNumber: formData.get('phone'),
-        address: formData.get('address'),
+        phoneNumber: formData.get('phone') || "",
+        address: formData.get('address') || "",
         role: formData.get('role'),
         currentBalance: 0,
         createdAt: Date.now()
@@ -582,15 +582,18 @@ export default function POSPage() {
       {/* Add Customer Dialog */}
       <Dialog open={isAddCustomerOpen} onOpenChange={setIsAddCustomerOpen}>
         <DialogContent className="rounded-[32px] max-w-md">
-           <DialogHeader><DialogTitle className="text-2xl font-black">إضافة زبون جديد</DialogTitle></DialogHeader>
+           <DialogHeader>
+             <DialogTitle className="text-2xl font-black">إضافة زبون جديد</DialogTitle>
+             <DialogDescription className="text-xs">أدخل بيانات الزبون لتمييز حساباته وديونه.</DialogDescription>
+           </DialogHeader>
            <form onSubmit={handleAddNewCustomer} className="space-y-4 pt-4">
               <div className="space-y-2">
                  <Label className="font-bold">اسم الزبون</Label>
                  <Input name="name" required className="rounded-xl h-12 bg-muted/20 border-none" />
               </div>
               <div className="space-y-2">
-                 <Label className="font-bold">رقم الهاتف</Label>
-                 <Input name="phone" required className="rounded-xl h-12 bg-muted/20 border-none text-left" dir="ltr" />
+                 <Label className="font-bold">رقم الهاتف (اختياري)</Label>
+                 <Input name="phone" className="rounded-xl h-12 bg-muted/20 border-none text-left" dir="ltr" />
               </div>
               <div className="space-y-2">
                  <Label className="font-bold">العنوان</Label>
