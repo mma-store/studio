@@ -9,7 +9,8 @@ import {
   Wrench, 
   ArrowUpRight, 
   Package, 
-  MoreVertical 
+  MoreVertical,
+  Loader2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { 
@@ -59,6 +60,16 @@ export default function AdminDashboard() {
   [db]);
   const { data: lowStockProducts, loading: stockLoading } = useCollection(lowStockQuery);
 
+  const allOrdersQuery = useMemo(() => query(collection(db, 'orders')), [db]);
+  const { data: allOrders } = useCollection(allOrdersQuery);
+
+  const allUsersQuery = useMemo(() => query(collection(db, 'users')), [db]);
+  const { data: allUsers } = useCollection(allUsersQuery);
+
+  const totalSales = useMemo(() => {
+    return allOrders.reduce((acc, order: any) => acc + (order.total || 0), 0);
+  }, [allOrders]);
+
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -78,31 +89,29 @@ export default function AdminDashboard() {
 
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
         <StatsCard 
-          title="مبيعات اليوم" 
-          value="1,245,000 د.ع" 
+          title="إجمالي المبيعات" 
+          value={`${totalSales.toLocaleString()} د.ع`} 
           icon={BadgeDollarSign} 
-          trend={{ value: "12%+", isUp: true }}
+          trend={{ value: "مباشر", isUp: true }}
           color="green"
         />
         <StatsCard 
           title="الطلبات المعلقة" 
-          value={recentOrders.filter((o: any) => o.status === 'pending').length.toString()} 
+          value={allOrders.filter((o: any) => o.status === 'pending').length.toString()} 
           icon={ShoppingCart} 
-          trend={{ value: "5%-", isUp: false }}
           color="orange"
         />
         <StatsCard 
-          title="مهام الورشة" 
-          value="8" 
-          icon={Wrench} 
-          color="blue"
+          title="العملاء" 
+          value={allUsers.length.toString()} 
+          icon={Users} 
+          color="purple"
         />
         <StatsCard 
-          title="إجمالي العملاء" 
-          value="1,120" 
-          icon={Users} 
-          trend={{ value: "24+", isUp: true }}
-          color="purple"
+          title="المخزون الحرج" 
+          value={lowStockProducts.filter((p: any) => p.stock < 5).length.toString()} 
+          icon={Package} 
+          color="red"
         />
       </div>
 
@@ -209,12 +218,12 @@ export default function AdminDashboard() {
             <Table>
               <TableHeader>
                 <TableRow className="border-b bg-muted/30 hover:bg-muted/30">
-                  <TableHead className="text-right font-black text-xs uppercase tracking-widest">رقم الطلب</TableHead>
-                  <TableHead className="text-right font-black text-xs uppercase tracking-widest">العميل</TableHead>
-                  <TableHead className="text-right font-black text-xs uppercase tracking-widest">المبلغ</TableHead>
-                  <TableHead className="text-right font-black text-xs uppercase tracking-widest">الحالة</TableHead>
-                  <TableHead className="text-right font-black text-xs uppercase tracking-widest">التاريخ</TableHead>
-                  <TableHead className="text-left font-black text-xs uppercase tracking-widest">إجراءات</TableHead>
+                  <TableHead className="text-right font-black text-xs uppercase tracking-widest text-foreground">رقم الطلب</TableHead>
+                  <TableHead className="text-right font-black text-xs uppercase tracking-widest text-foreground">العميل</TableHead>
+                  <TableHead className="text-right font-black text-xs uppercase tracking-widest text-foreground">المبلغ</TableHead>
+                  <TableHead className="text-right font-black text-xs uppercase tracking-widest text-foreground">الحالة</TableHead>
+                  <TableHead className="text-right font-black text-xs uppercase tracking-widest text-foreground">التاريخ</TableHead>
+                  <TableHead className="text-left font-black text-xs uppercase tracking-widest text-foreground">إجراءات</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

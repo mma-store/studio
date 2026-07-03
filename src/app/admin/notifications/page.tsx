@@ -17,7 +17,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Select, 
   SelectContent, 
@@ -25,24 +24,47 @@ import {
   SelectTrigger, 
   SelectValue 
 } from "@/components/ui/select";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { toast } from "@/hooks/use-toast";
-import { cn } from "@/lib/utils";
+import { useFirestore, useCollection, useUser } from "@/firebase";
+import { collection, addDoc, query, orderBy, limit } from "firebase/firestore";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function NotificationsPage() {
+  const db = useFirestore();
+  const { profile } = useUser();
   const [isSending, setIsSending] = useState(false);
+  const [title, setTitle] = useState("");
+  const [message, setMessage] = useState("");
+  const [target, setTarget] = useState("all");
 
-  const handleSend = (e: React.FormEvent) => {
+  const historyQuery = useMemo(() => query(collection(db, 'notifications'), orderBy('timestamp', 'desc'), limit(10)), [db]);
+  const { data: history, loading } = useCollection(historyQuery);
+
+  const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSending(true);
-    setTimeout(() => {
+    try {
+      await addDoc(collection(db, 'notifications'), {
+        title,
+        message,
+        target,
+        senderName: profile?.displayName || "مدير",
+        timestamp: Date.now(),
+        status: 'sent'
+      });
+      toast({ title: "تم الإرسال", description: "تم حفظ الإشعار وإرساله للمستهدفين." });
+      setTitle("");
+      setMessage("");
+    } catch (e) {
+      toast({ variant: "destructive", title: "خطأ", description: "فشل إرسال الإشعار." });
+    } finally {
       setIsSending(false);
-      toast({ title: "تم الإرسال", description: "جاري إرسال الإشعار إلى كافة المستخدمين المحددين عبر النظام." });
-    }, 2000);
+    }
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
+    <div className="space-y-8 animate-in fade-in duration-500 pb-20">
       <div className="space-y-1">
         <h1 className="text-3xl font-black tracking-tight">مركز الإشعارات</h1>
         <p className="text-muted-foreground font-medium text-sm">إرسال تنبيهات مباشرة وعروض ترويجية لهواتف العملاء.</p>
@@ -61,11 +83,11 @@ export default function NotificationsPage() {
                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
                        <Label className="font-bold">عنوان الإشعار</Label>
-                       <Input required placeholder="مثال: خصم جديد في المجمع!" className="rounded-xl h-12 bg-muted/30 border-none" />
+                       <Input required value={title} onChange={(e) => setTitle(e.target.value)} placeholder="مثال: خصم جديد في المجمع!" className="rounded-xl h-12 bg-muted/30 border-none" />
                     </div>
                     <div className="space-y-2">
                        <Label className="font-bold">الفئة المستهدفة</Label>
-                       <Select defaultValue="all">
+                       <Select value={target} onValueChange={setTarget}>
                           <SelectTrigger className="rounded-xl h-12 bg-muted/30 border-none">
                              <SelectValue placeholder="اختر الجمهور" />
                           </SelectTrigger>
@@ -79,11 +101,7 @@ export default function NotificationsPage() {
                  </div>
                  <div className="space-y-2">
                     <Label className="font-bold">محتوى الرسالة</Label>
-                    <Textarea required placeholder="اكتب نص الإشعار هنا..." className="rounded-2xl bg-muted/30 border-none min-h-[120px]" />
-                 </div>
-                 <div className="space-y-2">
-                    <Label className="font-bold">رابط التوجيه (اختياري)</Label>
-                    <Input placeholder="مثال: /catalog/products-id" className="rounded-xl h-12 bg-muted/30 border-none text-left" dir="ltr" />
+                    <Textarea required value={message} onChange={(e) => setMessage(e.target.value)} placeholder="اكتب نص الإشعار هنا..." className="rounded-2xl bg-muted/30 border-none min-h-[120px]" />
                  </div>
                  <Button disabled={isSending} className="w-full h-14 rounded-2xl font-black text-lg gap-2 shadow-xl shadow-primary/20 transition-all hover:scale-[1.01] active:scale-95">
                     {isSending ? <Loader2 className="h-6 w-6 animate-spin" /> : <Send className="h-6 w-6" />}
@@ -104,17 +122,10 @@ export default function NotificationsPage() {
              <CardContent className="space-y-6">
                 <div className="flex justify-between items-center p-4 rounded-2xl bg-white/5 border border-white/10">
                    <div className="space-y-1">
-                      <p className="text-[10px] font-black uppercase opacity-60">إجمالي المشتركين</p>
-                      <p className="text-2xl font-black">1,450</p>
+                      <p className="text-[10px] font-black uppercase opacity-60">إجمالي السجلات</p>
+                      <p className="text-2xl font-black">{history.length}</p>
                    </div>
                    <Users className="h-8 w-8 opacity-20" />
-                </div>
-                <div className="flex justify-between items-center p-4 rounded-2xl bg-white/5 border border-white/10">
-                   <div className="space-y-1">
-                      <p className="text-[10px] font-black uppercase opacity-60">نسبة فتح الإشعارات</p>
-                      <p className="text-2xl font-black">24%</p>
-                   </div>
-                   <Smartphone className="h-8 w-8 opacity-20" />
                 </div>
              </CardContent>
           </Card>
@@ -126,15 +137,21 @@ export default function NotificationsPage() {
                 </CardTitle>
              </CardHeader>
              <CardContent className="space-y-4">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="p-4 rounded-2xl bg-muted/30 space-y-2 border-r-4 border-primary">
-                     <p className="text-sm font-bold truncate">تخفيضات تصل لـ 50% على قطع الغيار</p>
-                     <div className="flex items-center justify-between text-[10px] text-muted-foreground font-bold">
-                        <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> قبل يومين</span>
-                        <span className="flex items-center gap-1 text-emerald-600"><CheckCircle2 className="h-3 w-3" /> تم الوصول</span>
-                     </div>
-                  </div>
-                ))}
+                {loading ? (
+                  Array(3).fill(0).map((_, i) => <Skeleton key={i} className="h-16 w-full rounded-2xl" />)
+                ) : history.length > 0 ? (
+                  history.map((notif: any) => (
+                    <div key={notif.id} className="p-4 rounded-2xl bg-muted/30 space-y-2 border-r-4 border-primary">
+                       <p className="text-sm font-bold truncate">{notif.title}</p>
+                       <div className="flex items-center justify-between text-[10px] text-muted-foreground font-bold">
+                          <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> {new Date(notif.timestamp).toLocaleDateString("ar-EG")}</span>
+                          <span className="flex items-center gap-1 text-emerald-600"><CheckCircle2 className="h-3 w-3" /> {notif.status}</span>
+                       </div>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-center text-xs opacity-30 font-bold">لا يوجد تاريخ إرسال.</p>
+                )}
              </CardContent>
           </Card>
         </div>

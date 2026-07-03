@@ -17,7 +17,9 @@ import {
   Trash2,
   CheckCircle2,
   AlertTriangle,
-  Settings2
+  Settings2,
+  Zap,
+  Loader2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -31,21 +33,15 @@ import {
   CardTitle, 
   CardDescription 
 } from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { useFirestore, useDoc, useCollection } from "@/firebase";
-import { doc, updateDoc, collection, query, where, serverTimestamp } from "firebase/firestore";
+import { doc, updateDoc, collection, query, serverTimestamp } from "firebase/firestore";
 import { useMemo, useState, useEffect } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
 import { useParams } from "next/navigation";
+import { workshopDiagnosisAssistant } from "@/ai/flows/workshop-diagnosis-assistant";
 
 export default function RepairOrderDetailsPage() {
   const params = useParams();
@@ -59,6 +55,8 @@ export default function RepairOrderDetailsPage() {
   const [usedParts, setUsedParts] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiDiagnosis, setAiDiagnosis] = useState<any>(null);
 
   const inventoryQuery = useMemo(() => query(collection(db, 'products')), [db]);
   const { data: products } = useCollection(inventoryQuery);
@@ -90,6 +88,20 @@ export default function RepairOrderDetailsPage() {
       quantity: 1
     }]);
     setSearchTerm("");
+  };
+
+  const handleAiDiagnosis = async () => {
+    if (!order?.problemDescription) return;
+    setAiLoading(true);
+    try {
+      const result = await workshopDiagnosisAssistant({ symptomsDescription: order.problemDescription });
+      setAiDiagnosis(result.diagnoses);
+      toast({ title: "اكتمل التشخيص", description: "قام الذكاء الاصطناعي بتحليل الأعطال." });
+    } catch (e) {
+      toast({ variant: "destructive", title: "خطأ", description: "فشل استدعاء مساعد الذكاء الاصطناعي." });
+    } finally {
+      setAiLoading(false);
+    }
   };
 
   const removePart = (productId: string) => {
@@ -157,7 +169,7 @@ export default function RepairOrderDetailsPage() {
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
+    <div className="space-y-8 animate-in fade-in duration-500 pb-20">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div className="flex items-center gap-4">
            <Link href="/admin/workshop">
@@ -174,23 +186,55 @@ export default function RepairOrderDetailsPage() {
                         {statusConfig[order.status]?.label}
                      </Badge>
                   </div>
-                  <p className="text-xs text-muted-foreground font-medium">آخر تحديث: {order.updatedAt ? new Date(order.updatedAt).toLocaleString() : 'غير محدد'}</p>
+                  <p className="text-xs text-muted-foreground font-medium">آخر تحديث: {order.updatedAt ? new Date(order.updatedAt).toLocaleString("ar-EG") : 'غير محدد'}</p>
                 </>
               ) : <Skeleton className="h-8 w-48" />}
            </div>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+           <Button variant="outline" className="rounded-xl border-2 font-bold h-11 gap-2 bg-purple-50 text-purple-700 border-purple-100" onClick={handleAiDiagnosis} disabled={aiLoading || !order}>
+             {aiLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4" />} تشخيص بالذكاء الاصطناعي
+           </Button>
            <Button variant="outline" className="rounded-xl border-2 font-bold h-11 gap-2" onClick={notifyCustomer} disabled={!order}>
              <MessageCircle className="h-5 w-5 text-emerald-600" /> إبلاغ العميل
-           </Button>
-           <Button variant="outline" className="rounded-xl border-2 font-bold h-11 gap-2" disabled={!order}>
-             <Printer className="h-5 w-5" /> طباعة الفاتورة
            </Button>
            <Button className="rounded-xl font-bold h-11 shadow-lg shadow-primary/20 gap-2 px-8" onClick={saveInvoice} disabled={isSaving || !order}>
              <Save className="h-5 w-5" /> {isSaving ? "جاري الحفظ..." : "حفظ التغييرات"}
            </Button>
         </div>
       </div>
+
+      {aiDiagnosis && (
+        <Card className="rounded-[32px] border-none shadow-xl bg-gradient-to-br from-purple-600 to-indigo-700 text-white p-8 relative overflow-hidden">
+           <div className="relative z-10 space-y-6">
+              <div className="flex items-center gap-3">
+                 <Zap className="h-8 w-8 text-yellow-400 fill-current" />
+                 <h2 className="text-2xl font-black">تشخيص الـ AI المقترح</h2>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                 {aiDiagnosis.map((d: any, i: number) => (
+                   <div key={i} className="bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/20 space-y-3">
+                      <h3 className="font-black text-lg underline decoration-yellow-400 underline-offset-8">{d.diagnosis}</h3>
+                      <div className="space-y-2">
+                         <p className="text-[10px] font-black uppercase opacity-60">الأسباب المحتملة:</p>
+                         <ul className="text-xs space-y-1 opacity-90 list-disc list-inside">
+                           {d.commonCauses.map((c: string, idx: number) => <li key={idx}>{c}</li>)}
+                         </ul>
+                      </div>
+                      <div className="space-y-2">
+                         <p className="text-[10px] font-black uppercase opacity-60">خطوات الحل:</p>
+                         <ul className="text-xs space-y-1 opacity-90 list-decimal list-inside">
+                           {d.troubleshootingSteps.map((s: string, idx: number) => <li key={idx}>{s}</li>)}
+                         </ul>
+                      </div>
+                   </div>
+                 ))}
+              </div>
+              <Button variant="secondary" className="rounded-full font-black px-10" onClick={() => setAiDiagnosis(null)}>إخفاء التشخيص</Button>
+           </div>
+           <Zap className="absolute -right-10 -bottom-10 h-64 w-64 opacity-5" />
+        </Card>
+      )}
 
       {order && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
