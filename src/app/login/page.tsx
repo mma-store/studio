@@ -2,8 +2,9 @@
 "use client";
 
 import { useState } from "react";
-import { useAuth } from "@/firebase";
-import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider } from "firebase/auth";
+import { useAuth, useFirestore } from "@/firebase";
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from "firebase/auth";
+import { collection, query, where, getDocs, doc, updateDoc, setDoc } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,12 +12,12 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
-import { Chrome, Mail, Lock, Loader2, ArrowRight, Phone } from "lucide-react";
-import Link from "next/link";
+import { Loader2, Lock, Phone, Mail } from "lucide-react";
 import Image from "next/image";
 
 export default function LoginPage() {
   const auth = useAuth();
+  const db = useFirestore();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const LOGO_URL = "https://up6.cc/2026/07/178308238964931.png";
@@ -25,30 +26,68 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
-  // نفس دالة التطهير لضمان المطابقة
-  const cleanPhoneForAuth = (p: string) => p.replace(/\s/g, '').replace(/^(\+964|0)/, '');
+  const cleanPhone = (p: string) => p.replace(/\s/g, '').replace(/^(\+964|0)/, '');
 
   const handlePhonePasswordLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    
+    const purePhone = cleanPhone(phoneNumber);
+    const fakeEmail = `${purePhone}@mma.store`;
+
     try {
-      const purePhone = cleanPhoneForAuth(phoneNumber);
-      const fakeEmail = `${purePhone}@mma.store`;
-      
+      // 1. محاولة تسجيل الدخول العادي
       await signInWithEmailAndPassword(auth, fakeEmail, password);
-      toast({ title: "تم تسجيل الدخول", description: "مرحباً بك مجدداً في مجمع محمد علاء." });
+      toast({ title: "تم تسجيل الدخول", description: "مرحباً بك مجدداً." });
       
-      // التوجه بناءً على الرقم (إذا كان الأدمن)
-      if (purePhone === '7858833838') {
+      if (['7858833838', '07858833838'].includes(phoneNumber)) {
         router.push("/admin");
       } else {
         router.push("/");
       }
     } catch (error: any) {
+      // 2. إذا لم يكن الحساب موجوداً في Auth، نتحقق من وجوده كموظف مضاف يدوياً
+      if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
+        try {
+          const usersRef = collection(db, "users");
+          const q = query(usersRef, where("phoneNumber", "in", [purePhone, `0${purePhone}`]));
+          const querySnapshot = await getDocs(q);
+
+          if (!querySnapshot.empty) {
+            const userDoc = querySnapshot.docs[0];
+            const userData = userDoc.data();
+
+            // التحقق من كلمة السر المؤقتة للموظف
+            if (userData.tempPassword === password) {
+              toast({ title: "تفعيل الحساب...", description: "جاري إنشاء حسابك الرسمي للمرة الأولى." });
+              
+              // إنشاء الحساب في Auth
+              const userCredential = await createUserWithEmailAndPassword(auth, fakeEmail, password);
+              const newUser = userCredential.user;
+
+              // تحديث السجل في Firestore وربطه بـ UID الجديد
+              await setDoc(doc(db, "users", newUser.uid), {
+                ...userData,
+                uid: newUser.uid,
+                email: fakeEmail,
+                lastLogin: Date.now(),
+                tempPassword: null // مسح كلمة السر المؤقتة بعد التفعيل
+              });
+
+              toast({ title: "تم التفعيل بنجاح" });
+              router.push("/admin");
+              return;
+            }
+          }
+        } catch (innerError) {
+          console.error("Auto-provisioning failed:", innerError);
+        }
+      }
+      
       toast({ 
         variant: "destructive", 
         title: "خطأ في الدخول", 
-        description: "رقم الهاتف أو كلمة المرور غير صحيحة." 
+        description: "تأكد من رقم الهاتف وكلمة المرور. إذا كنت موظفاً جديداً، استخدم كلمة السر التي زودك بها المدير." 
       });
     } finally {
       setLoading(false);
@@ -72,12 +111,12 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-[#FDF8F5] p-4 relative overflow-hidden">
       <Card className="w-full max-w-md rounded-[40px] border-none shadow-2xl overflow-hidden bg-white">
         <CardHeader className="space-y-4 pt-12 pb-6 text-center">
-          <div className="mx-auto relative h-24 w-56">
-            <Image src={LOGO_URL} alt="MMA" fill className="object-contain" />
+          <div className="mx-auto relative h-28 w-64">
+            <Image src={LOGO_URL} alt="MMA" fill className="object-contain" priority />
           </div>
           <div className="space-y-1">
             <CardTitle className="text-3xl font-black">مجمع محمد علاء</CardTitle>
-            <CardDescription className="font-medium">سجل دخولك للوصول إلى خدماتنا</CardDescription>
+            <CardDescription className="font-medium">سجل دخولك للوصول إلى لوحة التحكم</CardDescription>
           </div>
         </CardHeader>
         

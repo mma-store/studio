@@ -12,7 +12,8 @@ import {
   Loader2,
   Plus,
   Edit2,
-  Save
+  Save,
+  X
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -62,7 +63,7 @@ export default function EmployeesPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<any>(null);
 
-  // استخدام المراقب المباشر لضمان التزامن اللحظي
+  // استخدام المراقب المباشر لضمان التزامن اللحظي بين الأجهزة
   const staffQuery = useMemo(() => query(
     collection(db, 'users'), 
     where('role', 'in', ['admin', 'sales_employee', 'workshop_technician', 'warehouse_employee']),
@@ -70,26 +71,26 @@ export default function EmployeesPage() {
   ), [db]);
   const { data: staff, loading } = useCollection(staffQuery);
 
-  const cleanPhoneForSearch = (p: string) => p.replace(/\s/g, '').replace(/^(\+964|0)/, '');
+  const cleanPhone = (p: string) => p.replace(/\s/g, '').replace(/^(\+964|0)/, '');
 
   const handleAddEmployee = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsSaving(true);
     const formData = new FormData(e.currentTarget);
-    const purePhone = cleanPhoneForSearch(formData.get('phone') as string);
+    const purePhone = cleanPhone(formData.get('phone') as string);
+    
     try {
       await addDoc(collection(db, 'users'), {
         displayName: formData.get('name'),
-        email: `${purePhone}@mma.staff`,
-        phoneNumber: `0${purePhone}`, // حفظه بالصفر ليكون مألوفاً
+        phoneNumber: `0${purePhone}`, 
         role: formData.get('role'),
-        tempPassword: formData.get('password'),
+        tempPassword: formData.get('password'), // كلمة السر التي يدخلها الأدمن
         createdAt: Date.now()
       });
       setIsAddOpen(false);
-      toast({ title: "تمت الإضافة", description: "تم تسجيل الموظف. اطلب منه التسجيل بهذا الرقم." });
+      toast({ title: "تم تسجيل الموظف", description: "يمكن للموظف الآن تسجيل الدخول مباشرة بنفس الرقم وكلمة السر." });
     } catch (e) {
-      toast({ variant: "destructive", title: "خطأ", description: "فشل إضافة الموظف." });
+      toast({ variant: "destructive", title: "خطأ في الإضافة" });
     } finally {
       setIsSaving(false);
     }
@@ -100,7 +101,8 @@ export default function EmployeesPage() {
     if (!editingEmployee) return;
     setIsSaving(true);
     const formData = new FormData(e.currentTarget);
-    const purePhone = cleanPhoneForSearch(formData.get('phone') as string);
+    const purePhone = cleanPhone(formData.get('phone') as string);
+    
     try {
       await updateDoc(doc(db, 'users', editingEmployee.id), {
         displayName: formData.get('name'),
@@ -110,18 +112,22 @@ export default function EmployeesPage() {
       });
       setIsEditOpen(false);
       setEditingEmployee(null);
-      toast({ title: "تم التحديث" });
+      toast({ title: "تم تحديث البيانات" });
     } catch (e) {
-      toast({ variant: "destructive", title: "خطأ" });
+      toast({ variant: "destructive", title: "فشل التعديل" });
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("هل تريد إزالة هذا الموظف؟")) return;
-    await deleteDoc(doc(db, 'users', id));
-    toast({ title: "تم الحذف" });
+    if (!confirm("هل تريد إزالة هذا الموظف نهائياً؟")) return;
+    try {
+      await deleteDoc(doc(db, 'users', id));
+      toast({ title: "تم الحذف" });
+    } catch (e) {
+      toast({ variant: "destructive", title: "خطأ في الحذف" });
+    }
   };
 
   return (
@@ -129,7 +135,7 @@ export default function EmployeesPage() {
       <div className="flex justify-between items-center">
         <div className="space-y-1">
           <h1 className="text-3xl font-black tracking-tight">إدارة فريق العمل</h1>
-          <p className="text-muted-foreground font-medium text-sm">إدارة حسابات الموظفين والصلاحيات.</p>
+          <p className="text-muted-foreground font-medium text-sm">إضافة الموظفين وتعيين كلمات سر لهم للدخول الفوري.</p>
         </div>
         
         <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
@@ -150,8 +156,9 @@ export default function EmployeesPage() {
                   <Input name="phone" required placeholder="07XXXXXXXXX" className="rounded-xl h-12 bg-muted/20 border-none text-left" dir="ltr" />
                </div>
                <div className="space-y-2">
-                  <Label className="font-bold">كلمة السر الأولية</Label>
-                  <Input name="password" required type="text" placeholder="MMA12345" className="rounded-xl h-12 bg-muted/20 border-none text-left font-black" />
+                  <Label className="font-bold">كلمة سر الدخول</Label>
+                  <Input name="password" required type="text" placeholder="اكتب رمزاً للموظف..." className="rounded-xl h-12 bg-muted/20 border-none text-left font-black" />
+                  <p className="text-[10px] text-muted-foreground font-bold px-1">هذه الكلمة سيستخدمها الموظف للدخول لأول مرة.</p>
                </div>
                <div className="space-y-2">
                   <Label className="font-bold">الدور الوظيفي</Label>
@@ -161,7 +168,7 @@ export default function EmployeesPage() {
                     </SelectTrigger>
                     <SelectContent className="rounded-2xl">
                        <SelectItem value="admin">مدير نظام</SelectItem>
-                       <SelectItem value="sales_employee">موظف مبيعات</SelectItem>
+                       <SelectItem value="sales_employee">موظف مبيعات (صلاحيات كاملة)</SelectItem>
                        <SelectItem value="workshop_technician">فني ورشة</SelectItem>
                        <SelectItem value="warehouse_employee">أمين مخزن</SelectItem>
                     </SelectContent>
@@ -169,7 +176,7 @@ export default function EmployeesPage() {
                </div>
                <DialogFooter>
                   <Button type="submit" disabled={isSaving} className="w-full h-14 rounded-2xl font-black text-lg">
-                    {isSaving ? <Loader2 className="h-5 w-5 animate-spin" /> : "حفظ بيانات الموظف"}
+                    {isSaving ? <Loader2 className="h-5 w-5 animate-spin" /> : "حفظ الموظف وتفعيل دخوله"}
                   </Button>
                </DialogFooter>
             </form>
@@ -177,13 +184,14 @@ export default function EmployeesPage() {
         </Dialog>
       </div>
 
-      <div className="rounded-[32px] border-none bg-white dark:bg-card shadow-sm overflow-hidden">
+      <div className="rounded-[32px] border-none bg-white dark:bg-card shadow-sm overflow-hidden border">
         <Table>
           <TableHeader>
             <TableRow className="border-b bg-muted/30">
               <TableHead className="text-right font-black text-xs uppercase py-6 px-6">الموظف</TableHead>
               <TableHead className="text-right font-black text-xs uppercase">الدور</TableHead>
               <TableHead className="text-right font-black text-xs uppercase">رقم الهاتف</TableHead>
+              <TableHead className="text-right font-black text-xs uppercase">كلمة السر</TableHead>
               <TableHead className="text-left font-black text-xs uppercase px-6">إجراءات</TableHead>
             </TableRow>
           </TableHeader>
@@ -194,6 +202,7 @@ export default function EmployeesPage() {
                   <TableCell className="px-6"><Skeleton className="h-10 w-48" /></TableCell>
                   <TableCell><Skeleton className="h-6 w-24 rounded-full" /></TableCell>
                   <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-12" /></TableCell>
                   <TableCell className="px-6 text-left"><Skeleton className="h-8 w-8" /></TableCell>
                 </TableRow>
               ))
@@ -209,7 +218,7 @@ export default function EmployeesPage() {
                       </div>
                       <div className="flex flex-col">
                         <span className="font-black text-sm">{member.displayName}</span>
-                        <span className="text-[10px] text-muted-foreground font-bold">{member.email}</span>
+                        <span className="text-[10px] text-muted-foreground font-bold">{member.email || 'حساب مفعل'}</span>
                       </div>
                     </div>
                   </TableCell>
@@ -220,6 +229,7 @@ export default function EmployeesPage() {
                     </Badge>
                   </TableCell>
                   <TableCell className="font-bold text-sm" dir="ltr">{member.phoneNumber}</TableCell>
+                  <TableCell className="font-mono text-xs opacity-50">{member.tempPassword || '******'}</TableCell>
                   <TableCell className="text-left px-6">
                     <div className="flex items-center justify-end gap-2">
                        <Button variant="ghost" size="icon" className="rounded-xl text-blue-600" onClick={() => { setEditingEmployee(member); setIsEditOpen(true); }}>
@@ -237,6 +247,7 @@ export default function EmployeesPage() {
         </Table>
       </div>
 
+      {/* نافذة التعديل */}
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
         <DialogContent className="rounded-[32px]">
           <DialogHeader><DialogTitle className="text-2xl font-black">تعديل الموظف</DialogTitle></DialogHeader>

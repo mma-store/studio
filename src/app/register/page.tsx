@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { toast } from "@/hooks/use-toast";
-import { User, Phone, Lock, Loader2, ArrowRight } from "lucide-react";
+import { User, Phone, Lock, Loader2 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 
@@ -28,20 +28,19 @@ export default function RegisterPage() {
     password: "",
   });
 
-  // توحيد تنظيف الرقم: إزالة الفراغات والصفر الأول ورمز الدولة
-  const cleanPhoneForAuth = (p: string) => p.replace(/\s/g, '').replace(/^(\+964|0)/, '');
+  const cleanPhone = (p: string) => p.replace(/\s/g, '').replace(/^(\+964|0)/, '');
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
-      const purePhone = cleanPhoneForAuth(formData.phoneNumber);
+      const purePhone = cleanPhone(formData.phoneNumber);
       const fakeEmail = `${purePhone}@mma.store`;
 
-      // 1. البحث عن رقم الهاتف في سجلات الموظفين أو الزبائن المضافة مسبقاً
+      // 1. البحث عن رقم الهاتف في سجلات الموظفين المضافة مسبقاً
       const usersRef = collection(db, "users");
-      const phoneQuery = query(usersRef, where("phoneNumber", "in", [purePhone, `0${purePhone}`, `+964${purePhone}`]));
+      const phoneQuery = query(usersRef, where("phoneNumber", "in", [purePhone, `0${purePhone}`]));
       const querySnapshot = await getDocs(phoneQuery);
       
       let assignedRole = 'retail_customer';
@@ -57,8 +56,8 @@ export default function RegisterPage() {
         await deleteDoc(doc(db, "users", existingDocId!));
       }
 
-      // إذا كان الرقم هو رقم الماستر أدمن
-      if (purePhone === '7858833838') {
+      // حساب الماستر أدمن
+      if (['7858833838', '07858833838'].includes(formData.phoneNumber)) {
         assignedRole = 'admin';
       }
 
@@ -70,7 +69,7 @@ export default function RegisterPage() {
       const finalUserData = {
         uid: user.uid,
         displayName: formData.displayName || existingData?.displayName || "مستخدم",
-        phoneNumber: `0${purePhone}`, // حفظه بالصفر للعرض
+        phoneNumber: `0${purePhone}`,
         email: fakeEmail,
         role: assignedRole,
         currentBalance: existingData?.currentBalance || 0,
@@ -90,7 +89,6 @@ export default function RegisterPage() {
       router.push(isAdminOrStaff ? "/admin" : "/");
       
     } catch (error: any) {
-      console.error(error);
       toast({ 
         variant: "destructive", 
         title: "خطأ في التسجيل", 
@@ -105,8 +103,8 @@ export default function RegisterPage() {
     <div className="min-h-screen flex items-center justify-center bg-[#FDF8F5] p-4 relative overflow-hidden">
       <Card className="w-full max-w-md rounded-[40px] border-none shadow-2xl overflow-hidden bg-white">
         <CardHeader className="space-y-4 pt-12 pb-6 text-center">
-          <div className="mx-auto relative h-24 w-56">
-            <Image src={LOGO_URL} alt="MMA" fill className="object-contain" />
+          <div className="mx-auto relative h-28 w-64">
+            <Image src={LOGO_URL} alt="MMA" fill className="object-contain" priority />
           </div>
           <div className="space-y-1">
             <CardTitle className="text-3xl font-black text-foreground">إنشاء حساب جديد</CardTitle>
