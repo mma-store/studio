@@ -1,3 +1,4 @@
+
 'use client';
 
 import { Header } from "@/components/layout/header";
@@ -110,8 +111,8 @@ export default function ProfilePage() {
            <div className="h-24 w-24 bg-primary/10 rounded-full flex items-center justify-center">
               <User className="h-12 w-12 text-primary" />
            </div>
-           <h2 className="text-2xl font-black">أهلاً بك في مجمعنا</h2>
-           <p className="text-muted-foreground font-medium">يرجى تسجيل الدخول للوصول إلى كافة المميزات والطلبات الخاصة بك.</p>
+           <h2 className="text-2xl font-black text-foreground">أهلاً بك في مجمع محمد علاء</h2>
+           <p className="text-muted-foreground font-medium text-balance">يرجى تسجيل الدخول للوصول إلى كافة المميزات والطلبات الخاصة بك.</p>
            <Link href="/login" className="w-full">
               <Button className="w-full h-14 rounded-full text-lg font-black shadow-lg shadow-primary/20">تسجيل الدخول</Button>
            </Link>
@@ -143,7 +144,7 @@ export default function ProfilePage() {
                 </label>
              </div>
              <div className="text-center">
-                <h2 className="text-2xl font-black">{profile?.displayName || "مستخدم جديد"}</h2>
+                <h2 className="text-2xl font-black text-foreground">{profile?.displayName || "مستخدم جديد"}</h2>
                 <p className="text-sm text-muted-foreground font-medium">{user.email}</p>
                 <div className="mt-2">
                    <Badge variant="outline" className="rounded-full bg-primary/5 border-primary/20 text-primary px-4 font-bold">
@@ -178,7 +179,7 @@ export default function ProfilePage() {
                 <div className="h-10 w-10 flex items-center justify-center rounded-full bg-orange-100 dark:bg-orange-500/10 text-orange-600">
                    {isDarkMode ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
                 </div>
-                <span className="font-bold">الوضع الليلي</span>
+                <span className="font-bold text-foreground">الوضع الليلي</span>
              </div>
              <Switch checked={isDarkMode} onCheckedChange={toggleDarkMode} />
           </div>
@@ -194,7 +195,7 @@ export default function ProfilePage() {
                      <div className={`h-10 w-10 flex items-center justify-center rounded-2xl ${item.bg} ${item.color}`}>
                         <item.icon className="h-5 w-5" />
                      </div>
-                     <span className="font-bold text-sm">{item.label}</span>
+                     <span className="font-bold text-sm text-foreground">{item.label}</span>
                   </div>
                   <ChevronLeft className="h-5 w-5 text-muted-foreground" />
                </button>
@@ -211,9 +212,12 @@ export default function ProfilePage() {
           </Button>
           
           <div className="text-center pt-16 pb-8 opacity-60">
-             <p className="text-[9px] text-muted-foreground font-black tracking-[0.4em] uppercase mb-1">MMA v1.0.8</p>
+             <div className="flex justify-center mb-4">
+                <div className="h-8 w-14 bg-muted rounded-xl flex items-center justify-center font-black italic tracking-tighter text-muted-foreground text-xs">MMA</div>
+             </div>
+             <p className="text-[9px] text-muted-foreground font-black tracking-[0.4em] uppercase mb-1">مجمع محمد علاء v2.1</p>
              <p className="text-[11px] font-bold text-muted-foreground">
-                Developed by <span className="text-primary font-black">Hussein Salah</span>
+                Automotive Excellence Platform
              </p>
           </div>
         </div>

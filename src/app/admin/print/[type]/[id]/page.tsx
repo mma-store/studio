@@ -18,7 +18,7 @@ const collectionMap: Record<string, string> = {
   payment: 'paymentVouchers',
   workshop: 'repairOrders',
   return: 'returns',
-  statement: 'users' // Special case for customer statements
+  statement: 'users' 
 };
 
 export default function PrintPreviewPage() {
@@ -29,14 +29,13 @@ export default function PrintPreviewPage() {
   
   const type = params?.type as string;
   const id = params?.id as string;
-  const size = searchParams.get('size') || '80mm'; // Default to thermal 80mm
+  const size = searchParams.get('size') || '80mm'; 
 
   const docRef = useMemo(() => id ? doc(db, collectionMap[type] || 'orders', id) : null, [db, type, id]);
   const { data, loading } = useDoc<any>(docRef);
 
   const [settings, setSettings] = useState<any>(null);
   useEffect(() => {
-    // Get store settings for header
     const fetchSettings = async () => {
       const sRef = doc(db, 'settings', 'main');
       const { getDoc } = await import("firebase/firestore");
@@ -98,14 +97,13 @@ export default function PrintPreviewPage() {
           )}
           id="printable-document"
         >
-          {/* Document Content Rendered based on type */}
           <div className="p-6 md:p-10 text-slate-900 printable-area">
              {/* Header */}
              <div className="text-center space-y-2 mb-8 border-b pb-6">
-                <div className="h-14 w-14 bg-primary text-white flex items-center justify-center rounded-2xl mx-auto font-black text-2xl italic mb-2">M</div>
+                <div className="h-10 w-16 bg-primary text-white flex items-center justify-center rounded-xl mx-auto font-black text-xl italic tracking-tighter mb-2">MMA</div>
                 <h2 className="text-xl font-black">{settings?.storeName || 'مجمع محمد علاء'}</h2>
-                <p className="text-[10px] font-bold text-muted-foreground">{settings?.address}</p>
-                <p className="text-[10px] font-bold text-muted-foreground" dir="ltr">{settings?.phone}</p>
+                <p className="text-[10px] font-bold text-muted-foreground">{settings?.address || 'العراق - بغداد'}</p>
+                <p className="text-[10px] font-bold text-muted-foreground" dir="ltr">{settings?.phone || '07XXXXXXXXX'}</p>
              </div>
 
              {/* Doc Title & Info */}
@@ -116,7 +114,7 @@ export default function PrintPreviewPage() {
                        type === 'purchase' ? 'فاتورة شراء' : 
                        type === 'receipt' ? 'سند قبض' : 
                        type === 'payment' ? 'سند صرف' : 
-                       type === 'workshop' ? 'فاتورة صيانة' : 'مستند'}
+                       type === 'workshop' ? 'فاتورة صيانة' : 'مستند رسمي'}
                    </h3>
                    <p className="text-[10px] font-bold">الرقم: <span className="text-primary">#{data.orderNumber || data.voucherNumber || data.invoiceNumber || id.slice(-6)}</span></p>
                 </div>
@@ -179,12 +177,6 @@ export default function PrintPreviewPage() {
                    <span>المجموع الفرعي:</span>
                    <span>{(data.total || data.totalAmount || 0).toLocaleString()} د.ع</span>
                 </div>
-                {data.deliveryFee > 0 && (
-                  <div className="flex justify-between items-center text-[10px] font-bold opacity-60">
-                    <span>التوصيل:</span>
-                    <span>{data.deliveryFee.toLocaleString()} د.ع</span>
-                  </div>
-                )}
                 <div className="flex justify-between items-center bg-slate-900 text-white p-4 rounded-xl">
                    <span className="text-sm font-black uppercase">الإجمالي النهائي</span>
                    <span className="text-xl font-black">{(data.total || data.totalAmount || data.amount || 0).toLocaleString()} د.ع</span>
@@ -201,8 +193,8 @@ export default function PrintPreviewPage() {
              {/* Footer Barcode & QR */}
              <div className="mt-12 text-center space-y-4 opacity-70">
                 <div className="flex flex-col items-center gap-1">
-                   <p className="text-[8px] font-black uppercase tracking-[0.3em]">Thank you for your business</p>
-                   <p className="text-[10px] font-black">نتمنى لكم رحلة آمنة 🏍️</p>
+                   <p className="text-[8px] font-black uppercase tracking-[0.3em]">Quality Parts & Professional Service</p>
+                   <p className="text-[10px] font-black">مجمع محمد علاء - ثقتكم هدفنا 🏍️</p>
                 </div>
                 <div className="pt-4 border-t flex justify-between items-center">
                    <div className="text-right">

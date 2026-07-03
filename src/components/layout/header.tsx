@@ -20,26 +20,29 @@ export function Header() {
     <header className="sticky top-0 z-40 w-full border-b bg-background/80 backdrop-blur-md">
       <div className="container flex h-16 items-center justify-between px-4">
         <div className="flex items-center gap-4">
-          <Link href="/" className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-              <span className="text-sm font-bold text-white">M</span>
+          <Link href="/" className="flex items-center gap-3">
+            <div className="flex h-9 w-14 items-center justify-center rounded-xl bg-primary shadow-lg shadow-primary/20">
+              <span className="text-sm font-black text-white italic tracking-tighter">MMA</span>
             </div>
-            <h1 className="text-xl font-black tracking-tight text-foreground">
-              MMA
-            </h1>
+            <div className="flex flex-col">
+              <h1 className="text-base font-black tracking-tight text-foreground leading-none">
+                مجمع محمد علاء
+              </h1>
+              <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest mt-0.5">Automotive Hub</span>
+            </div>
           </Link>
         </div>
 
         <div className="flex items-center gap-1 sm:gap-2">
           <Link href="/search">
-            <Button variant="ghost" size="icon" className="rounded-full hover:bg-muted">
+            <Button variant="ghost" size="icon" className="rounded-full hover:bg-muted text-foreground">
               <Search className="h-5 w-5" />
             </Button>
           </Link>
 
           <Sheet>
             <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" className="rounded-full relative hover:bg-muted">
+              <Button variant="ghost" size="icon" className="rounded-full relative hover:bg-muted text-foreground">
                 <Bell className="h-5 w-5" />
                 <span className="absolute top-2 right-2 flex h-2 w-2">
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
@@ -52,13 +55,13 @@ export function Header() {
                </SheetHeader>
                <div className="flex flex-col items-center justify-center h-full text-center gap-4 opacity-30">
                   <Bell className="h-16 w-16" strokeWidth={1} />
-                  <p className="font-bold">لا توجد إشعارات جديدة حالياً</p>
+                  <p className="font-bold text-foreground">لا توجد إشعارات جديدة حالياً</p>
                </div>
             </SheetContent>
           </Sheet>
 
           <Link href="/cart">
-            <Button variant="ghost" size="icon" className="rounded-full relative hover:bg-muted">
+            <Button variant="ghost" size="icon" className="rounded-full relative hover:bg-muted text-foreground">
               <ShoppingCart className="h-5 w-5" />
               {totalItems > 0 && (
                 <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] text-white font-bold animate-in zoom-in duration-300">

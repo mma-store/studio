@@ -31,18 +31,14 @@ export default function RegisterPage() {
     setLoading(true);
 
     try {
-      // تنظيف رقم الهاتف وتحويله لبريد وهمي للدخول بكلمة مرور
       const cleanPhone = formData.phoneNumber.replace(/\s/g, '');
       const fakeEmail = `${cleanPhone}@mma.store`;
 
-      // 1. إنشاء الحساب في Firebase Auth
       const userCredential = await createUserWithEmailAndPassword(auth, fakeEmail, formData.password);
       const user = userCredential.user;
 
-      // 2. تحديد الدور (مدير للرقم المحدد، عميل للبقية)
       const role = cleanPhone === '07858833838' ? 'admin' : 'retail_customer';
 
-      // 3. إنشاء ملف التعريف في Firestore
       await setDoc(doc(db, "users", user.uid), {
         uid: user.uid,
         displayName: formData.displayName,
@@ -52,7 +48,7 @@ export default function RegisterPage() {
         createdAt: Date.now(),
       });
 
-      toast({ title: "تم إنشاء الحساب", description: "مرحباً بك في مجمع محمد علاء." });
+      toast({ title: "تم إنشاء الحساب", description: "مرحباً بك في عائلة مجمع محمد علاء." });
       router.push(role === 'admin' ? "/admin" : "/");
     } catch (error: any) {
       console.error(error);
@@ -67,15 +63,15 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#FDF8F5] p-4">
+    <div className="min-h-screen flex items-center justify-center bg-[#FDF8F5] p-4 relative overflow-hidden">
       <Card className="w-full max-w-md rounded-[40px] border-none shadow-2xl overflow-hidden bg-white">
-        <CardHeader className="space-y-4 pt-10 pb-6 text-center">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-primary text-white shadow-lg">
-            <span className="text-3xl font-black italic">M</span>
+        <CardHeader className="space-y-4 pt-12 pb-6 text-center">
+          <div className="mx-auto flex h-14 w-20 items-center justify-center rounded-2xl bg-primary text-white shadow-xl shadow-primary/30">
+            <span className="text-2xl font-black italic tracking-tighter">MMA</span>
           </div>
           <div className="space-y-1">
-            <CardTitle className="text-3xl font-black">إنشاء حساب جديد</CardTitle>
-            <CardDescription className="font-medium">انضم إلينا للحصول على أفضل الخدمات</CardDescription>
+            <CardTitle className="text-3xl font-black text-foreground">إنشاء حساب جديد</CardTitle>
+            <CardDescription className="font-medium text-muted-foreground">انضم إلينا للحصول على أفضل خدمات الصيانة</CardDescription>
           </div>
         </CardHeader>
         
@@ -87,7 +83,7 @@ export default function RegisterPage() {
                 <User className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                 <Input 
                   placeholder="محمد علاء" 
-                  className="h-14 rounded-2xl pr-12 bg-muted/20 border-none"
+                  className="h-14 rounded-2xl pr-12 bg-muted/20 border-none font-bold"
                   value={formData.displayName}
                   onChange={(e) => setFormData({...formData, displayName: e.target.value})}
                   required
@@ -102,7 +98,7 @@ export default function RegisterPage() {
                 <Input 
                   type="tel" 
                   placeholder="07XXXXXXXXX" 
-                  className="h-14 rounded-2xl pr-12 bg-muted/20 border-none text-left"
+                  className="h-14 rounded-2xl pr-12 bg-muted/20 border-none text-left font-black"
                   dir="ltr"
                   value={formData.phoneNumber}
                   onChange={(e) => setFormData({...formData, phoneNumber: e.target.value})}
@@ -127,7 +123,7 @@ export default function RegisterPage() {
             </div>
 
             <Button type="submit" className="w-full h-14 rounded-2xl font-black text-lg gap-2 shadow-lg mt-4" disabled={loading}>
-              {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : "إنشاء الحساب"}
+              {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : "إنشاء الحساب الآن"}
             </Button>
           </form>
         </CardContent>
@@ -142,6 +138,7 @@ export default function RegisterPage() {
           </Button>
         </CardFooter>
       </Card>
+      <div className="absolute -top-20 -left-20 h-64 w-64 bg-primary/10 rounded-full blur-[100px]" />
     </div>
   );
 }

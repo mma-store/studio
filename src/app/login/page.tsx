@@ -28,14 +28,12 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
     try {
-      // تحويل رقم الهاتف لبريد وهمي داخلياً كما في التسجيل
       const cleanPhone = phoneNumber.replace(/\s/g, '');
       const fakeEmail = `${cleanPhone}@mma.store`;
       
       await signInWithEmailAndPassword(auth, fakeEmail, password);
-      toast({ title: "تم تسجيل الدخول", description: "مرحباً بك مجدداً." });
+      toast({ title: "تم تسجيل الدخول", description: "مرحباً بك مجدداً في مجمع محمد علاء." });
       
-      // التوجيه بناءً على ما إذا كان المدير
       if (cleanPhone === '07858833838') {
         router.push("/admin");
       } else {
@@ -83,13 +81,13 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#FDF8F5] p-4 relative overflow-hidden">
       <Card className="w-full max-w-md rounded-[40px] border-none shadow-2xl overflow-hidden bg-white">
-        <CardHeader className="space-y-4 pt-10 pb-6 text-center">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-primary text-white shadow-lg">
-            <span className="text-3xl font-black italic">M</span>
+        <CardHeader className="space-y-4 pt-12 pb-6 text-center">
+          <div className="mx-auto flex h-14 w-20 items-center justify-center rounded-2xl bg-primary text-white shadow-xl shadow-primary/30">
+            <span className="text-2xl font-black italic tracking-tighter">MMA</span>
           </div>
           <div className="space-y-1">
-            <CardTitle className="text-3xl font-black">مرحباً بك</CardTitle>
-            <CardDescription className="font-medium">سجل دخولك للوصول إلى كافة خدماتنا</CardDescription>
+            <CardTitle className="text-3xl font-black">مجمع محمد علاء</CardTitle>
+            <CardDescription className="font-medium">سجل دخولك للوصول إلى خدماتنا</CardDescription>
           </div>
         </CardHeader>
         
@@ -109,7 +107,7 @@ export default function LoginPage() {
                     <Input 
                       type="tel" 
                       placeholder="07XXXXXXXXX" 
-                      className="h-14 rounded-2xl pr-12 bg-muted/20 border-none text-left"
+                      className="h-14 rounded-2xl pr-12 bg-muted/20 border-none text-left font-black"
                       dir="ltr"
                       value={phoneNumber}
                       onChange={(e) => setPhoneNumber(e.target.value)}
@@ -132,7 +130,7 @@ export default function LoginPage() {
                   </div>
                 </div>
                 <Button type="submit" className="w-full h-14 rounded-2xl font-black text-lg gap-2 shadow-lg mt-2" disabled={loading}>
-                  {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : "دخول"}
+                  {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : "تسجيل الدخول"}
                 </Button>
               </form>
             </TabsContent>
@@ -195,6 +193,9 @@ export default function LoginPage() {
           </Button>
         </CardFooter>
       </Card>
+      {/* Decorative Blur */}
+      <div className="absolute -top-20 -right-20 h-64 w-64 bg-primary/10 rounded-full blur-[100px]" />
+      <div className="absolute -bottom-20 -left-20 h-64 w-64 bg-primary/10 rounded-full blur-[100px]" />
     </div>
   );
 }

@@ -121,8 +121,8 @@ export function AdminSidebar() {
     <Sidebar collapsible="icon" className="border-l bg-card">
       <SidebarHeader className="h-16 flex items-center justify-center border-b px-6">
         <Link href="/admin" className="flex items-center gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary text-white shadow-lg shadow-primary/20">
-            <span className="text-xl font-black italic">M</span>
+          <div className="flex h-9 w-14 shrink-0 items-center justify-center rounded-xl bg-primary text-white shadow-lg shadow-primary/20">
+            <span className="text-sm font-black italic tracking-tighter">MMA</span>
           </div>
           <div className="flex flex-col truncate group-data-[collapsible=icon]:hidden">
             <span className="text-sm font-black leading-none">مجمع محمد علاء</span>
