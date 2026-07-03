@@ -28,22 +28,23 @@ export default function RegisterPage() {
     password: "",
   });
 
-  const normalizePhone = (p: string) => p.replace(/\s/g, '').replace(/^0/, '').replace(/^\+964/, '');
+  // توحيد تنظيف الرقم: إزالة الفراغات والصفر الأول ورمز الدولة
+  const cleanPhoneForAuth = (p: string) => p.replace(/\s/g, '').replace(/^(\+964|0)/, '');
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
-      const cleanPhone = normalizePhone(formData.phoneNumber);
-      const fakeEmail = `${cleanPhone}@mma.store`;
+      const purePhone = cleanPhoneForAuth(formData.phoneNumber);
+      const fakeEmail = `${purePhone}@mma.store`;
 
-      // 1. البحث عن رقم الهاتف في سجلات النظام المضافة مسبقاً (سواء زبون أو موظف)
+      // 1. البحث عن رقم الهاتف في سجلات الموظفين أو الزبائن المضافة مسبقاً
       const usersRef = collection(db, "users");
-      const phoneQuery = query(usersRef, where("phoneNumber", "in", [cleanPhone, `0${cleanPhone}`]));
+      const phoneQuery = query(usersRef, where("phoneNumber", "in", [purePhone, `0${purePhone}`, `+964${purePhone}`]));
       const querySnapshot = await getDocs(phoneQuery);
       
-      let assignedRole = 'retail_customer'; // الدور الافتراضي
+      let assignedRole = 'retail_customer';
       let existingData: any = null;
       let existingDocId: string | null = null;
 
@@ -52,14 +53,12 @@ export default function RegisterPage() {
         existingData = querySnapshot.docs[0].data();
         assignedRole = existingData.role;
         
-        // إذا كان رقم الماستر أدمن
-        if (cleanPhone === '7858833838') {
-          assignedRole = 'admin';
-        }
-
-        // حذف السجل المؤقت الذي أضافه الأدمن لنستبدله بالسجل الرسمي المرتبط بـ UID في الخطوة القادمة
+        // حذف السجل المؤقت لاستبداله بالسجل الرسمي المرتبط بـ UID
         await deleteDoc(doc(db, "users", existingDocId!));
-      } else if (cleanPhone === '7858833838') {
+      }
+
+      // إذا كان الرقم هو رقم الماستر أدمن
+      if (purePhone === '7858833838') {
         assignedRole = 'admin';
       }
 
@@ -67,11 +66,11 @@ export default function RegisterPage() {
       const userCredential = await createUserWithEmailAndPassword(auth, fakeEmail, formData.password);
       const user = userCredential.user;
 
-      // 3. حفظ بيانات المستخدم النهائية مع الدور الوظيفي الصحيح
+      // 3. حفظ بيانات المستخدم النهائية
       const finalUserData = {
         uid: user.uid,
-        displayName: formData.displayName || existingData?.displayName,
-        phoneNumber: cleanPhone,
+        displayName: formData.displayName || existingData?.displayName || "مستخدم",
+        phoneNumber: `0${purePhone}`, // حفظه بالصفر للعرض
         email: fakeEmail,
         role: assignedRole,
         currentBalance: existingData?.currentBalance || 0,
@@ -84,10 +83,9 @@ export default function RegisterPage() {
 
       toast({ 
         title: "تم إنشاء الحساب بنجاح", 
-        description: assignedRole === 'retail_customer' ? "مرحباً بك في عائلة مجمع محمد علاء." : `مرحباً بك زميلنا في الفريق بصلاحية: ${assignedRole}` 
+        description: assignedRole === 'retail_customer' ? "مرحباً بك في مجمع محمد علاء." : `مرحباً بك في الفريق بصلاحية: ${assignedRole}` 
       });
 
-      // توجيه الموظفين للوحة الإدارة والزبائن للرئيسية
       const isAdminOrStaff = ['admin', 'sales_employee', 'workshop_technician', 'warehouse_employee'].includes(assignedRole);
       router.push(isAdminOrStaff ? "/admin" : "/");
       
@@ -96,7 +94,7 @@ export default function RegisterPage() {
       toast({ 
         variant: "destructive", 
         title: "خطأ في التسجيل", 
-        description: error.code === 'auth/email-already-in-use' ? "رقم الهاتف مسجل مسبقاً لمستخدم آخر." : "فشل إنشاء الحساب، يرجى المحاولة مرة أخرى." 
+        description: error.code === 'auth/email-already-in-use' ? "رقم الهاتف مسجل مسبقاً." : "فشل إنشاء الحساب، يرجى المحاولة." 
       });
     } finally {
       setLoading(false);
@@ -108,12 +106,7 @@ export default function RegisterPage() {
       <Card className="w-full max-w-md rounded-[40px] border-none shadow-2xl overflow-hidden bg-white">
         <CardHeader className="space-y-4 pt-12 pb-6 text-center">
           <div className="mx-auto relative h-24 w-56">
-            <Image 
-              src={LOGO_URL} 
-              alt="مجمع محمد علاء" 
-              fill 
-              className="object-contain"
-            />
+            <Image src={LOGO_URL} alt="MMA" fill className="object-contain" />
           </div>
           <div className="space-y-1">
             <CardTitle className="text-3xl font-black text-foreground">إنشاء حساب جديد</CardTitle>
@@ -127,64 +120,32 @@ export default function RegisterPage() {
               <Label className="font-bold mr-1">الاسم الكامل</Label>
               <div className="relative">
                 <User className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                <Input 
-                  placeholder="محمد علاء" 
-                  className="h-14 rounded-2xl pr-12 bg-muted/20 border-none font-bold"
-                  value={formData.displayName}
-                  onChange={(e) => setFormData({...formData, displayName: e.target.value})}
-                  required
-                />
+                <Input placeholder="محمد علاء" className="h-14 rounded-2xl pr-12 bg-muted/20 border-none font-bold" value={formData.displayName} onChange={(e) => setFormData({...formData, displayName: e.target.value})} required />
               </div>
             </div>
-
             <div className="space-y-2">
               <Label className="font-bold mr-1">رقم الهاتف</Label>
               <div className="relative">
                 <Phone className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                <Input 
-                  type="tel" 
-                  placeholder="07XXXXXXXXX" 
-                  className="h-14 rounded-2xl pr-12 bg-muted/20 border-none text-left font-black"
-                  dir="ltr"
-                  value={formData.phoneNumber}
-                  onChange={(e) => setFormData({...formData, phoneNumber: e.target.value})}
-                  required
-                />
+                <Input type="tel" placeholder="07XXXXXXXXX" className="h-14 rounded-2xl pr-12 bg-muted/20 border-none text-left font-black" dir="ltr" value={formData.phoneNumber} onChange={(e) => setFormData({...formData, phoneNumber: e.target.value})} required />
               </div>
             </div>
-
             <div className="space-y-2">
               <Label className="font-bold mr-1">كلمة المرور</Label>
               <div className="relative">
                 <Lock className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                <Input 
-                  type="password" 
-                  placeholder="••••••••" 
-                  className="h-14 rounded-2xl pr-12 bg-muted/20 border-none"
-                  value={formData.password}
-                  onChange={(e) => setFormData({...formData, password: e.target.value})}
-                  required
-                />
+                <Input type="password" placeholder="••••••••" className="h-14 rounded-2xl pr-12 bg-muted/20 border-none" value={formData.password} onChange={(e) => setFormData({...formData, password: e.target.value})} required />
               </div>
             </div>
-
             <Button type="submit" className="w-full h-14 rounded-2xl font-black text-lg gap-2 shadow-lg mt-4" disabled={loading}>
               {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : "إنشاء الحساب الآن"}
             </Button>
           </form>
         </CardContent>
-        
-        <CardFooter className="pb-10 pt-4 flex flex-col gap-4">
-          <p className="text-center text-sm text-muted-foreground font-medium">
-            لديك حساب بالفعل؟{" "}
-            <Link href="/login" className="text-primary font-bold hover:underline">تسجيل الدخول</Link>
-          </p>
-          <Button variant="ghost" className="rounded-full gap-2 text-xs font-bold" asChild>
-             <Link href="/">تخطي والعودة للرئيسية <ArrowRight className="h-3 w-3" /></Link>
-          </Button>
+        <CardFooter className="pb-10 pt-4 flex flex-col gap-4 text-center">
+          <p className="text-sm text-muted-foreground font-medium">لديك حساب بالفعل؟ <Link href="/login" className="text-primary font-bold hover:underline">تسجيل الدخول</Link></p>
         </CardFooter>
       </Card>
-      <div className="absolute -top-20 -left-20 h-64 w-64 bg-primary/10 rounded-full blur-[100px]" />
     </div>
   );
 }

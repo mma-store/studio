@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from "react";
@@ -20,22 +21,25 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const LOGO_URL = "https://up6.cc/2026/07/178308238964931.png";
   
-  // States
   const [phoneNumber, setPhoneNumber] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+
+  // نفس دالة التطهير لضمان المطابقة
+  const cleanPhoneForAuth = (p: string) => p.replace(/\s/g, '').replace(/^(\+964|0)/, '');
 
   const handlePhonePasswordLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
-      const cleanPhone = phoneNumber.replace(/\s/g, '');
-      const fakeEmail = `${cleanPhone}@mma.store`;
+      const purePhone = cleanPhoneForAuth(phoneNumber);
+      const fakeEmail = `${purePhone}@mma.store`;
       
       await signInWithEmailAndPassword(auth, fakeEmail, password);
       toast({ title: "تم تسجيل الدخول", description: "مرحباً بك مجدداً في مجمع محمد علاء." });
       
-      if (cleanPhone === '07858833838') {
+      // التوجه بناءً على الرقم (إذا كان الأدمن)
+      if (purePhone === '7858833838') {
         router.push("/admin");
       } else {
         router.push("/");
@@ -56,26 +60,11 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      toast({ title: "تم تسجيل الدخول", description: "مرحباً بك مجدداً." });
       router.push("/");
     } catch (error: any) {
-      toast({ 
-        variant: "destructive", 
-        title: "خطأ في الدخول", 
-        description: "تأكد من صحة البريد الإلكتروني وكلمة المرور." 
-      });
+      toast({ variant: "destructive", title: "خطأ", description: "البريد أو كلمة المرور غير صحيحة." });
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleGoogleLogin = async () => {
-    const provider = new GoogleAuthProvider();
-    try {
-      await signInWithPopup(auth, provider);
-      router.push("/");
-    } catch (error) {
-      toast({ variant: "destructive", title: "خطأ", description: "فشل تسجيل الدخول عبر جوجل." });
     }
   };
 
@@ -83,13 +72,8 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-[#FDF8F5] p-4 relative overflow-hidden">
       <Card className="w-full max-w-md rounded-[40px] border-none shadow-2xl overflow-hidden bg-white">
         <CardHeader className="space-y-4 pt-12 pb-6 text-center">
-          <div className="mx-auto relative h-20 w-48">
-            <Image 
-              src={LOGO_URL} 
-              alt="مجمع محمد علاء" 
-              fill 
-              className="object-contain"
-            />
+          <div className="mx-auto relative h-24 w-56">
+            <Image src={LOGO_URL} alt="MMA" fill className="object-contain" />
           </div>
           <div className="space-y-1">
             <CardTitle className="text-3xl font-black">مجمع محمد علاء</CardTitle>
@@ -100,8 +84,8 @@ export default function LoginPage() {
         <CardContent className="space-y-6 px-8">
           <Tabs defaultValue="phone" className="w-full">
             <TabsList className="grid w-full grid-cols-2 h-12 rounded-xl bg-muted/30 mb-6 p-1">
-              <TabsTrigger value="phone" className="rounded-lg font-bold data-[state=active]:bg-white data-[state=active]:shadow-sm">رقم الهاتف</TabsTrigger>
-              <TabsTrigger value="email" className="rounded-lg font-bold data-[state=active]:bg-white data-[state=active]:shadow-sm">البريد الإلكتروني</TabsTrigger>
+              <TabsTrigger value="phone" className="rounded-lg font-bold">رقم الهاتف</TabsTrigger>
+              <TabsTrigger value="email" className="rounded-lg font-bold">البريد</TabsTrigger>
             </TabsList>
 
             <TabsContent value="phone" className="space-y-4">
@@ -110,29 +94,14 @@ export default function LoginPage() {
                   <Label className="font-bold mr-1">رقم الهاتف</Label>
                   <div className="relative">
                     <Phone className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                    <Input 
-                      type="tel" 
-                      placeholder="07XXXXXXXXX" 
-                      className="h-14 rounded-2xl pr-12 bg-muted/20 border-none text-left font-black"
-                      dir="ltr"
-                      value={phoneNumber}
-                      onChange={(e) => setPhoneNumber(e.target.value)}
-                      required
-                    />
+                    <Input type="tel" placeholder="07XXXXXXXXX" className="h-14 rounded-2xl pr-12 bg-muted/20 border-none text-left font-black" dir="ltr" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} required />
                   </div>
                 </div>
                 <div className="space-y-2">
                   <Label className="font-bold mr-1">كلمة المرور</Label>
                   <div className="relative">
                     <Lock className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                    <Input 
-                      type="password" 
-                      placeholder="••••••••" 
-                      className="h-14 rounded-2xl pr-12 bg-muted/20 border-none"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                    />
+                    <Input type="password" placeholder="••••••••" className="h-14 rounded-2xl pr-12 bg-muted/20 border-none" value={password} onChange={(e) => setPassword(e.target.value)} required />
                   </div>
                 </div>
                 <Button type="submit" className="w-full h-14 rounded-2xl font-black text-lg gap-2 shadow-lg mt-2" disabled={loading}>
@@ -145,63 +114,24 @@ export default function LoginPage() {
               <form onSubmit={handleEmailLogin} className="space-y-4">
                 <div className="space-y-2">
                   <Label className="font-bold mr-1">البريد الإلكتروني</Label>
-                  <div className="relative">
-                    <Mail className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                    <Input 
-                      type="email" 
-                      placeholder="admin@mma.com" 
-                      className="h-14 rounded-2xl pr-12 bg-muted/20 border-none"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                    />
-                  </div>
+                  <Input type="email" placeholder="admin@mma.com" className="h-14 rounded-2xl px-6 bg-muted/20 border-none" value={email} onChange={(e) => setEmail(e.target.value)} required />
                 </div>
                 <div className="space-y-2">
                   <Label className="font-bold mr-1">كلمة المرور</Label>
-                  <div className="relative">
-                    <Lock className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                    <Input 
-                      type="password" 
-                      placeholder="••••••••" 
-                      className="h-14 rounded-2xl pr-12 bg-muted/20 border-none"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                    />
-                  </div>
+                  <Input type="password" placeholder="••••••••" className="h-14 rounded-2xl px-6 bg-muted/20 border-none" value={password} onChange={(e) => setPassword(e.target.value)} required />
                 </div>
-                <Button type="submit" className="w-full h-14 rounded-2xl font-black text-lg gap-2 shadow-lg mt-2" disabled={loading}>
+                <Button type="submit" className="w-full h-14 rounded-2xl font-black text-lg shadow-lg mt-2" disabled={loading}>
                   {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : "دخول"}
                 </Button>
               </form>
             </TabsContent>
           </Tabs>
-
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
-            <div className="relative flex justify-center text-xs uppercase"><span className="bg-white px-4 text-muted-foreground font-bold">أو تابع عبر</span></div>
-          </div>
-
-          <Button variant="outline" className="w-full h-14 rounded-2xl border-2 font-black gap-3" onClick={handleGoogleLogin}>
-            <Chrome className="h-5 w-5 text-red-500" />
-            الدخول عبر جوجل
-          </Button>
         </CardContent>
         
-        <CardFooter className="pb-10 pt-4 flex flex-col gap-4">
-          <p className="text-center text-sm text-muted-foreground font-medium">
-            ليس لديك حساب؟{" "}
-            <Link href="/register" className="text-primary font-bold hover:underline">إنشاء حساب جديد</Link>
-          </p>
-          <Button variant="ghost" className="rounded-full gap-2 text-xs font-bold" asChild>
-             <Link href="/">تخطي والعودة للرئيسية <ArrowRight className="h-3 w-3" /></Link>
-          </Button>
+        <CardFooter className="pb-10 pt-4 flex flex-col gap-4 text-center">
+          <p className="text-sm text-muted-foreground font-medium">ليس لديك حساب؟ <Link href="/register" className="text-primary font-bold hover:underline">إنشاء حساب جديد</Link></p>
         </CardFooter>
       </Card>
-      {/* Decorative Blur */}
-      <div className="absolute -top-20 -right-20 h-64 w-64 bg-primary/10 rounded-full blur-[100px]" />
-      <div className="absolute -bottom-20 -left-20 h-64 w-64 bg-primary/10 rounded-full blur-[100px]" />
     </div>
   );
 }
