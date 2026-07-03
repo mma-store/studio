@@ -1,4 +1,3 @@
-
 "use client";
 
 import { 
@@ -32,12 +31,14 @@ import {
   DropdownMenuLabel, 
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
-import { useFirestore, useCollection } from "@/firebase";
-import { collection, query, orderBy, updateDoc, doc, serverTimestamp } from "firebase/firestore";
+import { useFirestore, useCollection, useUser } from "@/firebase";
+import { collection, query, orderBy, updateDoc, doc, serverTimestamp, writeBatch, increment, addDoc } from "firebase/firestore";
 import { useMemo, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
+import { errorEmitter } from "@/firebase/error-emitter";
+import { FirestorePermissionError } from "@/firebase/errors";
 
 const statusConfig = {
   pending: { label: "قيد الانتظار", icon: Clock, color: "bg-orange-100 text-orange-700 border-orange-200" },
@@ -51,6 +52,7 @@ const statusConfig = {
 
 export default function OrdersManagementPage() {
   const db = useFirestore();
+  const { profile } = useUser();
   const [searchQuery, setSearchQuery] = useState("");
   const ordersQuery = useMemo(() => query(collection(db, 'orders'), orderBy('createdAt', 'desc')), [db]);
   const { data: orders, loading } = useCollection(ordersQuery);
@@ -61,27 +63,59 @@ export default function OrdersManagementPage() {
     o.phoneNumber?.includes(searchQuery)
   );
 
-  const updateStatus = async (orderId: string, newStatus: string) => {
-    try {
-      await updateDoc(doc(db, "orders", orderId), {
-        status: newStatus,
-        updatedAt: serverTimestamp()
+  const updateStatus = async (order: any, newStatus: string) => {
+    if (order.status === newStatus) return;
+
+    const batch = writeBatch(db);
+    const orderRef = doc(db, "orders", order.id);
+
+    batch.update(orderRef, {
+      status: newStatus,
+      updatedAt: serverTimestamp()
+    });
+
+    // Business Logic: If order was active and now cancelled, restore inventory
+    if (newStatus === 'cancelled' && order.status !== 'cancelled') {
+      order.items?.forEach((item: any) => {
+        if (item.productId) {
+          const productRef = doc(db, "products", item.productId);
+          batch.update(productRef, { stock: increment(item.quantity) });
+        }
       });
-      toast({ title: "تم التحديث", description: "تم تغيير حالة الطلب بنجاح." });
-    } catch (error) {
-      toast({ variant: "destructive", title: "خطأ", description: "فشل تحديث الحالة." });
     }
+    
+    // Logic: If order was cancelled and now re-activated, deduct inventory again
+    if (order.status === 'cancelled' && newStatus !== 'cancelled') {
+      order.items?.forEach((item: any) => {
+        if (item.productId) {
+          const productRef = doc(db, "products", item.productId);
+          batch.update(productRef, { stock: increment(-item.quantity) });
+        }
+      });
+    }
+
+    // Audit log
+    const auditRef = doc(collection(db, "auditLogs"));
+    batch.set(auditRef, {
+      userId: profile?.uid || "admin",
+      userName: profile?.displayName || "مدير",
+      action: "تحديث حالة طلب",
+      target: order.orderNumber,
+      details: `تغيير الحالة من ${order.status} إلى ${newStatus}`,
+      timestamp: Date.now()
+    });
+
+    batch.commit()
+      .then(() => toast({ title: "تم التحديث", description: "تم تغيير حالة الطلب بنجاح." }))
+      .catch(async (err) => {
+        const perr = new FirestorePermissionError({ path: orderRef.path, operation: "update" });
+        errorEmitter.emit('permission-error', perr);
+      });
   };
 
   const handleWhatsApp = (order: any) => {
     const statusLabel = statusConfig[order.status as keyof typeof statusConfig]?.label || order.status;
-    const itemsList = order.items?.map((i: any) => `- ${i.name} (عدد: ${i.quantity})`).join("\n") || "";
-    const message = `مرحباً ${order.customerName}،\n` +
-                    `نود إعلامكم بأن حالة طلبكم رقم *${order.orderNumber}* هي الآن: *${statusLabel}*.\n\n` +
-                    `المنتجات:\n${itemsList}\n\n` +
-                    `المجموع الكلي: ${order.total?.toLocaleString()} د.ع\n` +
-                    `شكراً لتعاملكم مع مجمع محمد علاء.`;
-
+    const message = `مرحباً ${order.customerName}،\nنود إعلامكم بأن حالة طلبكم رقم *${order.orderNumber}* هي الآن: *${statusLabel}*.\nشكراً لتعاملكم مع مجمع محمد علاء.`;
     window.open(`https://wa.me/${order.phoneNumber}?text=${encodeURIComponent(message)}`, '_blank');
   };
 
@@ -90,7 +124,7 @@ export default function OrdersManagementPage() {
       <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <div className="space-y-1">
           <h1 className="text-3xl font-black tracking-tight">إدارة الطلبات</h1>
-          <p className="text-muted-foreground font-medium text-sm">متابعة حالة المبيعات، تحديث حالات الشحن، وإصدار الفواتير.</p>
+          <p className="text-muted-foreground font-medium text-sm">متابعة حالة المبيعات وتحديث حالات الشحن.</p>
         </div>
       </div>
 
@@ -178,7 +212,7 @@ export default function OrdersManagementPage() {
                             {Object.entries(statusConfig).map(([key, cfg]) => (
                               <DropdownMenuItem 
                                 key={key}
-                                onClick={() => updateStatus(order.id, key)}
+                                onClick={() => updateStatus(order, key)}
                                 className={cn("rounded-xl gap-2 font-bold cursor-pointer text-xs", cfg.color.split(' ')[1])}
                               >
                                 {cfg.label}

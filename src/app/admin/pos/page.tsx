@@ -29,15 +29,18 @@ import {
   DropdownMenuItem, 
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
-import { useFirestore, useCollection } from "@/firebase";
-import { collection, query, orderBy, addDoc } from "firebase/firestore";
+import { useFirestore, useCollection, useUser } from "@/firebase";
+import { collection, query, orderBy, writeBatch, doc, increment, addDoc } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
+import { errorEmitter } from "@/firebase/error-emitter";
+import { FirestorePermissionError } from "@/firebase/errors";
 
 export default function POSPage() {
   const db = useFirestore();
+  const { profile } = useUser();
   const [searchQuery, setSearchQuery] = useState("");
   const [cart, setCart] = useState<any[]>([]);
   const [selectedCustomer, setSelectedCustomer] = useState<{ name: string; type: 'retail' | 'wholesale'; id?: string }>({ name: "زبون نقدي", type: 'retail' });
@@ -92,10 +95,6 @@ export default function POSPage() {
     });
   };
 
-  const removeFromCart = (productId: string) => {
-    setCart(prev => prev.filter(item => item.id !== productId));
-  };
-
   const updateQuantity = (productId: string, delta: number) => {
     setCart(prev => prev.map(item => {
       if (item.id === productId) {
@@ -110,39 +109,73 @@ export default function POSPage() {
     }));
   };
 
+  const removeFromCart = (productId: string) => {
+    setCart(prev => prev.filter(item => item.id !== productId));
+  };
+
   const handleCompleteSale = async () => {
     if (cart.length === 0) return;
     setProcessingOrder(true);
-    try {
-      const orderData = {
-        orderNumber: `POS-${Date.now().toString().slice(-6)}`,
-        customerName: selectedCustomer.name,
-        customerType: selectedCustomer.type,
-        items: cart.map(item => ({
-          productId: item.id,
-          name: item.name || "منتج غير مسمى",
-          price: selectedCustomer.type === 'wholesale' ? (item.wholesalePrice || item.retailPrice || 0) : (item.retailPrice || 0),
-          quantity: item.quantity
-        })),
-        subtotal,
-        discount,
-        total,
-        paymentMethod: 'cash',
-        createdAt: Date.now(),
-        status: 'delivered',
-        source: 'pos'
-      };
+    const batch = writeBatch(db);
+    
+    const orderData = {
+      orderNumber: `POS-${Date.now().toString().slice(-6)}`,
+      customerName: selectedCustomer.name,
+      customerType: selectedCustomer.type,
+      items: cart.map(item => ({
+        productId: item.id,
+        name: item.name || "منتج غير مسمى",
+        price: selectedCustomer.type === 'wholesale' ? (item.wholesalePrice || item.retailPrice || 0) : (item.retailPrice || 0),
+        quantity: item.quantity
+      })),
+      subtotal,
+      discount,
+      total,
+      paymentMethod: 'cash',
+      createdAt: Date.now(),
+      status: 'delivered',
+      source: 'pos'
+    };
 
-      await addDoc(collection(db, "orders"), orderData);
-      toast({ title: "تم بنجاح", description: "تم تسجيل العملية وطباعة الفاتورة." });
-      setCart([]);
-      setDiscount(0);
-      setIsCheckoutOpen(false);
-    } catch (error) {
-      toast({ variant: "destructive", title: "خطأ", description: "فشل تسجيل العملية في النظام." });
-    } finally {
-      setProcessingOrder(false);
-    }
+    const newOrderRef = doc(collection(db, "orders"));
+    batch.set(newOrderRef, orderData);
+
+    // Update inventory for each item
+    cart.forEach(item => {
+      const productRef = doc(db, "products", item.id);
+      batch.update(productRef, { 
+        stock: increment(-item.quantity),
+        updatedAt: Date.now()
+      });
+    });
+
+    // Audit log
+    const auditRef = doc(collection(db, "auditLogs"));
+    batch.set(auditRef, {
+      userId: profile?.uid || "pos",
+      userName: profile?.displayName || "نقطة بيع",
+      action: "إتمام عملية بيع",
+      target: orderData.orderNumber,
+      details: `بيع ${cart.length} أصناف بمبلغ ${total.toLocaleString()} د.ع`,
+      timestamp: Date.now()
+    });
+
+    batch.commit()
+      .then(() => {
+        toast({ title: "تم بنجاح", description: "تم تسجيل العملية وتحديث المخزون." });
+        setCart([]);
+        setDiscount(0);
+        setIsCheckoutOpen(false);
+      })
+      .catch(async (err) => {
+        const perr = new FirestorePermissionError({
+          path: "orders/products",
+          operation: "write",
+          requestResourceData: orderData
+        });
+        errorEmitter.emit('permission-error', perr);
+      })
+      .finally(() => setProcessingOrder(false));
   };
 
   return (
@@ -217,7 +250,7 @@ export default function POSPage() {
         </div>
       </div>
 
-      {/* Cart Section - Collapsible in Mobile? No, just stack for now with height limit */}
+      {/* Cart Section */}
       <div className="w-full lg:w-[380px] xl:w-[420px] flex flex-col bg-white dark:bg-card border-t lg:border-t-0 lg:border-r shadow-2xl z-20 h-full max-h-[60vh] lg:max-h-full">
         <div className="p-4 md:p-6 border-b shrink-0">
            <div className="flex items-center justify-between mb-4">
@@ -249,8 +282,8 @@ export default function POSPage() {
                  <DropdownMenuItem className="rounded-xl gap-3 h-12 md:h-14 font-bold cursor-pointer" onClick={() => setSelectedCustomer({ name: "زبون نقدي", type: 'retail' })}>
                     زبون نقدي (مفرد)
                  </DropdownMenuItem>
-                 <DropdownMenuItem className="rounded-xl gap-3 h-12 md:h-14 font-bold cursor-pointer text-primary" onClick={() => setSelectedCustomer({ name: "شركة النور للقطع", type: 'wholesale' })}>
-                    جملة - شركة النور
+                 <DropdownMenuItem className="rounded-xl gap-3 h-12 md:h-14 font-bold cursor-pointer text-primary" onClick={() => setSelectedCustomer({ name: "عميل جملة (VIP)", type: 'wholesale' })}>
+                    عميل جملة (VIP)
                  </DropdownMenuItem>
               </DropdownMenuContent>
            </DropdownMenu>

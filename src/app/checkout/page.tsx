@@ -1,4 +1,3 @@
-
 "use client";
 
 import { Header } from "@/components/layout/header";
@@ -10,14 +9,16 @@ import { MapPin, Phone, Truck, Store, ChevronLeft, Loader2, ShoppingCart } from 
 import Link from "next/link";
 import { useState } from "react";
 import { useFirestore, useUser } from "@/firebase";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { collection, doc, writeBatch, increment, serverTimestamp } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import { toast } from "@/hooks/use-toast";
 import { useCart } from "@/context/cart-context";
+import { errorEmitter } from "@/firebase/error-emitter";
+import { FirestorePermissionError } from "@/firebase/errors";
 
 export default function CheckoutPage() {
   const db = useFirestore();
-  const { user } = useUser();
+  const { user, profile } = useUser();
   const { cart, subtotal, clearCart } = useCart();
   const router = useRouter();
   const [method, setMethod] = useState("delivery");
@@ -28,7 +29,7 @@ export default function CheckoutPage() {
 
   if (cart.length === 0) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-8 bg-[#FDF8F5]">
+      <div className="min-h-screen flex flex-col items-center justify-center p-8 bg-background">
          <ShoppingCart className="h-20 w-20 opacity-20 mb-4" />
          <h2 className="text-2xl font-black">السلة فارغة</h2>
          <p className="text-muted-foreground mb-6">لا يمكنك إتمام الطلب بدون منتجات.</p>
@@ -46,6 +47,7 @@ export default function CheckoutPage() {
     }
 
     setLoading(true);
+    const batch = writeBatch(db);
     const formData = new FormData(e.currentTarget);
     const customerName = formData.get("customerName") as string;
     const phoneNumber = formData.get("phoneNumber") as string;
@@ -73,39 +75,52 @@ export default function CheckoutPage() {
       updatedAt: Date.now(),
     };
 
-    try {
-      await addDoc(collection(db, "orders"), orderData);
-      
-      const itemsList = cart.map(item => `- ${item.name} (عدد: ${item.quantity})`).join("\n");
-      const message = `*طلب جديد من مجمع محمد علاء* 🏍️\n\n` +
-                      `*رقم الطلب:* ${orderNumber}\n` +
-                      `*الاسم:* ${customerName}\n` +
-                      `*الهاتف:* ${phoneNumber}\n` +
-                      `*طريقة الاستلام:* ${method === 'delivery' ? 'توصيل منزلي' : 'استلام من المجمع'}\n` +
-                      `*المنتجات:*\n${itemsList}\n\n` +
-                      `*المجموع الكلي:* ${total.toLocaleString()} د.ع\n\n` +
-                      `شكراً لطلبكم! سيتم التواصل معكم لتأكيد الطلب.`;
+    const orderRef = doc(collection(db, "orders"));
+    batch.set(orderRef, orderData);
 
-      const whatsappUrl = `https://wa.me/9647858833838?text=${encodeURIComponent(message)}`;
-      
-      toast({ title: "تم بنجاح", description: "تم استلام طلبك، جاري توجيهك للواتساب للتأكيد." });
-      
-      clearCart();
-      window.open(whatsappUrl, '_blank');
-      router.push("/orders");
-    } catch (error) {
-      toast({ variant: "destructive", title: "خطأ", description: "فشل في إتمام الطلب، حاول مرة أخرى." });
-    } finally {
-      setLoading(false);
-    }
+    // Business Logic: Deduct inventory stock
+    cart.forEach(item => {
+      const productRef = doc(db, "products", item.id);
+      batch.update(productRef, { stock: increment(-item.quantity) });
+    });
+
+    batch.commit()
+      .then(() => {
+        const itemsList = cart.map(item => `- ${item.name} (عدد: ${item.quantity})`).join("\n");
+        const message = `*طلب جديد من مجمع محمد علاء* 🏍️\n\n` +
+                        `*رقم الطلب:* ${orderNumber}\n` +
+                        `*الاسم:* ${customerName}\n` +
+                        `*الهاتف:* ${phoneNumber}\n` +
+                        `*طريقة الاستلام:* ${method === 'delivery' ? 'توصيل منزلي' : 'استلام من المجمع'}\n` +
+                        `*المنتجات:*\n${itemsList}\n\n` +
+                        `*المجموع الكلي:* ${total.toLocaleString()} د.ع\n\n` +
+                        `شكراً لطلبكم! سيتم التواصل معكم لتأكيد الطلب.`;
+
+        const whatsappUrl = `https://wa.me/9647858833838?text=${encodeURIComponent(message)}`;
+        
+        toast({ title: "تم بنجاح", description: "تم استلام طلبك، جاري توجيهك للواتساب للتأكيد." });
+        
+        clearCart();
+        window.open(whatsappUrl, '_blank');
+        router.push("/orders");
+      })
+      .catch(async (err) => {
+        const perr = new FirestorePermissionError({
+          path: "orders",
+          operation: "write",
+          requestResourceData: orderData
+        });
+        errorEmitter.emit('permission-error', perr);
+      })
+      .finally(() => setLoading(false));
   }
 
   return (
-    <div className="flex min-h-screen bg-[#FDF8F5]">
+    <div className="flex min-h-screen bg-background">
       <main className="flex-1 pb-40">
-        <div className="p-6 flex items-center gap-4 bg-white border-b sticky top-0 z-30">
+        <div className="p-6 flex items-center gap-4 bg-white dark:bg-card border-b sticky top-0 z-30">
           <Link href="/cart">
-             <Button variant="ghost" size="icon" className="rounded-full bg-muted/50">
+             <Button variant="ghost" size="icon" className="rounded-full bg-muted/50 dark:bg-muted/10">
                 <ChevronLeft className="h-6 w-6 rotate-180" />
              </Button>
           </Link>
@@ -113,23 +128,23 @@ export default function CheckoutPage() {
         </div>
 
         <form id="checkout-form" onSubmit={handlePlaceOrder} className="container p-4 space-y-6">
-          <section className="bg-white p-6 rounded-[28px] shadow-sm border space-y-4">
+          <section className="bg-white dark:bg-card p-6 rounded-[28px] shadow-sm border space-y-4">
              <h3 className="text-lg font-black flex items-center gap-2">
                 <Phone className="h-5 w-5 text-primary" /> معلومات التواصل
              </h3>
              <div className="grid gap-4">
                 <div className="space-y-2">
                    <Label className="font-bold">الاسم الكامل</Label>
-                   <Input name="customerName" required placeholder="مثال: علي محمد" className="rounded-xl h-12 bg-muted/30 border-none" />
+                   <Input name="customerName" defaultValue={profile?.displayName} required placeholder="مثال: علي محمد" className="rounded-xl h-12 bg-muted/30 dark:bg-muted/10 border-none" />
                 </div>
                 <div className="space-y-2">
                    <Label className="font-bold">رقم الهاتف</Label>
-                   <Input name="phoneNumber" required placeholder="07XXXXXXXXX" className="rounded-xl h-12 bg-muted/30 border-none text-left" dir="ltr" />
+                   <Input name="phoneNumber" defaultValue={profile?.phoneNumber} required placeholder="07XXXXXXXXX" className="rounded-xl h-12 bg-muted/30 dark:bg-muted/10 border-none text-left" dir="ltr" />
                 </div>
              </div>
           </section>
 
-          <section className="bg-white p-6 rounded-[28px] shadow-sm border space-y-4">
+          <section className="bg-white dark:bg-card p-6 rounded-[28px] shadow-sm border space-y-4">
              <h3 className="text-lg font-black flex items-center gap-2">
                 <Truck className="h-5 w-5 text-primary" /> طريقة الاستلام
              </h3>
@@ -158,18 +173,18 @@ export default function CheckoutPage() {
           </section>
 
           {method === 'delivery' && (
-            <section className="bg-white p-6 rounded-[28px] shadow-sm border space-y-4">
+            <section className="bg-white dark:bg-card p-6 rounded-[28px] shadow-sm border space-y-4">
                <h3 className="text-lg font-black flex items-center gap-2">
                   <MapPin className="h-5 w-5 text-primary" /> عنوان التوصيل
                </h3>
                <div className="space-y-4">
                   <div className="space-y-2">
                     <Label className="font-bold">المنطقة</Label>
-                    <Input name="address" required placeholder="مثال: المنصور، شارع 14 رمضان" className="rounded-xl h-12 bg-muted/30 border-none" />
+                    <Input name="address" required placeholder="مثال: المنصور، شارع 14 رمضان" className="rounded-xl h-12 bg-muted/30 dark:bg-muted/10 border-none" />
                   </div>
                   <div className="space-y-2">
                     <Label className="font-bold">أقرب نقطة دالة</Label>
-                    <Input name="landmark" placeholder="مثال: قرب مطعم البركة" className="rounded-xl h-12 bg-muted/30 border-none" />
+                    <Input name="landmark" placeholder="مثال: قرب مطعم البركة" className="rounded-xl h-12 bg-muted/30 dark:bg-muted/10 border-none" />
                   </div>
                </div>
             </section>
@@ -177,8 +192,8 @@ export default function CheckoutPage() {
         </form>
       </main>
 
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t rounded-t-[32px] shadow-2xl z-40">
-         <div className="container space-y-4">
+      <div className="fixed bottom-0 left-0 right-0 p-4 bg-white dark:bg-card border-t rounded-t-[32px] shadow-2xl z-40">
+         <div className="container space-y-4 max-w-4xl mx-auto">
             <div className="flex items-center justify-between text-xl">
                <span className="font-black">الإجمالي:</span>
                <span className="font-black text-primary">{total.toLocaleString()} د.ع</span>

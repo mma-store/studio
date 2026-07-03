@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo } from "react";
@@ -16,14 +15,17 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { useFirestore, useCollection } from "@/firebase";
-import { collection, query, orderBy, doc, updateDoc, serverTimestamp } from "firebase/firestore";
+import { useFirestore, useCollection, useUser } from "@/firebase";
+import { collection, query, orderBy, doc, updateDoc, serverTimestamp, addDoc } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
+import { errorEmitter } from "@/firebase/error-emitter";
+import { FirestorePermissionError } from "@/firebase/errors";
 
 export default function InventoryPage() {
   const db = useFirestore();
+  const { profile } = useUser();
   const [search, setSearch] = useState("");
   const [editingProduct, setEditingProduct] = useState<any>(null);
   const [newStock, setNewStock] = useState<number>(0);
@@ -39,18 +41,38 @@ export default function InventoryPage() {
   const handleUpdateStock = async () => {
     if (!editingProduct) return;
     setIsUpdating(true);
-    try {
-      await updateDoc(doc(db, 'products', editingProduct.id), {
-        stock: newStock,
-        updatedAt: Date.now()
-      });
-      toast({ title: "تم التحديث", description: `تم تعديل كمية ${editingProduct.name} بنجاح.` });
-      setEditingProduct(null);
-    } catch (e) {
-      toast({ variant: "destructive", title: "خطأ", description: "فشل تحديث المخزون." });
-    } finally {
-      setIsUpdating(false);
-    }
+    
+    const docRef = doc(db, 'products', editingProduct.id);
+    const updateData = {
+      stock: newStock,
+      updatedAt: Date.now()
+    };
+
+    updateDoc(docRef, updateData)
+      .then(() => {
+        toast({ title: "تم التحديث", description: `تم تعديل كمية ${editingProduct.name} بنجاح.` });
+        
+        // Audit log
+        addDoc(collection(db, "auditLogs"), {
+          userId: profile?.uid || "admin",
+          userName: profile?.displayName || "مدير",
+          action: "تعديل مخزن يدوي",
+          target: editingProduct.name,
+          details: `تغيير الكمية من ${editingProduct.stock} إلى ${newStock}`,
+          timestamp: Date.now()
+        });
+        
+        setEditingProduct(null);
+      })
+      .catch(async (err) => {
+        const perr = new FirestorePermissionError({
+          path: docRef.path,
+          operation: "update",
+          requestResourceData: updateData
+        });
+        errorEmitter.emit('permission-error', perr);
+      })
+      .finally(() => setIsUpdating(false));
   };
 
   return (

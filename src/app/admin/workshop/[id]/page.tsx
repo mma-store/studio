@@ -1,4 +1,3 @@
-
 'use client';
 
 import { 
@@ -33,8 +32,8 @@ import {
   CardTitle, 
   CardDescription 
 } from "@/components/ui/card";
-import { useFirestore, useDoc, useCollection } from "@/firebase";
-import { doc, updateDoc, collection, query, serverTimestamp } from "firebase/firestore";
+import { useFirestore, useDoc, useCollection, useUser } from "@/firebase";
+import { doc, updateDoc, collection, query, serverTimestamp, increment, writeBatch } from "firebase/firestore";
 import { useMemo, useState, useEffect } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import Link from "next/link";
@@ -42,11 +41,14 @@ import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
 import { useParams } from "next/navigation";
 import { workshopDiagnosisAssistant } from "@/ai/flows/workshop-diagnosis-assistant";
+import { errorEmitter } from "@/firebase/error-emitter";
+import { FirestorePermissionError } from "@/firebase/errors";
 
 export default function RepairOrderDetailsPage() {
   const params = useParams();
   const id = params?.id as string;
   const db = useFirestore();
+  const { profile } = useUser();
   
   const orderRef = useMemo(() => id && id !== 'default' ? doc(db, 'repairOrders', id) : null, [db, id]);
   const { data: order, loading } = useDoc<any>(orderRef);
@@ -76,18 +78,64 @@ export default function RepairOrderDetailsPage() {
   const subtotalParts = usedParts.reduce((acc, p) => acc + (p.price * p.quantity), 0);
   const total = subtotalParts + Number(laborCost);
 
-  const addPart = (product: any) => {
+  const addPart = async (product: any) => {
     if (usedParts.find(p => p.productId === product.id)) {
-       toast({ title: "موجود مسبقاً", description: "هذه القطعة مضافة بالفعل للفاتورة." });
+       toast({ title: "موجود مسبقاً", description: "هذه القطعة مضافة بالفعل." });
        return;
     }
-    setUsedParts([...usedParts, {
+    
+    if (product.stock <= 0) {
+      toast({ variant: "destructive", title: "نفذ المخزون", description: "هذه القطعة غير متوفرة حالياً." });
+      return;
+    }
+
+    const batch = writeBatch(db);
+    const newPart = {
       productId: product.id,
       name: product.name,
       price: product.retailPrice,
       quantity: 1
-    }]);
+    };
+
+    const updatedParts = [...usedParts, newPart];
+    
+    // Optimistic update locally
+    setUsedParts(updatedParts);
     setSearchTerm("");
+
+    // Background update: Reduce stock and update order parts list
+    if (orderRef) {
+      batch.update(orderRef, { partsUsed: updatedParts, updatedAt: Date.now() });
+      batch.update(doc(db, "products", product.id), { stock: increment(-1) });
+      
+      batch.commit().catch(async (err) => {
+        const perr = new FirestorePermissionError({
+          path: orderRef.path,
+          operation: "write",
+          requestResourceData: { partsUsed: updatedParts }
+        });
+        errorEmitter.emit('permission-error', perr);
+      });
+    }
+  };
+
+  const removePart = async (part: any) => {
+    const updatedParts = usedParts.filter(p => p.productId !== part.productId);
+    setUsedParts(updatedParts);
+
+    if (orderRef) {
+      const batch = writeBatch(db);
+      batch.update(orderRef, { partsUsed: updatedParts, updatedAt: Date.now() });
+      batch.update(doc(db, "products", part.productId), { stock: increment(part.quantity) });
+      
+      batch.commit().catch(async (err) => {
+        const perr = new FirestorePermissionError({
+          path: orderRef.path,
+          operation: "write"
+        });
+        errorEmitter.emit('permission-error', perr);
+      });
+    }
   };
 
   const handleAiDiagnosis = async () => {
@@ -104,36 +152,42 @@ export default function RepairOrderDetailsPage() {
     }
   };
 
-  const removePart = (productId: string) => {
-    setUsedParts(usedParts.filter(p => p.productId !== productId));
-  };
-
   const updateStatus = async (newStatus: string) => {
     if (!orderRef) return;
-    try {
-      await updateDoc(orderRef, { status: newStatus, updatedAt: serverTimestamp() });
-      toast({ title: "تم التحديث", description: "تم تغيير حالة المهمة بنجاح." });
-    } catch (error) {
-      toast({ variant: "destructive", title: "خطأ", description: "فشل تحديث الحالة." });
-    }
+    updateDoc(orderRef, { status: newStatus, updatedAt: serverTimestamp() })
+      .then(() => toast({ title: "تم التحديث", description: "تم تغيير حالة المهمة بنجاح." }))
+      .catch(async () => {
+        const perr = new FirestorePermissionError({ path: orderRef.path, operation: "update" });
+        errorEmitter.emit('permission-error', perr);
+      });
   };
 
   const saveInvoice = async () => {
     if (!orderRef) return;
     setIsSaving(true);
-    try {
-      await updateDoc(orderRef, {
-        partsUsed: usedParts,
-        laborCost: Number(laborCost),
-        totalAmount: total,
-        updatedAt: serverTimestamp()
+    
+    updateDoc(orderRef, {
+      laborCost: Number(laborCost),
+      totalAmount: total,
+      updatedAt: serverTimestamp()
+    })
+    .then(() => {
+      toast({ title: "تم الحفظ", description: "تم حفظ تكاليف العمل." });
+      // Audit log
+      addDoc(collection(db, "auditLogs"), {
+        userId: profile?.uid || "workshop",
+        userName: profile?.displayName || "فني الورشة",
+        action: "تحديث فاتورة ورشة",
+        target: order.orderNumber,
+        details: `تحديث أجور اليد إلى ${laborCost} د.ع`,
+        timestamp: Date.now()
       });
-      toast({ title: "تم الحفظ", description: "تم حفظ بيانات التكاليف والفاتورة." });
-    } catch (error) {
-      toast({ variant: "destructive", title: "خطأ", description: "فشل حفظ البيانات." });
-    } finally {
-      setIsSaving(false);
-    }
+    })
+    .catch(async () => {
+      const perr = new FirestorePermissionError({ path: orderRef.path, operation: "update" });
+      errorEmitter.emit('permission-error', perr);
+    })
+    .finally(() => setIsSaving(false));
   };
 
   const notifyCustomer = () => {
@@ -319,7 +373,7 @@ export default function RepairOrderDetailsPage() {
                    <div className="relative">
                       <Search className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                       <Input 
-                        placeholder="ابحث عن قطعة غيار لإضافتها (الاسم أو الباركود)..." 
+                        placeholder="ابحث عن قطعة غيار لإضافتها..." 
                         className="h-14 rounded-2xl pr-12 bg-muted/20 border-none shadow-inner"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
@@ -361,7 +415,7 @@ export default function RepairOrderDetailsPage() {
                              </div>
                              <div className="flex items-center gap-4">
                                 <span className="text-sm font-black">{ (part.price * part.quantity).toLocaleString() } د.ع</span>
-                                <button onClick={() => removePart(part.productId)} className="text-destructive hover:bg-destructive/10 p-2 rounded-xl transition-colors">
+                                <button onClick={() => removePart(part)} className="text-destructive hover:bg-destructive/10 p-2 rounded-xl transition-colors">
                                    <Trash2 className="h-4 w-4" />
                                 </button>
                              </div>
@@ -396,7 +450,6 @@ export default function RepairOrderDetailsPage() {
                             />
                             <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-bold">د.ع</span>
                          </div>
-                         <p className="text-[10px] text-muted-foreground font-medium">تشمل أجور الفحص والتصليح والتنظيف.</p>
                       </div>
 
                       <div className="bg-white dark:bg-card p-6 rounded-3xl shadow-sm space-y-4">
