@@ -2,7 +2,7 @@
 'use client';
 
 import { useSyncStatus } from '@/hooks/use-sync-status';
-import { Cloud, CloudOff, CloudSync, CheckCircle2 } from 'lucide-react';
+import { Cloud, CloudOff, RefreshCw, CheckCircle2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { 
   Tooltip,
@@ -26,7 +26,7 @@ export function SyncIndicator() {
           )}>
             {status === 'online' && <Cloud className="h-3.5 w-3.5" />}
             {status === 'offline' && <CloudOff className="h-3.5 w-3.5" />}
-            {status === 'syncing' && <CloudSync className="h-3.5 w-3.5 animate-spin" />}
+            {status === 'syncing' && <RefreshCw className="h-3.5 w-3.5 animate-spin" />}
             
             <span className="hidden sm:inline">
               {status === 'online' ? 'متصل ومحمي' : status === 'offline' ? 'وضع الأوفلاين' : 'جاري المزامنة...'}
