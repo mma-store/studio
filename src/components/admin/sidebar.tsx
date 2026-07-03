@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -119,9 +120,9 @@ export function AdminSidebar() {
 
   return (
     <Sidebar collapsible="icon" className="border-l bg-card">
-      <SidebarHeader className="h-24 flex items-center justify-center border-b px-6">
+      <SidebarHeader className="h-28 flex items-center justify-center border-b px-6">
         <Link href="/admin" className="flex items-center gap-3">
-          <div className="relative h-16 w-36 shrink-0">
+          <div className="relative h-20 w-48 shrink-0">
             <Image 
               src={LOGO_URL} 
               alt="MMA" 
@@ -167,7 +168,11 @@ export function AdminSidebar() {
         ))}
       </SidebarContent>
 
-      <SidebarFooter className="border-t p-4">
+      <SidebarFooter className="border-t p-4 space-y-4">
+        <div className="px-4 py-3 bg-primary/5 rounded-[20px] border border-primary/10 group-data-[collapsible=icon]:hidden">
+           <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest mb-1">حقوق النظام</p>
+           <p className="text-xs font-black text-foreground">تطوير: <span className="text-primary">حسين صلاح</span></p>
+        </div>
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton 

@@ -217,7 +217,7 @@ export default function ProfilePage() {
              </div>
              <p className="text-[9px] text-muted-foreground font-black tracking-[0.4em] uppercase mb-1">مجمع محمد علاء v2.1</p>
              <p className="text-[11px] font-bold text-muted-foreground">
-                Automotive Excellence Platform
+                حقوق النظام محفوظة لـ <span className="text-primary">حسين صلاح</span>
              </p>
           </div>
         </div>
