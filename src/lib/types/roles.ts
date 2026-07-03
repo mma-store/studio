@@ -19,7 +19,16 @@ export interface UserProfile {
 
 export const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
   admin: ['all'],
-  sales_employee: ['view_catalog', 'create_order', 'manage_pos', 'check_compatibility'],
+  sales_employee: [
+    'view_catalog', 
+    'create_order', 
+    'manage_pos', 
+    'manage_inventory', 
+    'add_product', 
+    'edit_product', 
+    'view_stock',
+    'check_compatibility'
+  ],
   workshop_technician: ['view_tasks', 'update_task_status', 'view_workshop_history'],
   warehouse_employee: ['manage_inventory', 'view_stock', 'manage_warehousing'],
   retail_customer: ['view_catalog', 'view_orders', 'check_compatibility'],

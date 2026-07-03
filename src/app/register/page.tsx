@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useAuth, useFirestore } from "@/firebase";
 import { createUserWithEmailAndPassword } from "firebase/auth";
-import { doc, setDoc } from "firebase/firestore";
+import { doc, setDoc, getDocs, collection, query, where, deleteDoc } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,28 +35,61 @@ export default function RegisterPage() {
       const cleanPhone = formData.phoneNumber.replace(/\s/g, '');
       const fakeEmail = `${cleanPhone}@mma.store`;
 
+      // 1. البحث عن رقم الهاتف في سجلات الموظفين المضافة مسبقاً
+      const staffQuery = query(collection(db, "users"), where("phoneNumber", "==", cleanPhone));
+      const staffSnapshot = await getDocs(staffQuery);
+      
+      let assignedRole = 'retail_customer'; // الدور الافتراضي
+      
+      // إذا وجدنا رقم الهاتف مسجل مسبقاً، نأخذ الدور الوظيفي المحدد له
+      if (!staffSnapshot.empty) {
+        const existingStaffDoc = staffSnapshot.docs[0];
+        const staffData = existingStaffDoc.data();
+        assignedRole = staffData.role;
+        
+        // إذا كان رقم الماستر أدمن
+        if (cleanPhone === '07858833838') {
+          assignedRole = 'admin';
+        }
+
+        // نقوم بحذف السجل المؤقت الذي أضافه الأدمن لنستبدله بالسجل الرسمي المرتبط بـ UID
+        if (existingStaffDoc.id !== cleanPhone) { // تجنب حذف السجل إذا كان id هو نفسه الرقم
+           await deleteDoc(doc(db, "users", existingStaffDoc.id));
+        }
+      } else if (cleanPhone === '07858833838') {
+        assignedRole = 'admin';
+      }
+
+      // 2. إنشاء الحساب في Firebase Auth
       const userCredential = await createUserWithEmailAndPassword(auth, fakeEmail, formData.password);
       const user = userCredential.user;
 
-      const role = cleanPhone === '07858833838' ? 'admin' : 'retail_customer';
-
+      // 3. حفظ بيانات المستخدم النهائية مع الدور الوظيفي الصحيح
       await setDoc(doc(db, "users", user.uid), {
         uid: user.uid,
         displayName: formData.displayName,
         phoneNumber: cleanPhone,
         email: fakeEmail,
-        role: role,
+        role: assignedRole,
         createdAt: Date.now(),
+        lastLogin: Date.now()
       });
 
-      toast({ title: "تم إنشاء الحساب", description: "مرحباً بك في عائلة مجمع محمد علاء." });
-      router.push(role === 'admin' ? "/admin" : "/");
+      toast({ 
+        title: "تم إنشاء الحساب بنجاح", 
+        description: assignedRole === 'retail_customer' ? "مرحباً بك في عائلة مجمع محمد علاء." : `مرحباً بك زميلنا في الفريق بصلاحية: ${assignedRole}` 
+      });
+
+      // توجيه الموظفين للوحة الإدارة والزبائن للرئيسية
+      const isAdminOrStaff = ['admin', 'sales_employee', 'workshop_technician', 'warehouse_employee'].includes(assignedRole);
+      router.push(isAdminOrStaff ? "/admin" : "/");
+      
     } catch (error: any) {
       console.error(error);
       toast({ 
         variant: "destructive", 
         title: "خطأ في التسجيل", 
-        description: error.message || "فشل إنشاء الحساب، يرجى المحاولة مرة أخرى." 
+        description: error.code === 'auth/phone-number-already-exists' ? "رقم الهاتف مسجل مسبقاً" : "فشل إنشاء الحساب، يرجى المحاولة مرة أخرى." 
       });
     } finally {
       setLoading(false);
@@ -67,7 +100,7 @@ export default function RegisterPage() {
     <div className="min-h-screen flex items-center justify-center bg-[#FDF8F5] p-4 relative overflow-hidden">
       <Card className="w-full max-w-md rounded-[40px] border-none shadow-2xl overflow-hidden bg-white">
         <CardHeader className="space-y-4 pt-12 pb-6 text-center">
-          <div className="mx-auto relative h-20 w-48">
+          <div className="mx-auto relative h-24 w-56">
             <Image 
               src={LOGO_URL} 
               alt="مجمع محمد علاء" 
