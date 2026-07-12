@@ -22,8 +22,8 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { useFirestore, useCollection } from "@/firebase";
-import { collection, query, orderBy, addDoc, doc, deleteDoc } from "firebase/firestore";
+import { useFirestore, useCollection, useUser } from "@/firebase";
+import { collection, query, orderBy, addDoc, doc, deleteDoc, where } from "firebase/firestore";
 import { useMemo, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/hooks/use-toast";
@@ -32,7 +32,13 @@ import { uploadToCloudinary } from "@/lib/cloudinary";
 
 export default function OffersPage() {
   const db = useFirestore();
-  const offersQuery = useMemo(() => query(collection(db, 'offers'), orderBy('createdAt', 'desc')), [db]);
+  const { tenantId } = useUser();
+  
+  const offersQuery = useMemo(() => query(
+    collection(db, 'offers'), 
+    where('tenantId', '==', tenantId),
+    orderBy('createdAt', 'desc')
+  ), [db, tenantId]);
   const { data: offers, loading } = useCollection(offersQuery);
   
   const [isAddOpen, setIsAddOpen] = useState(false);
@@ -44,6 +50,7 @@ export default function OffersPage() {
     const formData = new FormData(e.currentTarget);
     try {
       await addDoc(collection(db, 'offers'), {
+        tenantId,
         title: formData.get('title'),
         description: formData.get('description'),
         buttonText: formData.get('buttonText') || "تسوق الآن",

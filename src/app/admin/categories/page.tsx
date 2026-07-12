@@ -16,8 +16,8 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { useFirestore, useCollection } from "@/firebase";
-import { collection, query, orderBy, deleteDoc, doc, addDoc, updateDoc } from "firebase/firestore";
+import { useFirestore, useCollection, useUser } from "@/firebase";
+import { collection, query, orderBy, deleteDoc, doc, addDoc, updateDoc, where } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/hooks/use-toast";
 import Image from "next/image";
@@ -25,6 +25,7 @@ import { uploadToCloudinary, getOptimizedUrl } from "@/lib/cloudinary";
 
 export default function CategoriesPage() {
   const db = useFirestore();
+  const { tenantId } = useUser();
   const [search, setSearch] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<any>(null);
@@ -32,7 +33,11 @@ export default function CategoriesPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [uploadedImageUrl, setUploadedImageUrl] = useState("");
 
-  const categoriesQuery = useMemo(() => query(collection(db, 'categories'), orderBy('name')), [db]);
+  const categoriesQuery = useMemo(() => query(
+    collection(db, 'categories'), 
+    where('tenantId', '==', tenantId),
+    orderBy('name')
+  ), [db, tenantId]);
   const { data: categories, loading } = useCollection(categoriesQuery);
 
   useEffect(() => {
@@ -66,6 +71,7 @@ export default function CategoriesPage() {
     const name = formData.get('name') as string;
     
     const categoryData = {
+      tenantId,
       name: name,
       image: uploadedImageUrl,
       updatedAt: Date.now()

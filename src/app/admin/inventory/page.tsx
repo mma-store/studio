@@ -18,7 +18,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useFirestore, useCollection, useUser } from "@/firebase";
-import { collection, query, orderBy, doc, updateDoc, serverTimestamp, addDoc } from "firebase/firestore";
+import { collection, query, orderBy, doc, updateDoc, where, addDoc } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
@@ -27,13 +27,17 @@ import { FirestorePermissionError } from "@/firebase/errors";
 
 export default function InventoryPage() {
   const db = useFirestore();
-  const { profile } = useUser();
+  const { profile, tenantId } = useUser();
   const [search, setSearch] = useState("");
   const [editingProduct, setEditingProduct] = useState<any>(null);
   const [newStock, setNewStock] = useState<number>(0);
   const [isUpdating, setIsUpdating] = useState(false);
 
-  const productsQuery = useMemo(() => query(collection(db, 'products'), orderBy('stock', 'asc')), [db]);
+  const productsQuery = useMemo(() => query(
+    collection(db, 'products'), 
+    where('tenantId', '==', tenantId),
+    orderBy('stock', 'asc')
+  ), [db, tenantId]);
   const { data: products, loading } = useCollection(productsQuery);
 
   const filtered = products.filter((p: any) => 
@@ -54,8 +58,8 @@ export default function InventoryPage() {
       .then(() => {
         toast({ title: "تم التحديث", description: `تم تعديل كمية ${editingProduct.name} بنجاح.` });
         
-        // Audit log
         addDoc(collection(db, "auditLogs"), {
+          tenantId,
           userId: profile?.uid || "admin",
           userName: profile?.displayName || "مدير",
           action: "تعديل مخزن يدوي",
@@ -178,17 +182,15 @@ export default function InventoryPage() {
                   </Badge>
                 </TableCell>
                 <TableCell className="text-left px-6">
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className="rounded-xl font-black text-primary hover:bg-primary/5"
+                  <button 
+                    className="rounded-xl font-black text-primary hover:bg-primary/5 px-4 py-2"
                     onClick={() => {
                       setEditingProduct(p);
                       setNewStock(p.stock);
                     }}
                   >
                     تعديل الكمية
-                  </Button>
+                  </button>
                 </TableCell>
               </TableRow>
             ))}

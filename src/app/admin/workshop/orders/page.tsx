@@ -1,3 +1,4 @@
+
 'use client';
 
 import { 
@@ -14,8 +15,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
-import { useFirestore, useCollection } from "@/firebase";
-import { collection, query, orderBy } from "firebase/firestore";
+import { useFirestore, useCollection, useUser } from "@/firebase";
+import { collection, query, orderBy, where } from "firebase/firestore";
 import { useMemo, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import Link from "next/link";
@@ -34,8 +35,14 @@ const statusConfig = {
 
 export default function WorkshopOrdersPage() {
   const db = useFirestore();
+  const { tenantId } = useUser();
   const [search, setSearch] = useState("");
-  const repairOrdersQuery = useMemo(() => query(collection(db, 'repairOrders'), orderBy('createdAt', 'desc')), [db]);
+  
+  const repairOrdersQuery = useMemo(() => query(
+    collection(db, 'repairOrders'), 
+    where('tenantId', '==', tenantId),
+    orderBy('createdAt', 'desc')
+  ), [db, tenantId]);
   const { data: orders, loading } = useCollection(repairOrdersQuery);
 
   const filtered = orders.filter((o: any) => 
@@ -96,9 +103,9 @@ export default function WorkshopOrdersPage() {
                         <span className="font-black text-primary">{order.totalAmount?.toLocaleString()} د.ع</span>
                      </div>
                      <div className="flex justify-end pt-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Button variant="ghost" size="sm" className="rounded-full text-xs font-black gap-2">
+                        <div className="rounded-full text-xs font-black gap-2 flex items-center">
                            عرض التفاصيل <ChevronRight className="h-3 w-3 rotate-180" />
-                        </Button>
+                        </div>
                      </div>
                   </CardContent>
                </Card>

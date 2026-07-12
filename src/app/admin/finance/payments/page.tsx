@@ -26,20 +26,27 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useFirestore, useCollection, useUser } from "@/firebase";
-import { collection, query, orderBy, doc, writeBatch, increment } from "firebase/firestore";
+import { collection, query, orderBy, doc, writeBatch, increment, where } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/hooks/use-toast";
 
 export default function PaymentVouchersPage() {
   const db = useFirestore();
-  const { profile } = useUser();
+  const { profile, tenantId } = useUser();
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  const vouchersQuery = useMemo(() => query(collection(db, 'paymentVouchers'), orderBy('timestamp', 'desc')), [db]);
+  const vouchersQuery = useMemo(() => query(
+    collection(db, 'paymentVouchers'), 
+    where('tenantId', '==', tenantId),
+    orderBy('timestamp', 'desc')
+  ), [db, tenantId]);
   const { data: vouchers, loading } = useCollection(vouchersQuery);
 
-  const suppliersQuery = useMemo(() => query(collection(db, 'suppliers')), [db]);
+  const suppliersQuery = useMemo(() => query(
+    collection(db, 'suppliers'),
+    where('tenantId', '==', tenantId)
+  ), [db, tenantId]);
   const { data: suppliers } = useCollection(suppliersQuery);
 
   const handleAddVoucher = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -56,6 +63,7 @@ export default function PaymentVouchersPage() {
       
       const voucherRef = doc(collection(db, 'paymentVouchers'));
       batch.set(voucherRef, {
+        tenantId,
         voucherNumber: voucherNo,
         targetId: supplierId,
         targetName: supplier?.name || "جهة أخرى",
@@ -66,14 +74,13 @@ export default function PaymentVouchersPage() {
         employeeName: profile?.displayName || "مدير"
       });
 
-      // Update Supplier Balance (Reduce debt we owe them)
       if (supplierId) {
         const supplierRef = doc(db, 'suppliers', supplierId);
         batch.update(supplierRef, { balance: increment(-amount) });
         
-        // Ledger
         const transactionRef = doc(collection(db, "financialTransactions"));
         batch.set(transactionRef, {
+          tenantId,
           userId: supplierId,
           type: 'payment_out',
           amount: -amount,

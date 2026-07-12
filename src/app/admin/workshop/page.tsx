@@ -25,8 +25,8 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
-import { useFirestore, useCollection } from "@/firebase";
-import { collection, query, orderBy, limit } from "firebase/firestore";
+import { useFirestore, useCollection, useUser } from "@/firebase";
+import { collection, query, orderBy, limit, where } from "firebase/firestore";
 import { useMemo } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
@@ -44,7 +44,14 @@ const statusConfig = {
 
 export default function WorkshopDashboardPage() {
   const db = useFirestore();
-  const repairOrdersQuery = useMemo(() => query(collection(db, 'repairOrders'), orderBy('createdAt', 'desc'), limit(5)), [db]);
+  const { tenantId } = useUser();
+  
+  const repairOrdersQuery = useMemo(() => query(
+    collection(db, 'repairOrders'), 
+    where('tenantId', '==', tenantId),
+    orderBy('createdAt', 'desc'), 
+    limit(5)
+  ), [db, tenantId]);
   const { data: recentRepairs, loading } = useCollection(repairOrdersQuery);
 
   return (
@@ -69,27 +76,27 @@ export default function WorkshopDashboardPage() {
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
         <StatsCard 
           title="مهام اليوم" 
-          value="12" 
+          value="--" 
           icon={Wrench} 
           color="blue"
         />
         <StatsCard 
           title="قيد العمل" 
-          value="5" 
+          value="--" 
           icon={TrendingUp} 
           color="purple"
         />
         <StatsCard 
           title="بانتظار قطع" 
-          value="3" 
+          value="--" 
           icon={Clock} 
           color="orange"
         />
         <StatsCard 
           title="إيرادات الورشة" 
-          value="450,000 د.ع" 
+          value="-- د.ع" 
           icon={BadgeDollarSign} 
-          trend={{ value: "8%+", isUp: true }}
+          trend={{ value: "مباشر", isUp: true }}
           color="green"
         />
       </div>
@@ -125,7 +132,7 @@ export default function WorkshopDashboardPage() {
                        <div className="flex items-center gap-4">
                           <div className="text-left hidden md:block">
                              <p className="text-xs font-bold">{order.customerName}</p>
-                             <p className="text-[10px] text-muted-foreground">07/10/2023</p>
+                             <p className="text-[10px] text-muted-foreground">{new Date(order.createdAt).toLocaleDateString("ar-EG")}</p>
                           </div>
                           <ChevronRight className="h-5 w-5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-all -translate-x-2 group-hover:translate-x-0" />
                        </div>
@@ -155,7 +162,7 @@ export default function WorkshopDashboardPage() {
                       <span className="text-sm font-bold">{config.label}</span>
                    </div>
                    <Badge variant="outline" className="rounded-full font-black border-none bg-muted/50 px-3">
-                      {Math.floor(Math.random() * 5)}
+                      {recentRepairs.filter((o:any) => o.status === key).length}
                    </Badge>
                 </div>
               ))}

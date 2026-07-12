@@ -42,7 +42,7 @@ import {
   SelectTrigger, 
   SelectValue 
 } from "@/components/ui/select";
-import { useFirestore, useCollection } from "@/firebase";
+import { useFirestore, useCollection, useUser } from "@/firebase";
 import { collection, query, where, orderBy, deleteDoc, doc, addDoc, updateDoc } from "firebase/firestore";
 import { useMemo, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -51,6 +51,7 @@ import { toast } from "@/hooks/use-toast";
 
 const roleMap = {
   admin: { label: "مدير نظام", icon: ShieldCheck, color: "bg-red-100 text-red-700" },
+  owner: { label: "صاحب المتجر", icon: ShieldCheck, color: "bg-purple-100 text-purple-700" },
   sales_employee: { label: "موظف مبيعات", icon: ShoppingBag, color: "bg-blue-100 text-blue-700" },
   workshop_technician: { label: "فني ورشة", icon: Wrench, color: "bg-green-100 text-green-700" },
   warehouse_employee: { label: "أمين مخزن", icon: Warehouse, color: "bg-orange-100 text-orange-700" },
@@ -58,17 +59,18 @@ const roleMap = {
 
 export default function EmployeesPage() {
   const db = useFirestore();
+  const { tenantId } = useUser();
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<any>(null);
 
-  // استخدام المراقب المباشر لضمان التزامن اللحظي بين الأجهزة
   const staffQuery = useMemo(() => query(
     collection(db, 'users'), 
-    where('role', 'in', ['admin', 'sales_employee', 'workshop_technician', 'warehouse_employee']),
+    where('tenantId', '==', tenantId),
+    where('role', 'in', ['admin', 'owner', 'sales_employee', 'workshop_technician', 'warehouse_employee']),
     orderBy('createdAt', 'desc')
-  ), [db]);
+  ), [db, tenantId]);
   const { data: staff, loading } = useCollection(staffQuery);
 
   const cleanPhone = (p: string) => p.replace(/\s/g, '').replace(/^(\+964|0)/, '');
@@ -81,10 +83,11 @@ export default function EmployeesPage() {
     
     try {
       await addDoc(collection(db, 'users'), {
+        tenantId,
         displayName: formData.get('name'),
         phoneNumber: `0${purePhone}`, 
         role: formData.get('role'),
-        tempPassword: formData.get('password'), // كلمة السر التي يدخلها الأدمن
+        tempPassword: formData.get('password'),
         createdAt: Date.now()
       });
       setIsAddOpen(false);
@@ -247,7 +250,6 @@ export default function EmployeesPage() {
         </Table>
       </div>
 
-      {/* نافذة التعديل */}
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
         <DialogContent className="rounded-[32px]">
           <DialogHeader><DialogTitle className="text-2xl font-black">تعديل الموظف</DialogTitle></DialogHeader>

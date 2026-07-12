@@ -25,12 +25,18 @@ import { cn } from "@/lib/utils";
 
 export default function CashRegisterPage() {
   const db = useFirestore();
-  const { profile } = useUser();
+  const { profile, tenantId } = useUser();
   const [isOpening, setIsOpening] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
   const [amount, setAmount] = useState(0);
 
-  const shiftsQuery = useMemo(() => query(collection(db, 'cashShifts'), orderBy('openingTime', 'desc'), limit(10)), [db]);
+  const shiftsQuery = useMemo(() => query(
+    collection(db, 'cashShifts'), 
+    where('tenantId', '==', tenantId),
+    orderBy('openingTime', 'desc'), 
+    limit(10)
+  ), [db, tenantId]);
+  
   const { data: shifts, loading } = useCollection(shiftsQuery);
 
   const activeShift = shifts.find(s => s.status === 'open');
@@ -39,6 +45,7 @@ export default function CashRegisterPage() {
     setIsOpening(true);
     try {
       await addDoc(collection(db, 'cashShifts'), {
+        tenantId,
         openingBalance: Number(amount),
         openingTime: Date.now(),
         openedBy: profile?.displayName || "مدير",
@@ -150,7 +157,9 @@ export default function CashRegisterPage() {
               <CardHeader className="bg-muted/30"><CardTitle className="text-lg font-black flex items-center gap-2"><History className="h-5 w-5" /> سجل الورديات السابقة</CardTitle></CardHeader>
               <CardContent className="p-0">
                  <div className="divide-y">
-                    {shifts.map((s: any) => (
+                    {loading ? (
+                      Array(5).fill(0).map((_, i) => <div key={i} className="p-6"><Skeleton className="h-12 w-full rounded-2xl" /></div>)
+                    ) : shifts.map((s: any) => (
                       <div key={s.id} className="p-6 flex items-center justify-between hover:bg-muted/10 transition-colors">
                          <div className="flex items-center gap-4">
                             <div className={cn("h-10 w-10 rounded-xl flex items-center justify-center", s.status === 'open' ? "bg-green-50 text-green-600" : "bg-slate-100 text-slate-500")}>

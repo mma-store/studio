@@ -14,7 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { useFirestore, useCollection } from "@/firebase";
+import { useFirestore, useCollection, useUser } from "@/firebase";
 import { collection, query, where, orderBy } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
@@ -23,9 +23,15 @@ import { cn } from "@/lib/utils";
 
 export default function CustomerDebtsPage() {
   const db = useFirestore();
+  const { tenantId } = useUser();
   const [search, setSearch] = useState("");
 
-  const customersQuery = useMemo(() => query(collection(db, 'users'), where('currentBalance', '>', 0), orderBy('currentBalance', 'desc')), [db]);
+  const customersQuery = useMemo(() => query(
+    collection(db, 'users'), 
+    where('tenantId', '==', tenantId),
+    where('currentBalance', '>', 0), 
+    orderBy('currentBalance', 'desc')
+  ), [db, tenantId]);
   const { data: customers, loading } = useCollection(customersQuery);
 
   const filtered = customers.filter((c: any) => 
@@ -47,7 +53,7 @@ export default function CustomerDebtsPage() {
               <BadgeDollarSign className="h-6 w-6" />
            </div>
            <div>
-              <p className="text-[10px] font-black uppercase tracking-widest opacity-60">إجمالي الديون المستحقة</p>
+              <p className="text-[10px] font-black uppercase opacity-60">إجمالي الديون المستحقة</p>
               <h3 className="text-2xl font-black">{totalDebts.toLocaleString()} د.ع</h3>
            </div>
         </div>

@@ -43,7 +43,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { useFirestore, useCollection, useUser } from "@/firebase";
-import { collection, query, orderBy, writeBatch, doc, increment, addDoc, getDoc, updateDoc } from "firebase/firestore";
+import { collection, query, orderBy, writeBatch, doc, increment, addDoc, getDoc, updateDoc, where } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
@@ -186,6 +186,7 @@ function CartView({ cart, selectedCustomer, customerSearch, setCustomerSearch, s
 
 export default function POSPage() {
   const db = useFirestore();
+  const { tenantId } = useUser();
   const router = useRouter();
   const searchParams = useSearchParams();
   const editOrderId = searchParams.get('edit');
@@ -206,7 +207,6 @@ export default function POSPage() {
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'credit' | 'partial'>('cash');
   const [printSize, setPrintSize] = useState<'58mm' | '80mm' | 'A4'>('80mm');
 
-  // جلب الطلب المراد تعديله
   useEffect(() => {
     if (editOrderId) {
       const fetchOrder = async () => {
@@ -218,7 +218,6 @@ export default function POSPage() {
           setPaidAmount(data.paidAmount || 0);
           setPaymentMethod(data.paymentMethod || 'cash');
           
-          // تحويل الأصناف للسلة مع مراعاة الصور من قاعدة البيانات
           const cartItems = await Promise.all(data.items.map(async (item: any) => {
              const prodSnap = await getDoc(doc(db, 'products', item.productId));
              const prodData = prodSnap.data();
@@ -228,7 +227,7 @@ export default function POSPage() {
                 price: item.price,
                 quantity: item.quantity,
                 image: prodData?.images?.[0] || "",
-                stock: (prodData?.stock || 0) + item.quantity // المخزون الحالي + المحجوز في هذه الفاتورة
+                stock: (prodData?.stock || 0) + item.quantity
              };
           }));
           setCart(cartItems);
@@ -238,9 +237,23 @@ export default function POSPage() {
     }
   }, [editOrderId, db]);
 
-  const productsQuery = useMemo(() => query(collection(db, 'products'), orderBy('name')), [db]);
-  const categoriesQuery = useMemo(() => query(collection(db, 'categories'), orderBy('name')), [db]);
-  const allUsersQuery = useMemo(() => query(collection(db, 'users'), orderBy('displayName')), [db]);
+  const productsQuery = useMemo(() => query(
+    collection(db, 'products'), 
+    where('tenantId', '==', tenantId),
+    orderBy('name')
+  ), [db, tenantId]);
+  
+  const categoriesQuery = useMemo(() => query(
+    collection(db, 'categories'), 
+    where('tenantId', '==', tenantId),
+    orderBy('name')
+  ), [db, tenantId]);
+  
+  const allUsersQuery = useMemo(() => query(
+    collection(db, 'users'), 
+    where('tenantId', '==', tenantId),
+    orderBy('displayName')
+  ), [db, tenantId]);
 
   const { data: products, loading } = useCollection(productsQuery);
   const { data: categories } = useCollection(categoriesQuery);
@@ -261,10 +274,7 @@ export default function POSPage() {
   }, [products, searchQuery, selectedCategory]);
 
   const total = useMemo(() => {
-    return cart.reduce((acc, item) => {
-      const retail = item.price || 0;
-      return acc + (retail * (item.quantity || 1));
-    }, 0);
+    return cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
   }, [cart]);
 
   const addToCart = (product: any) => {
@@ -272,7 +282,7 @@ export default function POSPage() {
     setCart(prev => {
       const existing = prev.find(item => item.id === product.id);
       if (existing) {
-        if (existing.quantity >= stock && !editOrderId) { // تنبيه المخزن فقط للجديد
+        if (existing.quantity >= stock && !editOrderId) {
           toast({ variant: "destructive", title: "تنبيه", description: "وصلت للحد الأقصى للمخزون." });
           return prev;
         }
@@ -309,6 +319,7 @@ export default function POSPage() {
     const unpaidAmount = total - paidAmount;
 
     const orderData = {
+      tenantId,
       orderNumber,
       userId: selectedCustomer.id || null,
       customerName: selectedCustomer.name,
@@ -332,25 +343,23 @@ export default function POSPage() {
     const targetOrderRef = editOrderId ? doc(db, 'orders', editOrderId) : doc(collection(db, "orders"));
     if (!editOrderId) (orderData as any).createdAt = Date.now();
 
-    // إدارة المخزون الذكية (إرجاع القديم وخصم الجديد)
     if (editOrderId && originalOrder) {
        originalOrder.items.forEach((item: any) => {
           batch.update(doc(db, "products", item.productId), { stock: increment(item.quantity) });
        });
     }
 
-    // خصم السلة الحالية
     cart.forEach(item => {
       batch.update(doc(db, "products", item.id), { stock: increment(-item.quantity) });
     });
 
-    // تحديث رصيد الزبون (الفرق بين الدين القديم والجديد)
     if (selectedCustomer.id) {
        const oldDebt = originalOrder?.unpaidAmount || 0;
        const diff = unpaidAmount - oldDebt;
        if (diff !== 0) {
           batch.update(doc(db, "users", selectedCustomer.id), { currentBalance: increment(diff) });
           batch.set(doc(collection(db, "financialTransactions")), {
+             tenantId,
              userId: selectedCustomer.id,
              type: editOrderId ? 'adjustment' : 'sale',
              amount: diff,

@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "Tenant": {
@@ -19,6 +20,21 @@
       },
       "required": ["tenantId", "slug", "businessName"]
     },
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User account information linked to a tenant",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "tenantId": { "type": "string", "description": "The ID of the business this user belongs to" },
+        "displayName": { "type": "string" },
+        "email": { "type": "string" },
+        "phoneNumber": { "type": "string" },
+        "role": { "type": "string", "enum": ["owner", "admin", "sales_employee", "workshop_technician", "warehouse_employee", "retail_customer", "wholesale_customer"] },
+        "currentBalance": { "type": "number" }
+      },
+      "required": ["uid", "tenantId", "role"]
+    },
     "Product": {
       "title": "Product",
       "description": "Motorcycle spare parts and accessories",
@@ -34,21 +50,8 @@
         "category": { "type": "string" },
         "storageLocation": { "type": "string" },
         "status": { "type": "string", "enum": ["available", "out_of_stock", "discontinued"] }
-      }
-    },
-    "UserProfile": {
-      "title": "UserProfile",
-      "description": "User account information linked to a tenant",
-      "type": "object",
-      "properties": {
-        "uid": { "type": "string" },
-        "tenantId": { "type": "string" },
-        "displayName": { "type": "string" },
-        "email": { "type": "string" },
-        "phoneNumber": { "type": "string" },
-        "role": { "type": "string" },
-        "currentBalance": { "type": "number" }
-      }
+      },
+      "required": ["tenantId", "name"]
     },
     "Order": {
       "title": "Order",
@@ -61,7 +64,8 @@
         "total": { "type": "number" },
         "status": { "type": "string" },
         "createdAt": { "type": "number" }
-      }
+      },
+      "required": ["tenantId", "orderNumber"]
     }
   },
   "auth": {

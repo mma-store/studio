@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { useFirestore, useDoc, useCollection } from "@/firebase";
+import { useFirestore, useDoc, useCollection, useUser } from "@/firebase";
 import { doc, collection, query, where, orderBy } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useParams, useRouter } from "next/navigation";
@@ -27,13 +27,19 @@ export default function AccountStatementPage() {
   const router = useRouter();
   const id = params?.id as string;
   const db = useFirestore();
+  const { tenantId } = useUser();
 
   const userRef = useMemo(() => doc(db, 'users', id), [db, id]);
   const { data: customer, loading: userLoading } = useDoc<any>(userRef);
 
   const transactionsQuery = useMemo(() => 
-    query(collection(db, 'financialTransactions'), where('userId', '==', id), orderBy('timestamp', 'desc')), 
-  [db, id]);
+    query(
+      collection(db, 'financialTransactions'), 
+      where('tenantId', '==', tenantId),
+      where('userId', '==', id), 
+      orderBy('timestamp', 'desc')
+    ), 
+  [db, id, tenantId]);
   const { data: transactions, loading: transLoading } = useCollection(transactionsQuery);
 
   const handlePrint = () => {

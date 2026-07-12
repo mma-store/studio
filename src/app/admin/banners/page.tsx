@@ -20,8 +20,8 @@ import {
   DialogFooter
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { useFirestore, useCollection } from "@/firebase";
-import { collection, query, orderBy, addDoc, doc, deleteDoc, updateDoc } from "firebase/firestore";
+import { useFirestore, useCollection, useUser } from "@/firebase";
+import { collection, query, orderBy, addDoc, doc, deleteDoc, updateDoc, where } from "firebase/firestore";
 import { useMemo, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import Image from "next/image";
@@ -31,7 +31,13 @@ import { Switch } from "@/components/ui/switch";
 
 export default function BannersPage() {
   const db = useFirestore();
-  const bannersQuery = useMemo(() => query(collection(db, 'banners'), orderBy('createdAt', 'desc')), [db]);
+  const { tenantId } = useUser();
+  
+  const bannersQuery = useMemo(() => query(
+    collection(db, 'banners'), 
+    where('tenantId', '==', tenantId),
+    orderBy('createdAt', 'desc')
+  ), [db, tenantId]);
   const { data: banners, loading } = useCollection(bannersQuery);
   
   const [isAddOpen, setIsAddOpen] = useState(false);
@@ -58,6 +64,7 @@ export default function BannersPage() {
     const formData = new FormData(e.currentTarget);
     try {
       await addDoc(collection(db, 'banners'), {
+        tenantId,
         title: formData.get('title'),
         subtitle: formData.get('subtitle'),
         link: formData.get('link') || "/catalog",

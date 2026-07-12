@@ -33,23 +33,30 @@ import {
 } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useFirestore, useCollection, useUser } from "@/firebase";
-import { collection, query, orderBy, addDoc, doc, writeBatch, increment } from "firebase/firestore";
+import { collection, query, orderBy, addDoc, doc, writeBatch, increment, where } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 
 export default function ReceiptVouchersPage() {
   const db = useFirestore();
-  const { profile } = useUser();
+  const { profile, tenantId } = useUser();
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  const vouchersQuery = useMemo(() => query(collection(db, 'receiptVouchers'), orderBy('timestamp', 'desc')), [db]);
+  const vouchersQuery = useMemo(() => query(
+    collection(db, 'receiptVouchers'), 
+    where('tenantId', '==', tenantId),
+    orderBy('timestamp', 'desc')
+  ), [db, tenantId]);
   const { data: vouchers, loading } = useCollection(vouchersQuery);
 
-  const usersQuery = useMemo(() => query(collection(db, 'users')), [db]);
+  const usersQuery = useMemo(() => query(
+    collection(db, 'users'),
+    where('tenantId', '==', tenantId)
+  ), [db, tenantId]);
   const { data: users } = useCollection(usersQuery);
 
   const filtered = vouchers.filter((v: any) => 
@@ -69,6 +76,7 @@ export default function ReceiptVouchersPage() {
       const batch = writeBatch(db);
       const voucherNumber = `RV-${Date.now().toString().slice(-6)}`;
       const voucherData = {
+        tenantId,
         voucherNumber,
         userId,
         customerName: customer?.displayName || "غير معروف",
@@ -83,7 +91,6 @@ export default function ReceiptVouchersPage() {
       const voucherRef = doc(collection(db, 'receiptVouchers'));
       batch.set(voucherRef, voucherData);
 
-      // Update User Balance (Reduce Debt)
       const userRef = doc(db, 'users', userId);
       batch.update(userRef, {
         currentBalance: increment(-amount),
@@ -91,9 +98,9 @@ export default function ReceiptVouchersPage() {
         lastPaymentDate: Date.now()
       });
 
-      // Register Transaction
       const transactionRef = doc(collection(db, "financialTransactions"));
       batch.set(transactionRef, {
+        tenantId,
         userId,
         type: 'payment',
         amount: -amount,
@@ -209,7 +216,7 @@ export default function ReceiptVouchersPage() {
                   <TableCell><Skeleton className="h-4 w-24" /></TableCell>
                   <TableCell><Skeleton className="h-4 w-24" /></TableCell>
                   <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                  <TableCell className="px-6"><Skeleton className="h-8 w-8 rounded-lg" /></TableCell>
+                  <TableCell className="px-6 text-left"><Skeleton className="h-8 w-8 rounded-lg" /></TableCell>
                 </TableRow>
               ))
             ) : filtered.length > 0 ? (

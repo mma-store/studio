@@ -26,7 +26,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useFirestore, useCollection, useUser } from "@/firebase";
-import { collection, query, orderBy, addDoc, doc, deleteDoc } from "firebase/firestore";
+import { collection, query, orderBy, addDoc, doc, deleteDoc, where } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/hooks/use-toast";
 
@@ -43,11 +43,15 @@ const EXPENSE_CATEGORIES = [
 
 export default function ExpensesPage() {
   const db = useFirestore();
-  const { profile } = useUser();
+  const { profile, tenantId } = useUser();
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  const expensesQuery = useMemo(() => query(collection(db, 'expenses'), orderBy('timestamp', 'desc')), [db]);
+  const expensesQuery = useMemo(() => query(
+    collection(db, 'expenses'), 
+    where('tenantId', '==', tenantId),
+    orderBy('timestamp', 'desc')
+  ), [db, tenantId]);
   const { data: expenses, loading } = useCollection(expensesQuery);
 
   const totalExpenses = useMemo(() => expenses.reduce((acc, e) => acc + (e.amount || 0), 0), [expenses]);
@@ -58,6 +62,7 @@ export default function ExpensesPage() {
     const formData = new FormData(e.currentTarget);
     try {
       await addDoc(collection(db, 'expenses'), {
+        tenantId,
         category: formData.get('category'),
         amount: Number(formData.get('amount')),
         notes: formData.get('notes'),
