@@ -15,7 +15,8 @@ import {
   Loader2,
   Trash2,
   HardDrive,
-  Wand2
+  Wand2,
+  FlaskConical
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -50,16 +51,19 @@ export default function BackupPage() {
   const [isExporting, setIsExporting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [isMigrating, setIsMigrating] = useState(false);
+  const [isSeeding, setIsSeeding] = useState(false);
   const [restoreProgress, setRestoreProgress] = useState(0);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   const backupLogsQuery = useMemo(() => query(
     collection(db, 'auditLogs'), 
+    where('tenantId', '==', tenantId),
     orderBy('timestamp', 'desc'),
     limit(10)
-  ), [db]);
+  ), [db, tenantId]);
+  
   const { data: logs, loading: logsLoading } = useCollection(backupLogsQuery);
-  const backupHistory = logs.filter((l: any) => l.action.includes('نسخ') || l.action.includes('استعادة') || l.action.includes('هجرة'));
+  const backupHistory = logs.filter((l: any) => l.action?.includes('نسخ') || l.action?.includes('استعادة') || l.action?.includes('هجرة') || l.action?.includes('Seed'));
 
   const handleExport = async () => {
     setIsExporting(true);
@@ -82,6 +86,65 @@ export default function BackupPage() {
       toast({ variant: "destructive", title: "خطأ", description: "فشل إنشاء النسخة الاحتياطية." });
     } finally {
       setIsExporting(false);
+    }
+  };
+
+  const handleSeedTEST001 = async () => {
+    setIsSeeding(true);
+    const TEST_TENANT = "TEST001";
+    const batch = writeBatch(db);
+
+    try {
+      // 1. Create Tenant
+      const tenantRef = doc(db, "tenants", TEST_TENANT);
+      batch.set(tenantRef, {
+        tenantId: TEST_TENANT,
+        businessName: "متجر الاختبار التجريبي",
+        logo: "https://placehold.co/400x200?text=TEST001",
+        phone: "07000000000",
+        subscriptionStatus: "active",
+        createdAt: Date.now()
+      });
+
+      // 2. Create Sample Product
+      const productRef = doc(collection(db, "products"));
+      batch.set(productRef, {
+        tenantId: TEST_TENANT,
+        name: "منتج تجريبي معزول",
+        barcode: "TEST-BAR-001",
+        retailPrice: 15000,
+        stock: 100,
+        category: "قطع تجريبية",
+        createdAt: Date.now()
+      });
+
+      // 3. Create Sample Order
+      const orderRef = doc(collection(db, "orders"));
+      batch.set(orderRef, {
+        tenantId: TEST_TENANT,
+        orderNumber: "TEST-ORD-999",
+        customerName: "زبون معزول",
+        total: 15000,
+        status: "delivered",
+        createdAt: Date.now()
+      });
+
+      // 4. Create Audit Log
+      const logRef = doc(collection(db, "auditLogs"));
+      batch.set(logRef, {
+        tenantId: TEST_TENANT,
+        action: "Seed Isolation Test",
+        target: TEST_TENANT,
+        details: "إنشاء بيانات اختبارية لغرض فحص العزل البرمجي",
+        timestamp: Date.now()
+      });
+
+      await batch.commit();
+      toast({ title: "اكتمل التوليد", description: "تم إنشاء بيانات معزولة تحت معرف TEST001." });
+    } catch (e) {
+      toast({ variant: "destructive", title: "فشل التوليد" });
+    } finally {
+      setIsSeeding(false);
     }
   };
 
@@ -181,7 +244,16 @@ export default function BackupPage() {
           <h1 className="text-3xl font-black tracking-tight">إدارة البيانات والسحاب</h1>
           <p className="text-muted-foreground font-medium text-sm">تأمين بيانات المجمع وإدارتها في بيئة متعددة المتاجر.</p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-3">
+          <Button 
+            onClick={handleSeedTEST001} 
+            disabled={isSeeding} 
+            variant="outline"
+            className="rounded-2xl font-black h-14 gap-2 border-2 border-purple-200 text-purple-600 hover:bg-purple-50"
+          >
+            {isSeeding ? <Loader2 className="h-5 w-5 animate-spin" /> : <FlaskConical className="h-5 w-5" />}
+            توليد بيانات TEST001
+          </Button>
           <Button 
             onClick={handleMigrateToTenant} 
             disabled={isMigrating} 
@@ -189,7 +261,7 @@ export default function BackupPage() {
             className="rounded-2xl font-black h-14 gap-2 border-2 text-primary hover:bg-primary/5"
           >
             {isMigrating ? <Loader2 className="h-5 w-5 animate-spin" /> : <Wand2 className="h-5 w-5" />}
-            هجرة البيانات للنسخة الجديدة
+            هجرة بيانات MMA001
           </Button>
           <Button 
             onClick={handleExport} 
@@ -276,9 +348,13 @@ export default function BackupPage() {
                           <div className="flex items-center gap-4">
                              <div className={cn(
                                "h-10 w-10 rounded-xl flex items-center justify-center",
-                               log.action.includes('تصدير') ? "bg-blue-50 text-blue-600" : "bg-orange-50 text-orange-600"
+                               log.action?.includes('تصدير') ? "bg-blue-50 text-blue-600" :
+                               log.action?.includes('Seed') ? "bg-purple-50 text-purple-600" :
+                               "bg-orange-50 text-orange-600"
                              )}>
-                                {log.action.includes('تصدير') ? <Download className="h-5 w-5" /> : <RefreshCcw className="h-5 w-5" />}
+                                {log.action?.includes('تصدير') ? <Download className="h-5 w-5" /> : 
+                                 log.action?.includes('Seed') ? <FlaskConical className="h-5 w-5" /> :
+                                 <RefreshCcw className="h-5 w-5" />}
                              </div>
                              <div>
                                 <p className="text-sm font-black">{log.action}</p>

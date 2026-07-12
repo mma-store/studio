@@ -4,14 +4,23 @@
 import { useMemo } from "react";
 import { History, User, Clock, ShieldAlert } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useFirestore, useCollection } from "@/firebase";
-import { collection, query, orderBy, limit } from "firebase/firestore";
+import { useFirestore, useCollection, useUser } from "@/firebase";
+import { collection, query, orderBy, limit, where } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
 export default function AuditLogPage() {
   const db = useFirestore();
-  const logsQuery = useMemo(() => query(collection(db, 'auditLogs'), orderBy('timestamp', 'desc'), limit(50)), [db]);
+  const { tenantId } = useUser();
+  
+  // FIXED: Server-side tenant filtering to prevent cross-tenant leakage
+  const logsQuery = useMemo(() => query(
+    collection(db, 'auditLogs'), 
+    where('tenantId', '==', tenantId),
+    orderBy('timestamp', 'desc'), 
+    limit(50)
+  ), [db, tenantId]);
+  
   const { data: logs, loading } = useCollection(logsQuery);
 
   return (
@@ -29,8 +38,8 @@ export default function AuditLogPage() {
             <div key={log.id} className="flex items-center gap-4 p-5 bg-white border rounded-[28px] shadow-sm hover:shadow-md transition-shadow">
               <div className={cn(
                 "h-12 w-12 rounded-2xl flex items-center justify-center shrink-0",
-                log.action.includes('حذف') ? "bg-red-50 text-red-600" :
-                log.action.includes('إضافة') ? "bg-green-50 text-green-600" : "bg-blue-50 text-blue-600"
+                log.action?.includes('حذف') ? "bg-red-50 text-red-600" :
+                log.action?.includes('إضافة') ? "bg-green-50 text-green-600" : "bg-blue-50 text-blue-600"
               )}>
                 <ShieldAlert className="h-6 w-6" />
               </div>

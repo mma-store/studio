@@ -39,21 +39,14 @@ import {
   DialogFooter
 } from "@/components/ui/dialog";
 import { 
-  DropdownMenu, 
-  DropdownMenuContent, 
-  DropdownMenuItem, 
-  DropdownMenuLabel, 
-  DropdownMenuTrigger 
-} from "@/components/ui/dropdown-menu";
-import { 
   Select, 
   SelectContent, 
   SelectItem, 
   SelectTrigger, 
   SelectValue 
 } from "@/components/ui/select";
-import { useFirestore, useCollection } from "@/firebase";
-import { collection, query, orderBy, addDoc, doc, deleteDoc, updateDoc } from "firebase/firestore";
+import { useFirestore, useCollection, useUser } from "@/firebase";
+import { collection, query, orderBy, addDoc, doc, deleteDoc, updateDoc, where } from "firebase/firestore";
 import { useMemo, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
@@ -61,7 +54,16 @@ import { toast } from "@/hooks/use-toast";
 
 export default function CustomersManagementPage() {
   const db = useFirestore();
-  const customersQuery = useMemo(() => query(collection(db, 'users'), orderBy('createdAt', 'desc')), [db]);
+  const { tenantId } = useUser();
+  
+  // FIXED: Server-side tenant filtering to prevent data leakage
+  const customersQuery = useMemo(() => query(
+    collection(db, 'users'), 
+    where('tenantId', '==', tenantId),
+    where('role', 'in', ['retail_customer', 'wholesale_customer']),
+    orderBy('createdAt', 'desc')
+  ), [db, tenantId]);
+  
   const { data: customers, loading } = useCollection(customersQuery);
   const [search, setSearch] = useState("");
   const [isAddOpen, setIsAddOpen] = useState(false);
@@ -69,11 +71,9 @@ export default function CustomersManagementPage() {
   const [editingCustomer, setEditingCustomer] = useState<any>(null);
   const [isSaving, setIsSaving] = useState(false);
 
-  // تصفية العملاء فقط (استبعاد الأدمن والموظفين من هذه القائمة)
   const filtered = customers.filter((c: any) => 
-    !['admin', 'sales_employee', 'workshop_technician', 'warehouse_employee'].includes(c.role) &&
-    ((c.displayName?.toLowerCase() || "").includes(search.toLowerCase()) ||
-    (c.phoneNumber || "").includes(search))
+    (c.displayName?.toLowerCase() || "").includes(search.toLowerCase()) ||
+    (c.phoneNumber || "").includes(search)
   );
 
   const normalizePhone = (p: string) => p.replace(/\s/g, '').replace(/^0/, '');
@@ -85,6 +85,7 @@ export default function CustomersManagementPage() {
     const phone = normalizePhone(formData.get('phone') as string);
     try {
       await addDoc(collection(db, 'users'), {
+        tenantId, // Tag with tenantId
         displayName: formData.get('name'),
         phoneNumber: phone,
         email: `${phone}@mma.store`,
@@ -260,7 +261,6 @@ export default function CustomersManagementPage() {
         </Table>
       </div>
 
-      {/* نافذة التعديل */}
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
         <DialogContent className="rounded-[32px]">
           <DialogHeader><DialogTitle className="text-2xl font-black">تعديل بيانات العميل</DialogTitle></DialogHeader>
