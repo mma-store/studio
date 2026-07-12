@@ -1,4 +1,3 @@
-
 "use client";
 
 import Link from "next/link";
@@ -6,20 +5,26 @@ import { usePathname } from "next/navigation";
 import { Home, LayoutGrid, ClipboardList, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const NAV_ITEMS = [
-  { label: "الرئيسية", icon: Home, href: "/" },
-  { label: "الأقسام", icon: LayoutGrid, href: "/catalog" },
-  { label: "طلباتي", icon: ClipboardList, href: "/orders" },
-  { label: "حسابي", icon: User, href: "/profile" },
-];
+interface BottomNavProps {
+  slug?: string;
+}
 
-export function BottomNav() {
+export function BottomNav({ slug }: BottomNavProps) {
   const pathname = usePathname();
+  const baseUrl = slug ? `/store/${slug}` : "";
+
+  const NAV_ITEMS = [
+    { label: "الرئيسية", icon: Home, href: `${baseUrl}/` },
+    { label: "الأقسام", icon: LayoutGrid, href: `${baseUrl}/catalog` },
+    { label: "طلباتي", icon: ClipboardList, href: `${baseUrl}/orders` },
+    { label: "حسابي", icon: User, href: "/profile" },
+  ];
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 flex h-16 items-center justify-around border-t bg-background/80 px-4 pb-safe backdrop-blur-lg md:hidden shadow-[0_-1px_10px_rgba(0,0,0,0.05)]">
       {NAV_ITEMS.map((item) => {
-        const isActive = pathname === item.href;
+        // Simple match for root store page
+        const isActive = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
         const Icon = item.icon;
 
         return (
@@ -40,9 +45,6 @@ export function BottomNav() {
             <span className={cn("text-[10px] font-bold transition-all", isActive ? "opacity-100" : "opacity-70")}>
               {item.label}
             </span>
-            {isActive && (
-              <span className="absolute -top-1 w-1 h-1 rounded-full bg-primary" />
-            )}
           </Link>
         );
       })}

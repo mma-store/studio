@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo } from "react";
@@ -33,7 +32,7 @@ import {
   AlertDialogTrigger 
 } from "@/components/ui/alert-dialog";
 import { useFirestore, useUser, useCollection } from "@/firebase";
-import { collection, query, orderBy, limit, addDoc, getDocs, writeBatch, doc } from "firebase/firestore";
+import { collection, query, orderBy, limit, addDoc, getDocs, writeBatch, doc, where } from "firebase/firestore";
 import { toast } from "@/hooks/use-toast";
 import { 
   generateBackup, 
@@ -95,14 +94,16 @@ export default function BackupPage() {
     const batch = writeBatch(db);
 
     try {
-      // 1. Create Tenant
+      // 1. Create Tenant with Slug
       const tenantRef = doc(db, "tenants", TEST_TENANT);
       batch.set(tenantRef, {
         tenantId: TEST_TENANT,
         businessName: "متجر الاختبار التجريبي",
+        slug: "test-store",
         logo: "https://placehold.co/400x200?text=TEST001",
         phone: "07000000000",
-        subscriptionStatus: "active",
+        whatsapp: "07000000000",
+        status: "active",
         createdAt: Date.now()
       });
 
@@ -118,18 +119,7 @@ export default function BackupPage() {
         createdAt: Date.now()
       });
 
-      // 3. Create Sample Order
-      const orderRef = doc(collection(db, "orders"));
-      batch.set(orderRef, {
-        tenantId: TEST_TENANT,
-        orderNumber: "TEST-ORD-999",
-        customerName: "زبون معزول",
-        total: 15000,
-        status: "delivered",
-        createdAt: Date.now()
-      });
-
-      // 4. Create Audit Log
+      // 3. Create Audit Log
       const logRef = doc(collection(db, "auditLogs"));
       batch.set(logRef, {
         tenantId: TEST_TENANT,
@@ -140,7 +130,7 @@ export default function BackupPage() {
       });
 
       await batch.commit();
-      toast({ title: "اكتمل التوليد", description: "تم إنشاء بيانات معزولة تحت معرف TEST001." });
+      toast({ title: "اكتمل التوليد", description: "تم إنشاء بيانات معزولة تحت معرف TEST001 ورابط test-store." });
     } catch (e) {
       toast({ variant: "destructive", title: "فشل التوليد" });
     } finally {
@@ -149,7 +139,6 @@ export default function BackupPage() {
   };
 
   const handleMigrateToTenant = async () => {
-    if (!confirm("تحذير: سيتم تحويل كافة البيانات الحالية التي لا تملك معرفاً للمتجر لتتبع المعرف الحالي (MMA001). هل تريد الاستمرار؟")) return;
     setIsMigrating(true);
     
     const COLLECTIONS = [
@@ -159,33 +148,49 @@ export default function BackupPage() {
     ];
 
     try {
+      const batch = writeBatch(db);
+      
+      // Initialize MMA Tenant
+      const mmaRef = doc(db, "tenants", "MMA001");
+      batch.set(mmaRef, {
+        tenantId: "MMA001",
+        businessName: "مجمع محمد علاء",
+        slug: "mma-store",
+        logo: "https://up6.cc/2026/07/178308238964931.png",
+        phone: "07858833838",
+        whatsapp: "07858833838",
+        status: "active",
+        createdAt: Date.now()
+      }, { merge: true });
+
       let totalUpdated = 0;
       for (const colName of COLLECTIONS) {
         const snap = await getDocs(collection(db, colName));
-        const batch = writeBatch(db);
+        const innerBatch = writeBatch(db);
         let count = 0;
 
         snap.docs.forEach(d => {
           if (!d.data().tenantId) {
-            batch.update(d.ref, { tenantId: 'MMA001' });
+            innerBatch.update(d.ref, { tenantId: 'MMA001' });
             count++;
           }
         });
 
         if (count > 0) {
-          await batch.commit();
+          await innerBatch.commit();
           totalUpdated += count;
         }
       }
 
       await addDoc(collection(db, 'auditLogs'), {
         tenantId: 'MMA001',
-        action: "هجرة بيانات",
-        details: `تم تحديث ${totalUpdated} سجل لتتبع MMA001`,
+        action: "هجرة بيانات ونظام التوجيه",
+        details: `تم تحديث ${totalUpdated} سجل وتفعيل رابط mma-store`,
         timestamp: Date.now()
       });
 
-      toast({ title: "اكتملت الهجرة", description: `تم ربط ${totalUpdated} سجل بالمتجر الحالي.` });
+      await batch.commit();
+      toast({ title: "اكتملت الهجرة", description: `تم ربط البيانات بـ MMA001 وتفعيل الرابط الديناميكي.` });
     } catch (e) {
       toast({ variant: "destructive", title: "فشل الهجرة" });
     } finally {

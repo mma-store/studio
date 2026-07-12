@@ -1,4 +1,3 @@
-
 {
   "entities": {
     "Tenant": {
@@ -8,14 +7,17 @@
       "properties": {
         "tenantId": { "type": "string" },
         "businessName": { "type": "string" },
+        "slug": { "type": "string", "description": "Unique URL slug for the store (e.g. mma-store)" },
         "logo": { "type": "string" },
         "phone": { "type": "string" },
+        "whatsapp": { "type": "string" },
         "address": { "type": "string" },
-        "subscriptionStatus": { "type": "string", "enum": ["active", "suspended", "expired"] },
+        "status": { "type": "string", "enum": ["active", "suspended", "expired"] },
         "subscriptionPlan": { "type": "string" },
         "createdAt": { "type": "number" },
         "settings": { "type": "object" }
-      }
+      },
+      "required": ["tenantId", "slug", "businessName"]
     },
     "Product": {
       "title": "Product",
@@ -70,11 +72,15 @@
     "/users/{userId}": { "schema": "UserProfile", "description": "Tenant-scoped user accounts" },
     "/products/{productId}": { "schema": "Product", "description": "Tenant-scoped inventory" },
     "/orders/{orderId}": { "schema": "Order", "description": "Tenant-scoped sales orders" },
-    "/suppliers/{supplierId}": { "schema": "Supplier", "description": "Supplier information" },
-    "/purchases/{purchaseId}": { "schema": "PurchaseInvoice", "description": "Purchase invoices" },
-    "/expenses/{expenseId}": { "schema": "Expense", "description": "Business expenses" },
-    "/cashShifts/{shiftId}": { "schema": "CashShift", "description": "Cash register shifts" },
-    "/financialTransactions/{transactionId}": { "schema": "FinancialTransaction", "description": "Ledger for accounts" },
-    "/auditLogs/{logId}": { "schema": "AuditLog", "description": "Administrative actions" }
+    "/repairOrders/{repairId}": { "schema": "object", "description": "Workshop records" },
+    "/suppliers/{supplierId}": { "schema": "object", "description": "Supplier information" },
+    "/purchases/{purchaseId}": { "schema": "object", "description": "Purchase invoices" },
+    "/expenses/{expenseId}": { "schema": "object", "description": "Business expenses" },
+    "/cashShifts/{shiftId}": { "schema": "object", "description": "Cash register shifts" },
+    "/financialTransactions/{transactionId}": { "schema": "object", "description": "Ledger for accounts" },
+    "/auditLogs/{logId}": { "schema": "object", "description": "Administrative actions" },
+    "/categories/{categoryId}": { "schema": "object", "description": "Product categories per tenant" },
+    "/banners/{bannerId}": { "schema": "object", "description": "Store banners" },
+    "/offers/{offerId}": { "schema": "object", "description": "Promotional offers" }
   }
 }

@@ -13,19 +13,26 @@ import {
   SheetTrigger 
 } from "@/components/ui/sheet";
 
-export function Header() {
+interface HeaderProps {
+  logo?: string;
+  storeName?: string;
+  slug?: string;
+}
+
+export function Header({ logo, storeName, slug }: HeaderProps) {
   const { totalItems } = useCart();
-  const LOGO_URL = "https://up6.cc/2026/07/178308238964931.png";
+  const DEFAULT_LOGO = "https://up6.cc/2026/07/178308238964931.png";
+  const homeHref = slug ? `/store/${slug}` : "/";
 
   return (
     <header className="sticky top-0 z-40 w-full border-b bg-background/80 backdrop-blur-md">
       <div className="container flex h-20 items-center justify-between px-4">
         <div className="flex items-center gap-4">
-          <Link href="/" className="flex items-center gap-3">
-            <div className="relative h-14 w-36">
+          <Link href={homeHref} className="flex items-center gap-3">
+            <div className="relative h-14 w-40">
               <Image 
-                src={LOGO_URL} 
-                alt="مجمع محمد علاء" 
+                src={logo || DEFAULT_LOGO} 
+                alt={storeName || "مجمع محمد علاء"} 
                 fill 
                 className="object-contain"
                 priority
@@ -35,7 +42,7 @@ export function Header() {
         </div>
 
         <div className="flex items-center gap-1 sm:gap-2">
-          <Link href="/search">
+          <Link href={slug ? `/store/${slug}/search` : "/search"}>
             <Button variant="ghost" size="icon" className="rounded-full hover:bg-muted text-foreground">
               <Search className="h-5 w-5" />
             </Button>
@@ -61,7 +68,7 @@ export function Header() {
             </SheetContent>
           </Sheet>
 
-          <Link href="/cart">
+          <Link href={slug ? `/store/${slug}/cart` : "/cart"}>
             <Button variant="ghost" size="icon" className="rounded-full relative hover:bg-muted text-foreground">
               <ShoppingCart className="h-5 w-5" />
               {totalItems > 0 && (
