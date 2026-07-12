@@ -23,7 +23,10 @@ export function useUser() {
         const profileRef = doc(db, 'users', firebaseUser.uid);
         const unsubscribeProfile = onSnapshot(profileRef, (docSnap) => {
           if (docSnap.exists()) {
-            setProfile(docSnap.data() as UserProfile);
+            const data = docSnap.data() as UserProfile;
+            // Fallback for legacy users during migration
+            if (!data.tenantId) data.tenantId = 'MMA001';
+            setProfile(data);
           } else {
             setProfile(null);
           }
@@ -40,5 +43,5 @@ export function useUser() {
     return () => unsubscribeAuth();
   }, [auth, db]);
 
-  return { user, profile, loading };
+  return { user, profile, loading, tenantId: profile?.tenantId || 'MMA001' };
 }

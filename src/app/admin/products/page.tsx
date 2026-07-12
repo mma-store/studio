@@ -56,8 +56,8 @@ import {
   SelectTrigger, 
   SelectValue 
 } from "@/components/ui/select";
-import { useFirestore, useCollection } from "@/firebase";
-import { collection, query, orderBy, addDoc, doc, deleteDoc, updateDoc } from "firebase/firestore";
+import { useFirestore, useCollection, useUser } from "@/firebase";
+import { collection, query, orderBy, addDoc, doc, deleteDoc, updateDoc, where } from "firebase/firestore";
 import { useMemo, useState, useRef, useEffect } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import Image from "next/image";
@@ -69,10 +69,20 @@ import { useRouter } from "next/navigation";
 export default function ProductsManagementPage() {
   const db = useFirestore();
   const router = useRouter();
-  const productsQuery = useMemo(() => query(collection(db, 'products'), orderBy('createdAt', 'desc')), [db]);
+  const { tenantId } = useUser();
+  
+  const productsQuery = useMemo(() => query(
+    collection(db, 'products'), 
+    where('tenantId', '==', tenantId),
+    orderBy('createdAt', 'desc')
+  ), [db, tenantId]);
   const { data: products, loading } = useCollection(productsQuery);
   
-  const categoriesQuery = useMemo(() => query(collection(db, 'categories'), orderBy('name')), [db]);
+  const categoriesQuery = useMemo(() => query(
+    collection(db, 'categories'), 
+    where('tenantId', '==', tenantId),
+    orderBy('name')
+  ), [db, tenantId]);
   const { data: categories } = useCollection(categoriesQuery);
   
   const [searchQuery, setSearchQuery] = useState("");
@@ -86,7 +96,6 @@ export default function ProductsManagementPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
-  // Reset form when dialog closes or opens for new
   useEffect(() => {
     if (!isDialogOpen) {
       setEditingProduct(null);
@@ -134,6 +143,7 @@ export default function ProductsManagementPage() {
     const formData = new FormData(e.currentTarget);
     
     const productData: any = {
+      tenantId,
       name: formData.get('name'),
       barcode: formData.get('barcode'),
       category: selectedCategory,

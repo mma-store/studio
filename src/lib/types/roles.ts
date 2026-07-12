@@ -15,6 +15,7 @@ export interface UserProfile {
   phoneNumber?: string;
   photoURL?: string;
   createdAt: number;
+  tenantId: string; // The ID of the business/tenant this user belongs to
 }
 
 export const ROLE_PERMISSIONS: Record<UserRole, string[]> = {

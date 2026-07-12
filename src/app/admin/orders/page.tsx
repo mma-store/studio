@@ -35,7 +35,7 @@ import {
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
 import { useFirestore, useCollection, useUser } from "@/firebase";
-import { collection, query, orderBy, updateDoc, doc, serverTimestamp, writeBatch, increment } from "firebase/firestore";
+import { collection, query, orderBy, updateDoc, doc, serverTimestamp, writeBatch, increment, where } from "firebase/firestore";
 import { useMemo, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
@@ -56,11 +56,15 @@ const statusConfig = {
 
 export default function OrdersManagementPage() {
   const db = useFirestore();
-  const { profile } = useUser();
+  const { profile, tenantId } = useUser();
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
   
-  const ordersQuery = useMemo(() => query(collection(db, 'orders'), orderBy('createdAt', 'desc')), [db]);
+  const ordersQuery = useMemo(() => query(
+    collection(db, 'orders'), 
+    where('tenantId', '==', tenantId),
+    orderBy('createdAt', 'desc')
+  ), [db, tenantId]);
   const { data: orders, loading } = useCollection(ordersQuery);
 
   const filteredOrders = orders.filter((o: any) => 
@@ -213,4 +217,3 @@ export default function OrdersManagementPage() {
     </div>
   );
 }
-
