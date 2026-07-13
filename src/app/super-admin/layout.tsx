@@ -13,7 +13,7 @@ import { signOut } from "firebase/auth";
 import { useAuth } from "@/firebase";
 import { ShieldAlert, LogOut } from "lucide-react";
 
-// List of phone numbers allowed to be Super Admins
+// تم تحديث أرقام المدير العام للمنصة (الرقم الشخصي الجديد)
 const MASTER_SUPER_ADMINS = ['7858833838', '07858833838'];
 
 export default function SuperAdminLayout({ children }: { children: React.ReactNode }) {
@@ -27,14 +27,14 @@ export default function SuperAdminLayout({ children }: { children: React.ReactNo
       if (!user) {
         router.replace('/login');
       } else {
-        const purePhone = profile?.phoneNumber?.replace(/\s/g, '').replace(/^\+964/, '');
+        const purePhone = profile?.phoneNumber?.replace(/\s/g, '').replace(/^(\+964|0)/, '');
         const isMaster = purePhone && MASTER_SUPER_ADMINS.includes(purePhone);
         const isExplicitSuper = profile?.role === 'super_admin';
 
         if (isMaster || isExplicitSuper) {
           setIsAuthorized(true);
         } else {
-          router.replace('/admin'); // Redirect merchants back to their space
+          router.replace('/admin'); // توجيه التجار للوحة التحكم الخاصة بهم
         }
       }
     }
@@ -45,7 +45,7 @@ export default function SuperAdminLayout({ children }: { children: React.ReactNo
       <div className="flex h-screen w-full flex-col items-center justify-center bg-slate-900 gap-6">
          <div className="h-16 w-16 border-4 border-primary border-t-transparent rounded-full animate-spin shadow-2xl shadow-primary/20" />
          <div className="text-center space-y-2">
-            <p className="text-white font-black text-xl">جاري الدخول لمنطقة الإدارة العليا</p>
+            <p className="text-white font-black text-xl">جاري التحقق من الهوية العليا</p>
             <p className="text-white/40 text-xs font-bold uppercase tracking-widest">Master Identity Verification</p>
          </div>
       </div>
@@ -60,12 +60,12 @@ export default function SuperAdminLayout({ children }: { children: React.ReactNo
             <ShieldAlert className="h-12 w-12" />
           </div>
           <div className="space-y-2">
-            <h1 className="text-2xl font-black text-slate-900">منطقة محظورة تماماً</h1>
-            <p className="text-muted-foreground font-medium">هذه المنطقة مخصصة لإدارة المنصة السحابية فقط. تم تسجيل محاولة الدخول غير المصرح بها.</p>
+            <h1 className="text-2xl font-black text-slate-900">منطقة محظورة</h1>
+            <p className="text-muted-foreground font-medium">هذه المنطقة مخصصة حصراً لمدير المنصة العام. تم تسجيل محاولة الدخول.</p>
           </div>
           <div className="grid gap-3 pt-4">
              <Button onClick={() => router.replace('/admin')} className="w-full h-14 rounded-2xl font-black text-lg shadow-xl shadow-primary/20">
-                العودة للوحة التحكم الخاصة بمتجري
+                العودة لمتجري
              </Button>
              <Button variant="ghost" onClick={() => signOut(auth)} className="font-bold text-red-600">تسجيل الخروج</Button>
           </div>

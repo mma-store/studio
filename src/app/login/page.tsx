@@ -4,7 +4,7 @@
 import { useState } from "react";
 import { useAuth, useFirestore } from "@/firebase";
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from "firebase/auth";
-import { collection, query, where, getDocs, doc, updateDoc, setDoc } from "firebase/firestore";
+import { collection, query, where, getDocs, doc, getDoc, setDoc } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,20 +34,30 @@ export default function LoginPage() {
     setLoading(true);
     
     const purePhone = cleanPhone(phoneNumber);
-    const fakeEmail = `${purePhone}@mma.store`;
+    const fakeEmail = `${purePhone}@platform.store`;
 
     try {
-      // 1. محاولة تسجيل الدخول العادي
-      await signInWithEmailAndPassword(auth, fakeEmail, password);
+      // محاولة تسجيل الدخول العادي
+      const userCredential = await signInWithEmailAndPassword(auth, fakeEmail, password);
+      const user = userCredential.user;
+      
+      // جلب بيانات المستخدم لمعرفة التوجيه
+      const userSnap = await getDoc(doc(db, "users", user.uid));
+      const userData = userSnap.data();
+
       toast({ title: "تم تسجيل الدخول", description: "مرحباً بك مجدداً." });
       
-      if (['7858833838', '07858833838'].includes(phoneNumber)) {
+      const isMasterAdmin = ['7858833838', '07858833838'].includes(purePhone);
+      
+      if (isMasterAdmin || userData?.role === 'super_admin') {
+        router.push("/super-admin");
+      } else if (userData?.role && !['retail_customer', 'wholesale_customer'].includes(userData.role)) {
         router.push("/admin");
       } else {
         router.push("/");
       }
     } catch (error: any) {
-      // 2. إذا لم يكن الحساب موجوداً في Auth، نتحقق من وجوده كموظف مضاف يدوياً
+      // إذا لم يكن الحساب موجوداً في Auth، نتحقق من وجوده كموظف مضاف يدوياً
       if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
         try {
           const usersRef = collection(db, "users");
@@ -58,25 +68,27 @@ export default function LoginPage() {
             const userDoc = querySnapshot.docs[0];
             const userData = userDoc.data();
 
-            // التحقق من كلمة السر المؤقتة للموظف
             if (userData.tempPassword === password) {
               toast({ title: "تفعيل الحساب...", description: "جاري إنشاء حسابك الرسمي للمرة الأولى." });
               
-              // إنشاء الحساب في Auth
               const userCredential = await createUserWithEmailAndPassword(auth, fakeEmail, password);
               const newUser = userCredential.user;
 
-              // تحديث السجل في Firestore وربطه بـ UID الجديد
               await setDoc(doc(db, "users", newUser.uid), {
                 ...userData,
                 uid: newUser.uid,
                 email: fakeEmail,
                 lastLogin: Date.now(),
-                tempPassword: null // مسح كلمة السر المؤقتة بعد التفعيل
+                tempPassword: null
               });
 
               toast({ title: "تم التفعيل بنجاح" });
-              router.push("/admin");
+              
+              if (['7858833838', '07858833838'].includes(purePhone)) {
+                router.push("/super-admin");
+              } else {
+                router.push("/admin");
+              }
               return;
             }
           }
@@ -88,7 +100,7 @@ export default function LoginPage() {
       toast({ 
         variant: "destructive", 
         title: "خطأ في الدخول", 
-        description: "تأكد من رقم الهاتف وكلمة المرور. إذا كنت موظفاً جديداً، استخدم كلمة السر التي زودك بها المدير." 
+        description: "تأكد من رقم الهاتف وكلمة المرور." 
       });
     } finally {
       setLoading(false);
@@ -113,11 +125,11 @@ export default function LoginPage() {
       <Card className="w-full max-w-md rounded-[40px] border-none shadow-2xl overflow-hidden bg-white">
         <CardHeader className="space-y-4 pt-12 pb-6 text-center">
           <div className="mx-auto relative h-28 w-64">
-            <Image src={LOGO_URL} alt="MMA" fill className="object-contain" priority />
+            <Image src={LOGO_URL} alt="Platform" fill className="object-contain" priority />
           </div>
           <div className="space-y-1">
-            <CardTitle className="text-3xl font-black">مجمع محمد علاء</CardTitle>
-            <CardDescription className="font-medium">سجل دخولك للوصول إلى لوحة التحكم</CardDescription>
+            <CardTitle className="text-3xl font-black">بوابة الأعمال</CardTitle>
+            <CardDescription className="font-medium">سجل دخولك لإدارة متجرك ومبيعاتك</CardDescription>
           </div>
         </CardHeader>
         
@@ -145,7 +157,7 @@ export default function LoginPage() {
                   </div>
                 </div>
                 <Button type="submit" className="w-full h-14 rounded-2xl font-black text-lg gap-2 shadow-lg mt-2" disabled={loading}>
-                  {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : "تسجيل الدخول"}
+                  {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : "دخول إلى النظام"}
                 </Button>
               </form>
             </TabsContent>
@@ -154,7 +166,7 @@ export default function LoginPage() {
               <form onSubmit={handleEmailLogin} className="space-y-4">
                 <div className="space-y-2">
                   <Label className="font-bold mr-1">البريد الإلكتروني</Label>
-                  <Input type="email" placeholder="admin@mma.com" className="h-14 rounded-2xl px-6 bg-muted/20 border-none" value={email} onChange={(e) => setEmail(e.target.value)} required />
+                  <Input type="email" placeholder="user@example.com" className="h-14 rounded-2xl px-6 bg-muted/20 border-none" value={email} onChange={(e) => setEmail(e.target.value)} required />
                 </div>
                 <div className="space-y-2">
                   <Label className="font-bold mr-1">كلمة المرور</Label>
@@ -169,7 +181,7 @@ export default function LoginPage() {
         </CardContent>
         
         <CardFooter className="pb-10 pt-4 flex flex-col gap-4 text-center">
-          <p className="text-sm text-muted-foreground font-medium">ليس لديك حساب؟ <Link href="/register" className="text-primary font-bold hover:underline">إنشاء حساب جديد</Link></p>
+          <p className="text-sm text-muted-foreground font-medium">ليس لديك متجر بعد؟ <Link href="/onboarding" className="text-primary font-bold hover:underline">أنشئ متجرك الآن</Link></p>
         </CardFooter>
       </Card>
     </div>

@@ -29,7 +29,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       if (!user) {
         router.replace('/login');
       } else {
-        const isMasterAdmin = profile?.phoneNumber && ADMIN_PHONES.includes(profile.phoneNumber.replace(/\s/g, '').replace(/^\+964/, ''));
+        const purePhone = profile?.phoneNumber?.replace(/\s/g, '').replace(/^(\+964|0)/, '');
+        const isMasterAdmin = purePhone && ADMIN_PHONES.includes(purePhone);
         const isMerchant = profile && ['owner', 'admin', 'sales_employee', 'workshop_technician', 'warehouse_employee'].includes(profile.role);
         
         if ((isMerchant || isMasterAdmin) && tenantId) {
@@ -91,7 +92,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                       <AlertCircle className="h-5 w-5" />
                       <span className="font-black text-sm">انتهت الفترة التجريبية للمتجر. يرجى الترقية للاستمرار في العمل.</span>
                    </div>
-                   <Button variant="secondary" size="sm" className="rounded-xl font-black">ترقية الآن</Button>
+                   <Button variant="secondary" size="sm" className="rounded-xl font-black" asChild>
+                      <a href={`https://wa.me/9647858833838?text=${encodeURIComponent('أريد ترقية اشتراكي في المنصة')}`} target="_blank">تواصل مع الإدارة للترقية</a>
+                   </Button>
                 </div>
               ) : subscription.isTrial && (
                 <div className="bg-primary/10 border border-primary/20 text-primary px-4 py-2 rounded-2xl flex items-center justify-between text-xs font-bold">
@@ -99,7 +102,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                       <TrendingUp className="h-4 w-4" />
                       <span>أنت في الفترة التجريبية. يتبقى لك {subscription.daysRemaining} يوم.</span>
                    </div>
-                   <Link href="/admin/settings/billing" className="underline font-black">خطط الاشتراك</Link>
+                   <a href="https://wa.me/9647858833838" target="_blank" className="underline font-black">طلب اشتراك دائم</a>
                 </div>
               )}
             </div>

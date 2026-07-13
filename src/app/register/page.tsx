@@ -38,7 +38,7 @@ export default function RegisterPage() {
       const purePhone = cleanPhone(formData.phoneNumber);
       const fakeEmail = `${purePhone}@platform.store`;
 
-      // 1. البحث عن رقم الهاتف في سجلات الموظفين المضافة مسبقاً
+      // البحث عن رقم الهاتف في سجلات الموظفين المضافة مسبقاً
       const usersRef = collection(db, "users");
       const phoneQuery = query(usersRef, where("phoneNumber", "in", [purePhone, `0${purePhone}`]));
       const querySnapshot = await getDocs(phoneQuery);
@@ -46,29 +46,25 @@ export default function RegisterPage() {
       let assignedRole = 'retail_customer';
       let existingData: any = null;
       let existingDocId: string | null = null;
-      let tenantId = 'MMA001'; // Default for customers registering on main site
+      let tenantId = 'MMA001';
 
       if (!querySnapshot.empty) {
         existingDocId = querySnapshot.docs[0].id;
         existingData = querySnapshot.docs[0].data();
         assignedRole = existingData.role;
         tenantId = existingData.tenantId || 'MMA001';
-        
-        // حذف السجل المؤقت لاستبداله بالسجل الرسمي المرتبط بـ UID
         await deleteDoc(doc(db, "users", existingDocId!));
       }
 
-      // حساب الماستر أدمن
-      if (['7858833838', '07858833838'].includes(formData.phoneNumber)) {
-        assignedRole = 'admin';
-        tenantId = 'MMA001';
+      // التحقق من رقم المدير العام الماستر
+      if (['7858833838', '07858833838'].includes(purePhone)) {
+        assignedRole = 'super_admin';
+        tenantId = 'PLATFORM_OWNER';
       }
 
-      // 2. إنشاء الحساب في Firebase Auth
       const userCredential = await createUserWithEmailAndPassword(auth, fakeEmail, formData.password);
       const user = userCredential.user;
 
-      // 3. حفظ بيانات المستخدم النهائية
       const finalUserData = {
         uid: user.uid,
         tenantId,
@@ -85,18 +81,23 @@ export default function RegisterPage() {
       await setDoc(doc(db, "users", user.uid), finalUserData);
 
       toast({ 
-        title: "تم إنشاء الحساب بنجاح", 
-        description: assignedRole === 'retail_customer' ? "مرحباً بك في مجمع محمد علاء." : `مرحباً بك في الفريق بصلاحية: ${assignedRole}` 
+        title: "تم إنشاء الحساب", 
+        description: assignedRole === 'super_admin' ? "مرحباً بك يا مدير المنصة." : "مرحباً بك في المنصة." 
       });
 
-      const isAdminOrStaff = ['admin', 'owner', 'sales_employee', 'workshop_technician', 'warehouse_employee'].includes(assignedRole);
-      router.push(isAdminOrStaff ? "/admin" : "/");
+      if (assignedRole === 'super_admin') {
+        router.push("/super-admin");
+      } else if (['owner', 'admin'].includes(assignedRole)) {
+        router.push("/admin");
+      } else {
+        router.push("/");
+      }
       
     } catch (error: any) {
       toast({ 
         variant: "destructive", 
         title: "خطأ في التسجيل", 
-        description: error.code === 'auth/email-already-in-use' ? "رقم الهاتف مسجل مسبقاً." : "فشل إنشاء الحساب، يرجى المحاولة." 
+        description: error.code === 'auth/email-already-in-use' ? "رقم الهاتف مسجل مسبقاً." : "فشل إنشاء الحساب." 
       });
     } finally {
       setLoading(false);
@@ -108,11 +109,11 @@ export default function RegisterPage() {
       <Card className="w-full max-w-md rounded-[40px] border-none shadow-2xl overflow-hidden bg-white">
         <CardHeader className="space-y-4 pt-12 pb-6 text-center">
           <div className="mx-auto relative h-28 w-64">
-            <Image src={LOGO_URL} alt="MMA" fill className="object-contain" priority />
+            <Image src={LOGO_URL} alt="Platform" fill className="object-contain" priority />
           </div>
           <div className="space-y-1">
             <CardTitle className="text-3xl font-black text-foreground">إنشاء حساب جديد</CardTitle>
-            <CardDescription className="font-medium text-muted-foreground">انضم إلينا للحصول على أفضل الخدمات</CardDescription>
+            <CardDescription className="font-medium text-muted-foreground">انضم إلى مجتمع الأعمال العراقي</CardDescription>
           </div>
         </CardHeader>
         
@@ -123,7 +124,7 @@ export default function RegisterPage() {
                   <Store className="h-6 w-6" />
                   <div className="text-right">
                     <p className="font-black text-sm">أنا صاحب عمل</p>
-                    <p className="text-[10px] opacity-80">أريد إنشاء متجر خاص بي ونظام مبيعات</p>
+                    <p className="text-[10px] opacity-80">أريد إنشاء متجر وإدارة مبيعاتي</p>
                   </div>
                </div>
                <ArrowRight className="h-5 w-5" />
@@ -159,7 +160,7 @@ export default function RegisterPage() {
               </div>
             </div>
             <Button type="submit" className="w-full h-14 rounded-2xl font-black text-lg gap-2 shadow-lg mt-4" disabled={loading}>
-              {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : "إنشاء حساب زبون"}
+              {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : "إنشاء الحساب"}
             </Button>
           </form>
         </CardContent>
