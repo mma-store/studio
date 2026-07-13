@@ -42,10 +42,11 @@ export default function SuperAdminLayout({ children }: { children: React.ReactNo
 
   if (loading) {
     return (
-      <div className="flex h-screen w-full items-center justify-center bg-slate-900">
-         <div className="flex flex-col items-center gap-4">
-            <div className="h-16 w-16 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-            <p className="text-white font-black">جاري التحقق من صلاحيات المنصة...</p>
+      <div className="flex h-screen w-full flex-col items-center justify-center bg-slate-900 gap-6">
+         <div className="h-16 w-16 border-4 border-primary border-t-transparent rounded-full animate-spin shadow-2xl shadow-primary/20" />
+         <div className="text-center space-y-2">
+            <p className="text-white font-black text-xl">جاري الدخول لمنطقة الإدارة العليا</p>
+            <p className="text-white/40 text-xs font-bold uppercase tracking-widest">Master Identity Verification</p>
          </div>
       </div>
     );
@@ -55,16 +56,19 @@ export default function SuperAdminLayout({ children }: { children: React.ReactNo
     return (
       <div className="flex min-h-screen items-center justify-center p-6 bg-slate-50" dir="rtl">
         <div className="max-w-md w-full space-y-6 text-center">
-          <div className="h-24 w-24 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto shadow-inner">
+          <div className="h-24 w-24 bg-red-100 text-red-600 rounded-[32px] flex items-center justify-center mx-auto shadow-inner">
             <ShieldAlert className="h-12 w-12" />
           </div>
           <div className="space-y-2">
-            <h1 className="text-2xl font-black">منطقة محظورة</h1>
-            <p className="text-muted-foreground font-medium">هذه المنطقة مخصصة لإدارة المنصة فقط. لا تمتلك صلاحيات الدخول.</p>
+            <h1 className="text-2xl font-black text-slate-900">منطقة محظورة تماماً</h1>
+            <p className="text-muted-foreground font-medium">هذه المنطقة مخصصة لإدارة المنصة السحابية فقط. تم تسجيل محاولة الدخول غير المصرح بها.</p>
           </div>
-          <Button onClick={() => router.replace('/admin')} className="w-full h-14 rounded-2xl font-black">
-             العودة للوحة التحكم الخاصة بمتجري
-          </Button>
+          <div className="grid gap-3 pt-4">
+             <Button onClick={() => router.replace('/admin')} className="w-full h-14 rounded-2xl font-black text-lg shadow-xl shadow-primary/20">
+                العودة للوحة التحكم الخاصة بمتجري
+             </Button>
+             <Button variant="ghost" onClick={() => signOut(auth)} className="font-bold text-red-600">تسجيل الخروج</Button>
+          </div>
         </div>
       </div>
     );
@@ -74,11 +78,11 @@ export default function SuperAdminLayout({ children }: { children: React.ReactNo
 
   return (
     <SidebarProvider>
-      <div className="flex min-h-screen w-full bg-[#F1F5F9] dark:bg-slate-950 overflow-hidden">
+      <div className="flex min-h-screen w-full bg-[#F8FAFC] dark:bg-slate-950 overflow-hidden" dir="rtl">
         <SuperAdminSidebar />
         <SidebarInset className="flex flex-col min-w-0">
           <SuperAdminHeader />
-          <main className="flex-1 p-4 md:p-8 overflow-y-auto">
+          <main className="flex-1 p-4 md:p-8 lg:p-12 overflow-y-auto bg-slate-50/50">
             <div className="mx-auto max-w-7xl w-full">
               {children}
             </div>
