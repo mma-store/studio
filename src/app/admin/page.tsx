@@ -10,7 +10,10 @@ import {
   ArrowUpRight, 
   Package, 
   MoreVertical,
-  Loader2
+  Loader2,
+  PlusCircle,
+  Settings,
+  Rocket
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { 
@@ -31,51 +34,98 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 import { cn } from "@/lib/utils";
-import { useFirestore, useCollection } from "@/firebase";
-import { collection, query, orderBy, limit } from "firebase/firestore";
+import { useFirestore, useCollection, useUser } from "@/firebase";
+import { collection, query, orderBy, limit, where } from "firebase/firestore";
 import { useMemo } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import Link from "next/link";
 
 const DATA = [
-  { name: "سبت", sales: 4000 },
-  { name: "أحد", sales: 3000 },
-  { name: "اثنين", sales: 2000 },
-  { name: "ثلاثاء", sales: 2780 },
-  { name: "أربعاء", sales: 1890 },
-  { name: "خميس", sales: 2390 },
-  { name: "جمعة", sales: 3490 },
+  { name: "سبت", sales: 0 },
+  { name: "أحد", sales: 0 },
+  { name: "اثنين", sales: 0 },
+  { name: "ثلاثاء", sales: 0 },
+  { name: "أربعاء", sales: 0 },
+  { name: "خميس", sales: 0 },
+  { name: "جمعة", sales: 0 },
 ];
 
 export default function AdminDashboard() {
   const db = useFirestore();
+  const { tenantId, profile } = useUser();
   
   const recentOrdersQuery = useMemo(() => 
-    query(collection(db, 'orders'), orderBy('createdAt', 'desc'), limit(5)), 
-  [db]);
+    query(collection(db, 'orders'), where('tenantId', '==', tenantId), orderBy('createdAt', 'desc'), limit(5)), 
+  [db, tenantId]);
   const { data: recentOrders, loading: ordersLoading } = useCollection(recentOrdersQuery);
 
   const lowStockQuery = useMemo(() => 
-    query(collection(db, 'products'), orderBy('stock', 'asc'), limit(4)), 
-  [db]);
+    query(collection(db, 'products'), where('tenantId', '==', tenantId), orderBy('stock', 'asc'), limit(4)), 
+  [db, tenantId]);
   const { data: lowStockProducts, loading: stockLoading } = useCollection(lowStockQuery);
 
-  const allOrdersQuery = useMemo(() => query(collection(db, 'orders')), [db]);
+  const allOrdersQuery = useMemo(() => query(collection(db, 'orders'), where('tenantId', '==', tenantId)), [db, tenantId]);
   const { data: allOrders } = useCollection(allOrdersQuery);
 
-  const allUsersQuery = useMemo(() => query(collection(db, 'users')), [db]);
+  const allUsersQuery = useMemo(() => query(collection(db, 'users'), where('tenantId', '==', tenantId)), [db, tenantId]);
   const { data: allUsers } = useCollection(allUsersQuery);
 
   const totalSales = useMemo(() => {
     return allOrders.reduce((acc, order: any) => acc + (order.total || 0), 0);
   }, [allOrders]);
 
+  const isNewStore = useMemo(() => {
+    return allOrders.length === 0 && lowStockProducts.length === 0;
+  }, [allOrders, lowStockProducts]);
+
+  if (isNewStore && !ordersLoading && !stockLoading) {
+    return (
+      <div className="space-y-8 animate-in fade-in duration-500">
+        <div className="flex flex-col items-center justify-center p-12 text-center bg-white rounded-[40px] shadow-sm border space-y-6">
+           <div className="h-24 w-24 bg-primary/10 rounded-full flex items-center justify-center text-primary animate-bounce">
+              <Rocket className="h-12 w-12" />
+           </div>
+           <div className="space-y-2">
+              <h1 className="text-4xl font-black">أهلاً بك في متجرك الجديد!</h1>
+              <p className="text-muted-foreground font-medium text-lg max-w-lg mx-auto">
+                لقد قمت بتأسيس متجرك بنجاح. اتبع الخطوات التالية للبدء في البيع واستخدام لوحة التحكم.
+              </p>
+           </div>
+           
+           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-4xl pt-8">
+              <Link href="/admin/products" className="group">
+                 <div className="p-8 rounded-[32px] bg-muted/30 border-2 border-transparent hover:border-primary/20 transition-all text-right space-y-4">
+                    <PlusCircle className="h-10 w-10 text-primary" />
+                    <h3 className="font-black text-xl">أضف منتجاتك</h3>
+                    <p className="text-xs text-muted-foreground font-bold">ابدأ بإضافة الأصناف المتوفرة في مخزنك لتتمكن من بيعها.</p>
+                 </div>
+              </Link>
+              <Link href="/admin/settings" className="group">
+                 <div className="p-8 rounded-[32px] bg-muted/30 border-2 border-transparent hover:border-primary/20 transition-all text-right space-y-4">
+                    <Settings className="h-10 w-10 text-blue-600" />
+                    <h3 className="font-black text-xl">ضبط الإعدادات</h3>
+                    <p className="text-xs text-muted-foreground font-bold">أضف رقم الواتساب، الشعار، وعنوان المحل لتظهر في فواتيرك.</p>
+                 </div>
+              </Link>
+              <Link href="/admin/pos" className="group">
+                 <div className="p-8 rounded-[32px] bg-primary text-white transition-all hover:scale-[1.02] shadow-xl shadow-primary/20 text-right space-y-4">
+                    <BadgeDollarSign className="h-10 w-10" />
+                    <h3 className="font-black text-xl">ابدأ البيع (POS)</h3>
+                    <p className="text-xs opacity-80 font-bold">استخدم واجهة نقطة البيع لبيع المنتجات وإصدار الفواتير فوراً.</p>
+                 </div>
+              </Link>
+           </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div className="space-y-1">
           <h1 className="text-3xl font-black tracking-tight text-foreground">لوحة التحكم</h1>
-          <p className="text-muted-foreground font-medium text-sm">مرحباً بك مجدداً، إليك ملخص أداء المجمع اليوم.</p>
+          <p className="text-muted-foreground font-medium text-sm">مرحباً {profile?.displayName}، إليك ملخص أداء متجرك اليوم.</p>
         </div>
         <div className="flex items-center gap-3">
            <Link href="/admin/reports">
@@ -120,7 +170,7 @@ export default function AdminDashboard() {
           <CardHeader className="flex flex-row items-center justify-between">
              <div className="space-y-1">
                <CardTitle className="text-xl font-black">نظرة عامة على المبيعات</CardTitle>
-               <CardDescription className="font-medium">تحليل المبيعات الأسبوعي للمجمع</CardDescription>
+               <CardDescription className="font-medium">تحليل المبيعات الأسبوعي</CardDescription>
              </div>
              <Button variant="ghost" size="icon" className="rounded-xl"><MoreVertical className="h-5 w-5" /></Button>
           </CardHeader>
@@ -202,84 +252,6 @@ export default function AdminDashboard() {
           </CardContent>
         </Card>
       </div>
-
-      <Card className="rounded-[32px] border-none shadow-sm overflow-hidden bg-white dark:bg-card">
-        <CardHeader className="flex flex-row items-center justify-between">
-           <div className="space-y-1">
-             <CardTitle className="text-xl font-black">أحدث الطلبات</CardTitle>
-             <CardDescription className="font-medium">آخر الطلبات التي تم استلامها عبر المنصة</CardDescription>
-           </div>
-           <Link href="/admin/orders">
-             <Button variant="outline" className="rounded-xl font-bold h-10 border-2 px-6">عرض كل الطلبات</Button>
-           </Link>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="border-b bg-muted/30 hover:bg-muted/30">
-                  <TableHead className="text-right font-black text-xs uppercase tracking-widest text-foreground">رقم الطلب</TableHead>
-                  <TableHead className="text-right font-black text-xs uppercase tracking-widest text-foreground">العميل</TableHead>
-                  <TableHead className="text-right font-black text-xs uppercase tracking-widest text-foreground">المبلغ</TableHead>
-                  <TableHead className="text-right font-black text-xs uppercase tracking-widest text-foreground">الحالة</TableHead>
-                  <TableHead className="text-right font-black text-xs uppercase tracking-widest text-foreground">التاريخ</TableHead>
-                  <TableHead className="text-left font-black text-xs uppercase tracking-widest text-foreground">إجراءات</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {ordersLoading ? (
-                   Array(5).fill(0).map((_, i) => (
-                     <TableRow key={i}>
-                       <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-                       <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-                       <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                       <TableCell><Skeleton className="h-6 w-20 rounded-full" /></TableCell>
-                       <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                       <TableCell><Skeleton className="h-8 w-8 rounded-lg" /></TableCell>
-                     </TableRow>
-                   ))
-                ) : recentOrders.length > 0 ? (
-                  recentOrders.map((order: any) => (
-                    <TableRow key={order.id} className="hover:bg-muted/10 transition-colors">
-                      <TableCell className="font-bold text-sm">{order.orderNumber}</TableCell>
-                      <TableCell className="font-medium">{order.customerName}</TableCell>
-                      <TableCell className="font-black text-primary">{order.total?.toLocaleString()} د.ع</TableCell>
-                      <TableCell>
-                        <Badge className={cn(
-                          "rounded-full px-3 py-1 border-none font-bold text-[10px]",
-                          order.status === 'pending' ? "bg-orange-100 text-orange-700" :
-                          order.status === 'confirmed' ? "bg-blue-100 text-blue-700" :
-                          order.status === 'preparing' ? "bg-purple-100 text-purple-700" :
-                          "bg-green-100 text-green-700"
-                        )}>
-                           {order.status === 'pending' && "قيد الانتظار"}
-                           {order.status === 'confirmed' && "مؤكد"}
-                           {order.status === 'preparing' && "جاري التجهيز"}
-                           {order.status === 'delivered' && "تم التسليم"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground text-xs font-bold">
-                         {new Date(order.createdAt).toLocaleDateString("ar-EG")}
-                      </TableCell>
-                      <TableCell className="text-left">
-                         <Link href="/admin/orders">
-                           <Button variant="ghost" size="icon" className="rounded-xl hover:bg-primary/10 text-primary">
-                             <ArrowUpRight className="h-4 w-4" />
-                           </Button>
-                         </Link>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                ) : (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center py-10 opacity-50 font-bold">لا توجد طلبات بعد.</TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }

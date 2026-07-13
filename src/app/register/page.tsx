@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { toast } from "@/hooks/use-toast";
-import { User, Phone, Lock, Loader2 } from "lucide-react";
+import { User, Phone, Lock, Loader2, Store } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 
@@ -36,7 +36,7 @@ export default function RegisterPage() {
 
     try {
       const purePhone = cleanPhone(formData.phoneNumber);
-      const fakeEmail = `${purePhone}@mma.store`;
+      const fakeEmail = `${purePhone}@platform.store`;
 
       // 1. البحث عن رقم الهاتف في سجلات الموظفين المضافة مسبقاً
       const usersRef = collection(db, "users");
@@ -46,11 +46,13 @@ export default function RegisterPage() {
       let assignedRole = 'retail_customer';
       let existingData: any = null;
       let existingDocId: string | null = null;
+      let tenantId = 'MMA001'; // Default for customers registering on main site
 
       if (!querySnapshot.empty) {
         existingDocId = querySnapshot.docs[0].id;
         existingData = querySnapshot.docs[0].data();
         assignedRole = existingData.role;
+        tenantId = existingData.tenantId || 'MMA001';
         
         // حذف السجل المؤقت لاستبداله بالسجل الرسمي المرتبط بـ UID
         await deleteDoc(doc(db, "users", existingDocId!));
@@ -59,6 +61,7 @@ export default function RegisterPage() {
       // حساب الماستر أدمن
       if (['7858833838', '07858833838'].includes(formData.phoneNumber)) {
         assignedRole = 'admin';
+        tenantId = 'MMA001';
       }
 
       // 2. إنشاء الحساب في Firebase Auth
@@ -68,6 +71,7 @@ export default function RegisterPage() {
       // 3. حفظ بيانات المستخدم النهائية
       const finalUserData = {
         uid: user.uid,
+        tenantId,
         displayName: formData.displayName || existingData?.displayName || "مستخدم",
         phoneNumber: `0${purePhone}`,
         email: fakeEmail,
@@ -85,7 +89,7 @@ export default function RegisterPage() {
         description: assignedRole === 'retail_customer' ? "مرحباً بك في مجمع محمد علاء." : `مرحباً بك في الفريق بصلاحية: ${assignedRole}` 
       });
 
-      const isAdminOrStaff = ['admin', 'sales_employee', 'workshop_technician', 'warehouse_employee'].includes(assignedRole);
+      const isAdminOrStaff = ['admin', 'owner', 'sales_employee', 'workshop_technician', 'warehouse_employee'].includes(assignedRole);
       router.push(isAdminOrStaff ? "/admin" : "/");
       
     } catch (error: any) {
@@ -108,17 +112,36 @@ export default function RegisterPage() {
           </div>
           <div className="space-y-1">
             <CardTitle className="text-3xl font-black text-foreground">إنشاء حساب جديد</CardTitle>
-            <CardDescription className="font-medium text-muted-foreground">انضم إلينا للحصول على أفضل خدمات الصيانة</CardDescription>
+            <CardDescription className="font-medium text-muted-foreground">انضم إلينا للحصول على أفضل الخدمات</CardDescription>
           </div>
         </CardHeader>
         
-        <CardContent className="px-8">
+        <CardContent className="px-8 space-y-6">
+          <Link href="/onboarding">
+            <div className="p-4 rounded-2xl bg-primary text-white shadow-xl shadow-primary/20 flex items-center justify-between group hover:scale-[1.02] transition-transform">
+               <div className="flex items-center gap-3">
+                  <Store className="h-6 w-6" />
+                  <div className="text-right">
+                    <p className="font-black text-sm">أنا صاحب عمل</p>
+                    <p className="text-[10px] opacity-80">أريد إنشاء متجر خاص بي ونظام مبيعات</p>
+                  </div>
+               </div>
+               <ArrowRight className="h-5 w-5" />
+            </div>
+          </Link>
+
+          <div className="relative flex items-center py-2">
+            <div className="flex-grow border-t border-muted-foreground/20"></div>
+            <span className="flex-shrink mx-4 text-muted-foreground text-xs font-bold uppercase tracking-widest">أو كزبون</span>
+            <div className="flex-grow border-t border-muted-foreground/20"></div>
+          </div>
+
           <form onSubmit={handleRegister} className="space-y-4">
             <div className="space-y-2">
               <Label className="font-bold mr-1">الاسم الكامل</Label>
               <div className="relative">
                 <User className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                <Input placeholder="محمد علاء" className="h-14 rounded-2xl pr-12 bg-muted/20 border-none font-bold" value={formData.displayName} onChange={(e) => setFormData({...formData, displayName: e.target.value})} required />
+                <Input placeholder="الاسم الكامل" className="h-14 rounded-2xl pr-12 bg-muted/20 border-none font-bold" value={formData.displayName} onChange={(e) => setFormData({...formData, displayName: e.target.value})} required />
               </div>
             </div>
             <div className="space-y-2">
@@ -136,7 +159,7 @@ export default function RegisterPage() {
               </div>
             </div>
             <Button type="submit" className="w-full h-14 rounded-2xl font-black text-lg gap-2 shadow-lg mt-4" disabled={loading}>
-              {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : "إنشاء الحساب الآن"}
+              {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : "إنشاء حساب زبون"}
             </Button>
           </form>
         </CardContent>
