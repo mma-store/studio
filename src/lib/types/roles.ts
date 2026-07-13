@@ -1,5 +1,7 @@
 
 export type UserRole = 
+  | 'super_admin'
+  | 'owner' 
   | 'admin' 
   | 'sales_employee' 
   | 'workshop_technician' 
@@ -16,10 +18,14 @@ export interface UserProfile {
   photoURL?: string;
   createdAt: number;
   tenantId: string; // The ID of the business/tenant this user belongs to
+  currentBalance?: number;
+  totalPaid?: number;
 }
 
 export const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
+  super_admin: ['all_platform'],
   admin: ['all'],
+  owner: ['all'],
   sales_employee: [
     'view_catalog', 
     'create_order', 
