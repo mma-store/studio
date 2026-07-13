@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
-import { Loader2, Lock, Phone, Mail } from "lucide-react";
+import { Loader2, Lock, Phone, Mail, HelpCircle } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 
@@ -22,6 +22,7 @@ export default function LoginPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const LOGO_URL = "https://up6.cc/2026/07/178308238964931.png";
+  const MASTER_ADMIN_PHONE = "07858833838";
   
   const [phoneNumber, setPhoneNumber] = useState("");
   const [email, setEmail] = useState("");
@@ -37,11 +38,9 @@ export default function LoginPage() {
     const fakeEmail = `${purePhone}@platform.store`;
 
     try {
-      // محاولة تسجيل الدخول العادي
       const userCredential = await signInWithEmailAndPassword(auth, fakeEmail, password);
       const user = userCredential.user;
       
-      // جلب بيانات المستخدم لمعرفة التوجيه
       const userSnap = await getDoc(doc(db, "users", user.uid));
       const userData = userSnap.data();
 
@@ -57,7 +56,6 @@ export default function LoginPage() {
         router.push("/");
       }
     } catch (error: any) {
-      // إذا لم يكن الحساب موجوداً في Auth، نتحقق من وجوده كموظف مضاف يدوياً
       if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
         try {
           const usersRef = collection(db, "users");
@@ -129,7 +127,7 @@ export default function LoginPage() {
           </div>
           <div className="space-y-1">
             <CardTitle className="text-3xl font-black">بوابة الأعمال</CardTitle>
-            <CardDescription className="font-medium">سجل دخولك لإدارة متجرك ومبيعاتك</CardDescription>
+            <CardDescription className="font-medium">سجل دخولك لإدارة المنصة أو متجرك</CardDescription>
           </div>
         </CardHeader>
         
@@ -150,7 +148,16 @@ export default function LoginPage() {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label className="font-bold mr-1">كلمة المرور</Label>
+                  <div className="flex justify-between items-center px-1">
+                    <Label className="font-bold">كلمة المرور</Label>
+                    <a 
+                      href={`https://wa.me/9647858833838?text=${encodeURIComponent('أهلاً مدير المنصة، نسيت كلمة المرور الخاصة بحسابي.')}`}
+                      target="_blank"
+                      className="text-[10px] font-bold text-primary hover:underline flex items-center gap-1"
+                    >
+                      <HelpCircle className="h-3 w-3" /> نسيت كلمة المرور؟
+                    </a>
+                  </div>
                   <div className="relative">
                     <Lock className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                     <Input type="password" placeholder="••••••••" className="h-14 rounded-2xl pr-12 bg-muted/20 border-none" value={password} onChange={(e) => setPassword(e.target.value)} required />
