@@ -12,7 +12,7 @@ import {
   Check, 
   ArrowRight,
   ChevronDown,
-  Zap,
+  Zap, 
   ShieldCheck,
   Globe,
   LayoutDashboard,
@@ -20,7 +20,8 @@ import {
   Smartphone,
   CreditCard,
   History,
-  MousePointerClick
+  MousePointerClick,
+  ShoppingCart
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
