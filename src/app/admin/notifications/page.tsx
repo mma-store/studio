@@ -1,4 +1,3 @@
-
 'use client';
 
 import { 
@@ -27,18 +26,24 @@ import {
 import { useState, useMemo } from "react";
 import { toast } from "@/hooks/use-toast";
 import { useFirestore, useCollection, useUser } from "@/firebase";
-import { collection, addDoc, query, orderBy, limit } from "firebase/firestore";
+import { collection, addDoc, query, orderBy, limit, where } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function NotificationsPage() {
   const db = useFirestore();
-  const { profile } = useUser();
+  const { profile, tenantId } = useUser();
   const [isSending, setIsSending] = useState(false);
   const [title, setTitle] = useState("");
   const [message, setMessage] = useState("");
   const [target, setTarget] = useState("all");
 
-  const historyQuery = useMemo(() => query(collection(db, 'notifications'), orderBy('timestamp', 'desc'), limit(10)), [db]);
+  // FIXED: Scoped to tenantId
+  const historyQuery = useMemo(() => query(
+    collection(db, 'notifications'), 
+    where('tenantId', '==', tenantId),
+    orderBy('timestamp', 'desc'), 
+    limit(10)
+  ), [db, tenantId]);
   const { data: history, loading } = useCollection(historyQuery);
 
   const handleSend = async (e: React.FormEvent) => {
@@ -46,6 +51,7 @@ export default function NotificationsPage() {
     setIsSending(true);
     try {
       await addDoc(collection(db, 'notifications'), {
+        tenantId,
         title,
         message,
         target,

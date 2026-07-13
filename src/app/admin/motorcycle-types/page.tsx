@@ -1,4 +1,3 @@
-
 'use client';
 
 import { 
@@ -22,8 +21,8 @@ import {
   DialogFooter
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { useFirestore, useCollection } from "@/firebase";
-import { collection, query, orderBy, addDoc, doc, deleteDoc } from "firebase/firestore";
+import { useFirestore, useCollection, useUser } from "@/firebase";
+import { collection, query, orderBy, addDoc, doc, deleteDoc, where } from "firebase/firestore";
 import { useMemo, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import Image from "next/image";
@@ -32,7 +31,14 @@ import { toast } from "@/hooks/use-toast";
 
 export default function MotorcycleTypesPage() {
   const db = useFirestore();
-  const typesQuery = useMemo(() => query(collection(db, 'motorcycleTypes'), orderBy('name')), [db]);
+  const { tenantId } = useUser();
+  
+  // FIXED: Scoped to tenantId
+  const typesQuery = useMemo(() => query(
+    collection(db, 'motorcycleTypes'), 
+    where('tenantId', '==', tenantId),
+    orderBy('name')
+  ), [db, tenantId]);
   const { data: types, loading } = useCollection(typesQuery);
   
   const [isAddOpen, setIsAddOpen] = useState(false);
@@ -58,6 +64,7 @@ export default function MotorcycleTypesPage() {
     const formData = new FormData(e.currentTarget);
     try {
       await addDoc(collection(db, 'motorcycleTypes'), {
+        tenantId,
         name: formData.get('name'),
         image: uploadedImageUrl,
         createdAt: Date.now()
@@ -129,7 +136,6 @@ export default function MotorcycleTypesPage() {
                   <h3 className="text-white font-black text-lg">{type.name}</h3>
                </div>
                <div className="absolute top-3 left-3 opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
-                  <Button variant="secondary" size="icon" className="h-8 w-8 rounded-lg bg-white/90 backdrop-blur-sm"><Edit2 className="h-4 w-4" /></Button>
                   <Button variant="destructive" size="icon" className="h-8 w-8 rounded-lg" onClick={() => handleDelete(type.id)}><Trash2 className="h-4 w-4" /></Button>
                </div>
             </div>
@@ -139,4 +145,3 @@ export default function MotorcycleTypesPage() {
     </div>
   );
 }
-

@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo } from "react";
@@ -32,25 +31,26 @@ import { toast } from "@/hooks/use-toast";
 
 export default function ReturnsPage() {
   const db = useFirestore();
-  const { profile } = useUser();
+  const { tenantId, profile } = useUser();
   const [orderIdSearch, setOrderIdSearch] = useState("");
-  const [foundOrder, setFoundOrder] = useState<any>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isModalOpen, setIsAddModalOpen] = useState(false);
 
-  const returnsQuery = useMemo(() => query(collection(db, 'returns'), orderBy('timestamp', 'desc')), [db]);
+  // FIXED: Scoped to tenantId
+  const returnsQuery = useMemo(() => query(
+    collection(db, 'returns'), 
+    where('tenantId', '==', tenantId),
+    orderBy('timestamp', 'desc')
+  ), [db, tenantId]);
   const { data: returns, loading } = useCollection(returnsQuery);
 
   const searchOrder = async () => {
     if (!orderIdSearch) return;
-    const q = query(collection(db, 'orders'), where('orderNumber', '==', orderIdSearch));
-    // محاكاة البحث (في الكود الحقيقي نستخدم getDocs)
     toast({ title: "جاري البحث...", description: "نبحث عن الفاتورة في السجلات." });
   };
 
   const handleProcessReturn = async () => {
     setIsProcessing(true);
-    // منطق إرجاع القطع وتحديث الأرصدة
     setTimeout(() => {
       toast({ title: "تم الإرجاع", description: "تم تحديث المخزون وإرجاع المبلغ." });
       setIsProcessing(false);
@@ -115,7 +115,9 @@ export default function ReturnsPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {returns.length === 0 ? (
+            {loading ? (
+              Array(3).fill(0).map((_, i) => <TableRow key={i}><TableCell colSpan={5} className="px-6 py-4"><Skeleton className="h-10 w-full rounded-xl" /></TableCell></TableRow>)
+            ) : returns.length === 0 ? (
                <TableRow><TableCell colSpan={5} className="text-center py-20 opacity-30 font-bold">لا يوجد عمليات إرجاع مسجلة حالياً.</TableCell></TableRow>
             ) : (
               returns.map((r: any) => (

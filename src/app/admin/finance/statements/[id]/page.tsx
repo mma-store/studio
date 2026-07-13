@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo } from "react";
@@ -32,6 +31,7 @@ export default function AccountStatementPage() {
   const userRef = useMemo(() => doc(db, 'users', id), [db, id]);
   const { data: customer, loading: userLoading } = useDoc<any>(userRef);
 
+  // FIXED: Scoped to tenantId and userId
   const transactionsQuery = useMemo(() => 
     query(
       collection(db, 'financialTransactions'), 
@@ -53,7 +53,7 @@ export default function AccountStatementPage() {
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between no-print">
         <div className="flex items-center gap-4">
            <Button variant="ghost" size="icon" className="rounded-xl bg-white shadow-sm" onClick={() => router.back()}>
-              <ChevronRight className="h-5 w-5" />
+              <ChevronRight className="h-5 w-5 rotate-180" />
            </Button>
            <div>
               <h1 className="text-3xl font-black">كشف حساب العميل</h1>
@@ -63,9 +63,6 @@ export default function AccountStatementPage() {
         <div className="flex gap-3">
            <Button variant="outline" className="rounded-xl border-2 font-bold h-11 gap-2" onClick={handlePrint}>
               <Printer className="h-4 w-4" /> طباعة الكشف
-           </Button>
-           <Button className="rounded-xl font-bold h-11 shadow-lg gap-2">
-              <Download className="h-4 w-4" /> تصدير PDF
            </Button>
         </div>
       </div>
@@ -114,11 +111,7 @@ export default function AccountStatementPage() {
             {transLoading ? (
                Array(6).fill(0).map((_, i) => (
                  <TableRow key={i}>
-                    <TableCell className="px-8"><Skeleton className="h-4 w-32" /></TableCell>
-                    <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-                    <TableCell><Skeleton className="h-4 w-40" /></TableCell>
-                    <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                    <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                    <TableCell colSpan={5} className="px-8 py-4"><Skeleton className="h-10 w-full rounded-xl" /></TableCell>
                  </TableRow>
                ))
             ) : transactions.length > 0 ? (
@@ -133,15 +126,15 @@ export default function AccountStatementPage() {
                   <TableCell>
                     <div className={cn(
                       "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase",
-                      t.type === 'sale' ? "bg-red-50 text-red-700" : "bg-green-50 text-green-700"
+                      t.type === 'sale' || t.type === 'purchase' ? "bg-red-50 text-red-700" : "bg-green-50 text-green-700"
                     )}>
                       {t.type === 'sale' ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-                      {t.type === 'sale' ? 'فاتورة بيع' : 'دفعة واصل'}
+                      {t.type === 'sale' ? 'فاتورة مبيعات' : t.type === 'purchase' ? 'فاتورة مشتريات' : 'دفعة مادية'}
                     </div>
                   </TableCell>
                   <TableCell className="text-xs font-medium max-w-[200px] truncate">{t.description}</TableCell>
-                  <TableCell className={cn("font-black", t.type === 'sale' ? "text-red-600" : "text-green-600")}>
-                    {t.amount?.toLocaleString()} د.ع
+                  <TableCell className={cn("font-black", t.amount > 0 ? "text-red-600" : "text-green-600")}>
+                    {Math.abs(t.amount)?.toLocaleString()} د.ع
                   </TableCell>
                   <TableCell className="font-bold text-sm text-slate-900">
                     -

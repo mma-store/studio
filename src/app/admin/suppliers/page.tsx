@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect } from "react";
@@ -26,19 +25,25 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { useFirestore, useCollection } from "@/firebase";
-import { collection, query, orderBy, addDoc, deleteDoc, doc, updateDoc } from "firebase/firestore";
+import { useFirestore, useCollection, useUser } from "@/firebase";
+import { collection, query, orderBy, addDoc, deleteDoc, doc, updateDoc, where } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/hooks/use-toast";
 
 export default function SuppliersPage() {
   const db = useFirestore();
+  const { tenantId } = useUser();
   const [search, setSearch] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<any>(null);
   const [isSaving, setIsSaving] = useState(false);
 
-  const suppliersQuery = useMemo(() => query(collection(db, 'suppliers'), orderBy('name')), [db]);
+  // FIXED: Scoped to tenantId
+  const suppliersQuery = useMemo(() => query(
+    collection(db, 'suppliers'), 
+    where('tenantId', '==', tenantId),
+    orderBy('name')
+  ), [db, tenantId]);
   const { data: suppliers, loading } = useCollection(suppliersQuery);
 
   useEffect(() => {
@@ -54,6 +59,7 @@ export default function SuppliersPage() {
     setIsSaving(true);
     const formData = new FormData(e.currentTarget);
     const supplierData = {
+      tenantId,
       name: formData.get('name'),
       phone: formData.get('phone'),
       address: formData.get('address'),
@@ -148,7 +154,7 @@ export default function SuppliersPage() {
           </TableHeader>
           <TableBody>
             {loading ? (
-              Array(4).fill(0).map((_, i) => <TableRow key={i}><TableCell colSpan={4}><Skeleton className="h-12 w-full" /></TableCell></TableRow>)
+              Array(4).fill(0).map((_, i) => <TableRow key={i}><TableCell colSpan={4}><Skeleton className="h-12 w-full rounded-xl" /></TableCell></TableRow>)
             ) : filtered.length > 0 ? (
               filtered.map((s: any) => (
               <TableRow key={s.id}>

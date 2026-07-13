@@ -38,7 +38,7 @@ import {
 } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useFirestore, useCollection, useUser } from "@/firebase";
-import { collection, query, orderBy, doc, writeBatch, increment, addDoc, serverTimestamp } from "firebase/firestore";
+import { collection, query, orderBy, doc, writeBatch, increment, addDoc, serverTimestamp, where } from "firebase/firestore";
 import { toast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -46,7 +46,7 @@ import { cn } from "@/lib/utils";
 export default function NewPurchaseInvoicePage() {
   const db = useFirestore();
   const router = useRouter();
-  const { profile } = useUser();
+  const { profile, tenantId } = useUser();
   const [isSaving, setIsSaving] = useState(false);
   const [cart, setCart] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -59,8 +59,18 @@ export default function NewPurchaseInvoicePage() {
   const [isNewProductOpen, setIsNewProductOpen] = useState(false);
   const [priceChangeDialog, setPriceChangeDialog] = useState<{ open: boolean; product: any; newCost: number } | null>(null);
 
-  const suppliersQuery = useMemo(() => query(collection(db, 'suppliers'), orderBy('name')), [db]);
-  const productsQuery = useMemo(() => query(collection(db, 'products'), orderBy('name')), [db]);
+  // FIXED: Scoped to tenantId
+  const suppliersQuery = useMemo(() => query(
+    collection(db, 'suppliers'), 
+    where('tenantId', '==', tenantId),
+    orderBy('name')
+  ), [db, tenantId]);
+  
+  const productsQuery = useMemo(() => query(
+    collection(db, 'products'), 
+    where('tenantId', '==', tenantId),
+    orderBy('name')
+  ), [db, tenantId]);
   
   const { data: suppliers } = useCollection(suppliersQuery);
   const { data: products } = useCollection(productsQuery);
@@ -101,7 +111,6 @@ export default function NewPurchaseInvoicePage() {
   const updateItem = (id: string, updates: any) => {
     setCart(prev => prev.map(i => {
       if (i.id === id) {
-        // Detect cost change
         if (updates.cost !== undefined && updates.cost !== i.originalCost && updates.cost > 0) {
            setPriceChangeDialog({ open: true, product: i, newCost: updates.cost });
         }
@@ -129,6 +138,7 @@ export default function NewPurchaseInvoicePage() {
     try {
       const invoiceRef = doc(collection(db, "purchases"));
       const invoiceData = {
+        tenantId,
         invoiceNumber,
         supplierId: selectedSupplierId,
         supplierName: supplier?.name || "غير معروف",
@@ -144,7 +154,6 @@ export default function NewPurchaseInvoicePage() {
 
       batch.set(invoiceRef, invoiceData);
 
-      // Update Inventory & Product Prices
       cart.forEach(item => {
         const productRef = doc(db, "products", item.id);
         batch.update(productRef, {
@@ -157,13 +166,12 @@ export default function NewPurchaseInvoicePage() {
         });
       });
 
-      // Update Supplier Balance
       if (unpaidAmount !== 0) {
         const supplierRef = doc(db, "suppliers", selectedSupplierId);
         batch.update(supplierRef, { balance: increment(unpaidAmount) });
         
-        // Register Ledger Transaction
         batch.set(doc(collection(db, "financialTransactions")), {
+          tenantId,
           userId: selectedSupplierId,
           type: 'purchase',
           amount: unpaidAmount,
@@ -173,9 +181,9 @@ export default function NewPurchaseInvoicePage() {
         });
       }
 
-      // If there's a payment, register in cash shifts (if needed) or just audit
       if (paidAmount > 0) {
         batch.set(doc(collection(db, "expenses")), {
+          tenantId,
           category: "مشتريات بضاعة",
           amount: paidAmount,
           notes: `دفعة لفاتورة شراء ${invoiceNumber}`,
@@ -218,7 +226,6 @@ export default function NewPurchaseInvoicePage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-6">
-          {/* Item Search */}
           <Card className="rounded-[32px] border-none shadow-sm overflow-visible">
             <CardContent className="p-6 space-y-4">
               <div className="relative">
@@ -250,7 +257,7 @@ export default function NewPurchaseInvoicePage() {
                       <div className="p-8 text-center space-y-4">
                          <AlertCircle className="h-12 w-12 mx-auto text-orange-500 opacity-20" />
                          <p className="font-bold text-muted-foreground">هذا الصنف غير موجود في المخزن.</p>
-                         <Button variant="outline" className="rounded-full font-black px-8" onClick={() => setIsNewProductOpen(true)}>إضافة صنف جديد كلياً</Button>
+                         <Button variant="outline" className="rounded-full font-black px-8" onClick={() => router.push('/admin/products')}>إضافة صنف جديد كلياً</Button>
                       </div>
                     )}
                   </div>
@@ -259,7 +266,6 @@ export default function NewPurchaseInvoicePage() {
             </CardContent>
           </Card>
 
-          {/* Items Table */}
           <Card className="rounded-[32px] border-none shadow-sm overflow-hidden min-h-[400px]">
             <Table>
               <TableHeader className="bg-muted/30">
@@ -362,7 +368,7 @@ export default function NewPurchaseInvoicePage() {
 
                 <div className="space-y-2">
                    <Label className="font-black text-xs uppercase tracking-widest opacity-60">ملاحظات الفاتورة</Label>
-                   <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="مثلاً: بضاعة صيفية، عرض خاص..." className="h-14 rounded-2xl bg-muted/30 border-none font-bold" />
+                   <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="تفاصيل إضافية..." className="h-14 rounded-2xl bg-muted/30 border-none font-bold" />
                 </div>
              </CardContent>
           </Card>
@@ -384,65 +390,12 @@ export default function NewPurchaseInvoicePage() {
                 </div>
              </div>
              <p className="text-[10px] text-white/40 font-bold leading-relaxed">
-                * عند حفظ الفاتورة، سيتم زيادة المخزون تلقائياً وإضافة المبلغ المتبقي كذمة مالية للمورد المختار.
+                * عند حفظ الفاتورة، سيتم زيادة المخزون تلقائياً وإضافة المبلغ المتبقي كذمة مالية للمورد.
              </p>
           </Card>
         </div>
       </div>
 
-      {/* Supplier Change Dialog */}
-      <Dialog open={!!priceChangeDialog} onOpenChange={() => setPriceChangeDialog(null)}>
-        <DialogContent className="rounded-[32px] max-w-md p-0 overflow-hidden border-none shadow-2xl">
-           <DialogHeader className="p-8 bg-orange-600 text-white space-y-2">
-              <div className="h-12 w-12 rounded-2xl bg-white/20 flex items-center justify-center mb-2"><TrendingUp className="h-6 w-6" /></div>
-              <DialogTitle className="text-2xl font-black">تغير في سعر التكلفة!</DialogTitle>
-              <DialogDescription className="text-white/80 font-bold">لقد قمت بإدخال سعر شراء يختلف عن المسجل مسبقاً.</DialogDescription>
-           </DialogHeader>
-           <div className="p-8 space-y-8">
-              <div className="grid grid-cols-2 gap-4">
-                 <div className="bg-muted/50 p-4 rounded-2xl space-y-1">
-                    <p className="text-[10px] font-black opacity-50 uppercase">التكلفة القديمة</p>
-                    <p className="text-lg font-black">{priceChangeDialog?.product?.originalCost?.toLocaleString()} د.ع</p>
-                 </div>
-                 <div className="bg-orange-50 p-4 rounded-2xl space-y-1 border border-orange-100 text-orange-700">
-                    <p className="text-[10px] font-black opacity-50 uppercase">التكلفة الجديدة</p>
-                    <p className="text-lg font-black">{priceChangeDialog?.newCost?.toLocaleString()} د.ع</p>
-                 </div>
-              </div>
-
-              <div className="space-y-4">
-                 <h4 className="font-black text-sm">تعديل أسعار البيع المقترحة:</h4>
-                 <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                       <Label className="font-bold text-xs opacity-60">سعر المفرد</Label>
-                       <Input 
-                        type="number" 
-                        value={priceChangeDialog?.product?.retailPrice} 
-                        onChange={(e) => updateItem(priceChangeDialog!.product.id, { retailPrice: Number(e.target.value) })}
-                        className="h-12 rounded-xl bg-muted/20 border-none font-black text-center" 
-                       />
-                    </div>
-                    <div className="space-y-2">
-                       <Label className="font-bold text-xs opacity-60">سعر الجملة</Label>
-                       <Input 
-                        type="number" 
-                        value={priceChangeDialog?.product?.wholesalePrice} 
-                        onChange={(e) => updateItem(priceChangeDialog!.product.id, { wholesalePrice: Number(e.target.value) })}
-                        className="h-12 rounded-xl bg-muted/20 border-none font-black text-center" 
-                       />
-                    </div>
-                 </div>
-              </div>
-
-              <div className="grid gap-3">
-                 <Button className="h-14 rounded-2xl font-black text-lg shadow-lg" onClick={() => setPriceChangeDialog(null)}>اعتماد الأسعار الجديدة</Button>
-                 <Button variant="ghost" className="font-bold text-muted-foreground" onClick={() => setPriceChangeDialog(null)}>الإبقاء على أسعار البيع الحالية</Button>
-              </div>
-           </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* New Supplier Dialog */}
       <Dialog open={isAddSupplierOpen} onOpenChange={setIsAddSupplierOpen}>
         <DialogContent className="rounded-[32px] max-w-sm">
            <DialogHeader><DialogTitle className="text-2xl font-black">مورد جديد</DialogTitle></DialogHeader>
@@ -451,6 +404,7 @@ export default function NewPurchaseInvoicePage() {
               const fd = new FormData(e.currentTarget);
               const name = fd.get('name') as string;
               const res = await addDoc(collection(db, 'suppliers'), {
+                tenantId,
                 name,
                 phone: fd.get('phone'),
                 address: fd.get('address'),

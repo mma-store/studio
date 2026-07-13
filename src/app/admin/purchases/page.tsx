@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo } from "react";
@@ -19,8 +18,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { useFirestore, useCollection } from "@/firebase";
-import { collection, query, orderBy } from "firebase/firestore";
+import { useFirestore, useCollection, useUser } from "@/firebase";
+import { collection, query, orderBy, where } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
@@ -28,10 +27,16 @@ import { useRouter } from "next/navigation";
 
 export default function PurchasesPage() {
   const db = useFirestore();
+  const { tenantId } = useUser();
   const router = useRouter();
   const [search, setSearch] = useState("");
 
-  const purchasesQuery = useMemo(() => query(collection(db, 'purchases'), orderBy('timestamp', 'desc')), [db]);
+  // FIXED: Scoped to tenantId
+  const purchasesQuery = useMemo(() => query(
+    collection(db, 'purchases'), 
+    where('tenantId', '==', tenantId),
+    orderBy('timestamp', 'desc')
+  ), [db, tenantId]);
   const { data: purchases, loading } = useCollection(purchasesQuery);
 
   const filtered = purchases.filter((p: any) => 
@@ -64,9 +69,6 @@ export default function PurchasesPage() {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <Button variant="outline" className="h-14 rounded-2xl bg-white border-none shadow-sm px-8 font-black gap-2">
-           <Filter className="h-5 w-5" /> تصفية النتائج
-        </Button>
       </div>
 
       <div className="rounded-[32px] border-none bg-white shadow-sm overflow-hidden border">
@@ -85,12 +87,7 @@ export default function PurchasesPage() {
             {loading ? (
               Array(5).fill(0).map((_, i) => (
                 <TableRow key={i}>
-                  <TableCell className="px-6"><Skeleton className="h-4 w-24" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-40" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                  <TableCell className="px-6 text-left"><Skeleton className="h-8 w-8" /></TableCell>
+                  <TableCell colSpan={6} className="px-6 py-4"><Skeleton className="h-10 w-full rounded-xl" /></TableCell>
                 </TableRow>
               ))
             ) : filtered.length > 0 ? (
@@ -114,9 +111,6 @@ export default function PurchasesPage() {
                         onClick={() => router.push(`/admin/print/purchase/${p.id}?size=A4`)}
                       >
                         <Printer className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon" className="rounded-xl">
-                        <ArrowUpRight className="h-4 w-4" />
                       </Button>
                     </div>
                   </TableCell>

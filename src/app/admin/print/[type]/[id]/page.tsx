@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
-import { useFirestore, useDoc } from "@/firebase";
+import { useFirestore, useDoc, useUser } from "@/firebase";
 import { doc } from "firebase/firestore";
 import { Printer, FileText, ChevronRight, Download, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -25,6 +25,7 @@ export default function PrintPreviewPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const db = useFirestore();
+  const { tenantId } = useUser();
   const LOGO_URL = "https://up6.cc/2026/07/178308238964931.png";
   
   const type = params?.type as string;
@@ -34,16 +35,9 @@ export default function PrintPreviewPage() {
   const docRef = useMemo(() => id ? doc(db, collectionMap[type] || 'orders', id) : null, [db, type, id]);
   const { data, loading } = useDoc<any>(docRef);
 
-  const [settings, setSettings] = useState<any>(null);
-  useEffect(() => {
-    const fetchSettings = async () => {
-      const sRef = doc(db, 'settings', 'main');
-      const { getDoc } = await import("firebase/firestore");
-      const snap = await getDoc(sRef);
-      if (snap.exists()) setSettings(snap.data());
-    };
-    fetchSettings();
-  }, [db]);
+  // FIXED: Fetch settings from the tenant document instead of global main settings
+  const tenantRef = useMemo(() => tenantId ? doc(db, 'tenants', tenantId) : null, [db, tenantId]);
+  const { data: settings } = useDoc<any>(tenantRef);
 
   const handlePrint = () => {
     window.print();
@@ -62,7 +56,7 @@ export default function PrintPreviewPage() {
           </Button>
           <div>
             <h1 className="text-lg font-black leading-none">معاينة الطباعة</h1>
-            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-1">MMA Print Engine v2.0</p>
+            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-1">Platform Print Engine v2.1</p>
           </div>
         </div>
         
@@ -102,14 +96,14 @@ export default function PrintPreviewPage() {
              <div className="text-center space-y-2 mb-8 border-b pb-6">
                 <div className="relative h-20 w-40 mx-auto mb-2">
                   <Image 
-                    src={LOGO_URL} 
-                    alt="MMA" 
+                    src={settings?.logo || LOGO_URL} 
+                    alt="Logo" 
                     fill 
                     className="object-contain"
                   />
                 </div>
-                <h2 className="text-xl font-black">{settings?.storeName || 'مجمع محمد علاء'}</h2>
-                <p className="text-[10px] font-bold text-muted-foreground">{settings?.address || 'العراق - بغداد'}</p>
+                <h2 className="text-xl font-black">{settings?.businessName || 'المنصة المتكاملة'}</h2>
+                <p className="text-[10px] font-bold text-muted-foreground">{settings?.address || 'العراق'}</p>
                 <p className="text-[10px] font-bold text-muted-foreground" dir="ltr">{settings?.phone || '07XXXXXXXXX'}</p>
              </div>
 
@@ -134,7 +128,7 @@ export default function PrintPreviewPage() {
              {/* Customer/Supplier Info */}
              <div className="bg-muted/30 p-4 rounded-xl mb-6 text-xs space-y-2 border">
                 <div className="flex justify-between">
-                   <span className="opacity-60 font-bold">العميل:</span>
+                   <span className="opacity-60 font-bold">الطرف الآخر:</span>
                    <span className="font-black">{data.customerName || data.targetName || data.supplierName || 'زبون نقدي'}</span>
                 </div>
                 {(data.phoneNumber || data.phone) && (
@@ -150,7 +144,7 @@ export default function PrintPreviewPage() {
                <table className="w-full text-xs mb-8 border-collapse">
                   <thead>
                      <tr className="border-b-2 border-slate-900 bg-slate-50">
-                        <th className="text-right py-3 px-1 font-black">المنتج</th>
+                        <th className="text-right py-3 px-1 font-black">البيان</th>
                         <th className="text-center py-3 px-1 font-black">سعر</th>
                         <th className="text-center py-3 px-1 font-black">عدد</th>
                         <th className="text-left py-3 px-1 font-black">إجمالي</th>
@@ -172,7 +166,7 @@ export default function PrintPreviewPage() {
              {/* Payment Details (Vouchers) */}
              {type.includes('receipt') || type.includes('payment') ? (
                 <div className="p-6 border-2 border-dashed rounded-2xl text-center space-y-4 mb-8">
-                   <p className="text-sm font-bold opacity-60">المبلغ المدفوع</p>
+                   <p className="text-sm font-bold opacity-60">المبلغ</p>
                    <p className="text-3xl font-black text-primary">{data.amount?.toLocaleString()} د.ع</p>
                    <p className="text-xs font-bold leading-relaxed">{data.notes || 'لا يوجد ملاحظات إضافية'}</p>
                 </div>
@@ -200,8 +194,8 @@ export default function PrintPreviewPage() {
              {/* Footer Barcode & QR */}
              <div className="mt-12 text-center space-y-4 opacity-70">
                 <div className="flex flex-col items-center gap-1">
-                   <p className="text-[8px] font-black uppercase tracking-[0.3em]">Quality Parts & Professional Service</p>
-                   <p className="text-[10px] font-black">مجمع محمد علاء - ثقتكم هدفنا 🏍️</p>
+                   <p className="text-[8px] font-black uppercase tracking-[0.3em]">Quality & Professional Service</p>
+                   <p className="text-[10px] font-black">{settings?.businessName || 'MMA Platform'} 🏍️</p>
                 </div>
                 <div className="pt-4 border-t flex justify-between items-center">
                    <div className="text-right">
@@ -209,7 +203,7 @@ export default function PrintPreviewPage() {
                       <p className="text-[8px] font-bold opacity-50">تاريخ الطباعة: {new Date().toLocaleString("ar-EG")}</p>
                    </div>
                    <div className="relative h-12 w-12 bg-slate-100 rounded flex items-center justify-center">
-                      <Image src={LOGO_URL} alt="QR" fill className="object-contain p-1" />
+                      <Image src={settings?.logo || LOGO_URL} alt="QR" fill className="object-contain p-1" />
                    </div>
                 </div>
              </div>
