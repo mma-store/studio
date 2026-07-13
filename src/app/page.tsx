@@ -84,9 +84,11 @@ export default function SaaSLandingPage() {
                 Create Your Store <ArrowRight className="h-6 w-6 group-hover:translate-x-1 transition-transform" />
               </Button>
             </Link>
-            <Button variant="outline" className="h-16 px-10 rounded-2xl text-xl border-2 font-black">
-              View Demo Store
-            </Button>
+            <Link href="/store/demo-store">
+              <Button variant="outline" className="h-16 px-10 rounded-2xl text-xl border-2 font-black">
+                View Demo Store
+              </Button>
+            </Link>
           </div>
 
           {/* Dashboard Preview Placeholder */}

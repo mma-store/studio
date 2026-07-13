@@ -4,7 +4,7 @@
 import { useState } from "react";
 import { useAuth, useFirestore } from "@/firebase";
 import { createUserWithEmailAndPassword } from "firebase/auth";
-import { collection, doc, setDoc, query, where, getDocs, writeBatch } from "firebase/firestore";
+import { collection, doc, query, where, getDocs, writeBatch } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,7 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { toast } from "@/hooks/use-toast";
 import { Store, User, Phone, MapPin, Briefcase, Loader2, ArrowRight, CheckCircle2 } from "lucide-react";
 import Image from "next/image";
-import Link from "next/link";
+
 import { cn } from "@/lib/utils";
 
 export default function OnboardingPage() {
@@ -70,7 +70,10 @@ export default function OnboardingPage() {
       const batch = writeBatch(db);
       const tenantId = `T-${Date.now().toString().slice(-6)}`;
       
-      // A. Create Tenant
+      const trialDays = 14;
+      const now = Date.now();
+      
+      // A. Create Tenant with Trial Info
       const tenantRef = doc(db, "tenants", tenantId);
       batch.set(tenantRef, {
         tenantId,
@@ -80,9 +83,11 @@ export default function OnboardingPage() {
         phone: formData.phoneNumber,
         address: formData.address,
         businessType: formData.businessType,
-        status: "active",
+        status: "trial",
         subscriptionPlan: "trial",
-        createdAt: Date.now()
+        trialStartDate: now,
+        trialEndDate: now + trialDays * 24 * 60 * 60 * 1000,
+        createdAt: now
       });
 
       // B. Create Owner Profile
@@ -94,16 +99,16 @@ export default function OnboardingPage() {
         phoneNumber: formData.phoneNumber,
         email,
         role: "owner",
-        createdAt: Date.now()
+        createdAt: now
       });
 
-      // C. Create Default Settings
-      const settingsRef = doc(db, "auditLogs", `initial-${tenantId}`); // Just a log entry for now as placeholder for settings logic
-      batch.set(settingsRef, {
+      // C. Audit Log
+      const logRef = doc(collection(db, "auditLogs"));
+      batch.set(logRef, {
         tenantId,
-        action: "تأسيس المتجر",
-        details: `تم إنشاء متجر ${formData.businessName} بنجاح.`,
-        timestamp: Date.now()
+        action: "تأسيس المتجر (نسخة تجريبية)",
+        details: `تم إنشاء متجر ${formData.businessName} بنجاح. تبدأ الفترة التجريبية الآن.`,
+        timestamp: now
       });
 
       await batch.commit();
@@ -158,19 +163,19 @@ export default function OnboardingPage() {
             {step === 1 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in slide-in-from-right-4 duration-500">
                 <div className="space-y-2">
-                  <Label className="font-bold flex items-center gap-2"><Store className="h-4 w-4 text-primary" /> اسم المحل / المجمع</Label>
+                  <Store className="h-4 w-4 text-primary" /> <Label className="font-bold"> اسم المحل / المجمع</Label>
                   <Input name="businessName" value={formData.businessName} onChange={handleChange} required placeholder="مثال: مجمع السلام" className="h-14 rounded-2xl bg-muted/20 border-none font-bold" />
                 </div>
                 <div className="space-y-2">
-                  <Label className="font-bold flex items-center gap-2"><User className="h-4 w-4 text-primary" /> اسم صاحب العمل</Label>
+                   <User className="h-4 w-4 text-primary" /> <Label className="font-bold"> اسم صاحب العمل</Label>
                   <Input name="ownerName" value={formData.ownerName} onChange={handleChange} required placeholder="الاسم الكامل" className="h-14 rounded-2xl bg-muted/20 border-none font-bold" />
                 </div>
                 <div className="space-y-2">
-                  <Label className="font-bold flex items-center gap-2"><MapPin className="h-4 w-4 text-primary" /> العنوان</Label>
+                   <MapPin className="h-4 w-4 text-primary" /> <Label className="font-bold"> العنوان</Label>
                   <Input name="address" value={formData.address} onChange={handleChange} required placeholder="المدينة، المنطقة" className="h-14 rounded-2xl bg-muted/20 border-none font-bold" />
                 </div>
                 <div className="space-y-2">
-                  <Label className="font-bold flex items-center gap-2"><Briefcase className="h-4 w-4 text-primary" /> نوع النشاط</Label>
+                   <Briefcase className="h-4 w-4 text-primary" /> <Label className="font-bold"> نوع النشاط</Label>
                   <select name="businessType" value={formData.businessType} onChange={handleChange} className="w-full h-14 rounded-2xl bg-muted/20 border-none px-4 font-bold appearance-none outline-none focus:ring-2 focus:ring-primary/20">
                     <option value="motorcycle_parts">قطع غيار دراجات</option>
                     <option value="car_parts">قطع غيار سيارات</option>
@@ -181,11 +186,11 @@ export default function OnboardingPage() {
             ) : (
               <div className="max-w-md mx-auto space-y-6 animate-in slide-in-from-left-4 duration-500">
                 <div className="space-y-2">
-                  <Label className="font-bold flex items-center gap-2"><Phone className="h-4 w-4 text-primary" /> رقم الهاتف</Label>
+                   <Phone className="h-4 w-4 text-primary" /> <Label className="font-bold"> رقم الهاتف</Label>
                   <Input name="phoneNumber" value={formData.phoneNumber} onChange={handleChange} required placeholder="07XXXXXXXXX" className="h-14 rounded-2xl bg-muted/20 border-none text-left font-black" dir="ltr" />
                 </div>
                 <div className="space-y-2">
-                  <Label className="font-bold flex items-center gap-2">رمز الدخول (كلمة السر)</Label>
+                  <Label className="font-bold">رمز الدخول (كلمة السر)</Label>
                   <Input type="password" name="password" value={formData.password} onChange={handleChange} required placeholder="••••••••" className="h-14 rounded-2xl bg-muted/20 border-none text-left" dir="ltr" />
                 </div>
               </div>
@@ -213,7 +218,7 @@ export default function OnboardingPage() {
         </CardContent>
         <CardFooter className="bg-muted/30 p-6 text-center">
            <p className="w-full text-xs text-muted-foreground font-medium">
-             بالنقر على "إنشاء متجري"، أنت توافق على شروط الخدمة وسياسة الخصوصية.
+             تحصل تلقائياً على 14 يوماً من الاستخدام التجريبي الكامل لكافة الميزات.
            </p>
         </CardFooter>
       </Card>

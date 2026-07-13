@@ -8,11 +8,12 @@ import { useUser } from "@/firebase";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { ShieldAlert, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { signOut } from "firebase/auth";
 import { useAuth } from "@/firebase";
+import { ShieldAlert, LogOut, AlertCircle, TrendingUp } from "lucide-react";
+import { useSubscription } from "@/hooks/use-subscription";
+import Link from "next/link";
 
 const ADMIN_PHONES = ['7858833838', '07858833838'];
 
@@ -21,27 +22,26 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const auth = useAuth();
   const router = useRouter();
   const [isAuthorized, setIsAuthorized] = useState(false);
+  const subscription = useSubscription(tenantId);
 
   useEffect(() => {
     if (!loading) {
       if (!user) {
         router.replace('/login');
       } else {
-        // Strict SaaS Auth Check
         const isMasterAdmin = profile?.phoneNumber && ADMIN_PHONES.includes(profile.phoneNumber.replace(/\s/g, '').replace(/^\+964/, ''));
         const isMerchant = profile && ['owner', 'admin', 'sales_employee', 'workshop_technician', 'warehouse_employee'].includes(profile.role);
         
         if ((isMerchant || isMasterAdmin) && tenantId) {
           setIsAuthorized(true);
         } else {
-          // If logged in but not a merchant or has no tenant, they are just a customer
           router.replace('/');
         }
       }
     }
   }, [user, profile, loading, router, tenantId]);
 
-  if (loading) {
+  if (loading || subscription.loading) {
     return (
       <div className="flex min-h-screen w-full flex-col items-center justify-center bg-background p-8 gap-8">
          <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-primary text-white shadow-2xl animate-bounce">
@@ -81,6 +81,30 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <AdminSidebar />
         <SidebarInset className="flex flex-col min-w-0">
           <AdminHeader />
+          
+          {/* Trial / Expiry Banner */}
+          {tenantId !== 'MMA001' && (
+            <div className="px-6 py-2">
+              {subscription.isExpired ? (
+                <div className="bg-red-600 text-white px-4 py-3 rounded-2xl flex items-center justify-between animate-in slide-in-from-top duration-500">
+                   <div className="flex items-center gap-3">
+                      <AlertCircle className="h-5 w-5" />
+                      <span className="font-black text-sm">انتهت الفترة التجريبية للمتجر. يرجى الترقية للاستمرار في العمل.</span>
+                   </div>
+                   <Button variant="secondary" size="sm" className="rounded-xl font-black">ترقية الآن</Button>
+                </div>
+              ) : subscription.isTrial && (
+                <div className="bg-primary/10 border border-primary/20 text-primary px-4 py-2 rounded-2xl flex items-center justify-between text-xs font-bold">
+                   <div className="flex items-center gap-2">
+                      <TrendingUp className="h-4 w-4" />
+                      <span>أنت في الفترة التجريبية. يتبقى لك {subscription.daysRemaining} يوم.</span>
+                   </div>
+                   <Link href="/admin/settings/billing" className="underline font-black">خطط الاشتراك</Link>
+                </div>
+              )}
+            </div>
+          )}
+
           <main className="flex-1 p-4 md:p-6 lg:p-8 overflow-y-auto overflow-x-hidden">
             <div className="mx-auto max-w-7xl w-full">
               {children}

@@ -17,7 +17,8 @@ import {
   Camera,
   Upload,
   History,
-  Save
+  Save,
+  AlertTriangle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -65,11 +66,13 @@ import { toast } from "@/hooks/use-toast";
 import { uploadToCloudinary, getOptimizedUrl } from "@/lib/cloudinary";
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
+import { useSubscription } from "@/hooks/use-subscription";
 
 export default function ProductsManagementPage() {
   const db = useFirestore();
   const router = useRouter();
   const { tenantId } = useUser();
+  const subscription = useSubscription(tenantId);
   
   const productsQuery = useMemo(() => query(
     collection(db, 'products'), 
@@ -134,6 +137,17 @@ export default function ProductsManagementPage() {
   const handleAction = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (isSaving) return;
+
+    // Check Plan Limits
+    if (!editingProduct && !subscription.canAddProduct(products.length)) {
+       toast({ 
+         variant: "destructive", 
+         title: "تم الوصول للحد الأقصى", 
+         description: `خطتك الحالية (${subscription.plan}) تسمح بـ ${subscription.limits.maxProducts} منتج فقط. يرجى الترقية لزيادة الحد.` 
+       });
+       return;
+    }
+
     if (!selectedCategory) {
       toast({ variant: "destructive", title: "تنبيه", description: "يرجى اختيار القسم أولاً." });
       return;
@@ -213,11 +227,20 @@ export default function ProductsManagementPage() {
              </DialogTrigger>
              <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto rounded-[32px] p-0 border-none shadow-2xl">
                 <div className="p-8 space-y-6">
+                  {subscription.isExpired && (
+                    <div className="bg-red-50 text-red-600 p-4 rounded-2xl flex items-center gap-3 border border-red-100">
+                      <AlertTriangle className="h-5 w-5" />
+                      <p className="text-xs font-black">لا يمكنك إضافة منتجات جديدة لأن فترة الاشتراك قد انتهت.</p>
+                    </div>
+                  )}
+
                   <DialogHeader>
                     <DialogTitle className="text-3xl font-black text-right">
                       {editingProduct ? "تعديل المنتج" : "إضافة منتج جديد"}
                     </DialogTitle>
-                    <DialogDescription className="text-muted-foreground font-bold text-right">يرجى ملء كافة التفاصيل لضمان ظهور المنتج بشكل صحيح.</DialogDescription>
+                    <DialogDescription className="text-muted-foreground font-bold text-right">
+                       {subscription.isTrial && !editingProduct && `متبقي لك ${subscription.limits.maxProducts - products.length} منتجات في الخطة التجريبية.`}
+                    </DialogDescription>
                   </DialogHeader>
                   <form onSubmit={handleAction} className="space-y-8 py-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8" dir="rtl">
@@ -309,7 +332,7 @@ export default function ProductsManagementPage() {
                     </div>
 
                     <DialogFooter className="pt-8 gap-4 flex-row justify-end" dir="rtl">
-                      <Button type="submit" className="rounded-2xl h-14 px-12 shadow-xl font-black text-lg gap-2" disabled={isUploading || isSaving}>
+                      <Button type="submit" className="rounded-2xl h-14 px-12 shadow-xl font-black text-lg gap-2" disabled={isUploading || isSaving || (subscription.isExpired && !editingProduct)}>
                         {isSaving ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}
                         {editingProduct ? "حفظ التعديلات" : "حفظ المنتج والنشـر"}
                       </Button>

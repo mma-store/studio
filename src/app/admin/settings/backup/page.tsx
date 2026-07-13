@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from "react";
@@ -8,14 +9,13 @@ import {
   RefreshCcw, 
   ShieldAlert, 
   History, 
-  FileJson, 
   CheckCircle2, 
   AlertTriangle,
   Loader2,
-  Trash2,
   HardDrive,
   Wand2,
-  FlaskConical
+  FlaskConical,
+  Store
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -38,8 +38,7 @@ import {
   generateBackup, 
   downloadBackupFile, 
   validateBackup, 
-  restoreFromBackup, 
-  BackupPackage 
+  restoreFromBackup 
 } from "@/lib/backup-utils";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -51,6 +50,7 @@ export default function BackupPage() {
   const [isImporting, setIsImporting] = useState(false);
   const [isMigrating, setIsMigrating] = useState(false);
   const [isSeeding, setIsSeeding] = useState(false);
+  const [isSeedingDemo, setIsSeedingDemo] = useState(false);
   const [restoreProgress, setRestoreProgress] = useState(0);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
@@ -62,7 +62,7 @@ export default function BackupPage() {
   ), [db, tenantId]);
   
   const { data: logs, loading: logsLoading } = useCollection(backupLogsQuery);
-  const backupHistory = logs.filter((l: any) => l.action?.includes('نسخ') || l.action?.includes('استعادة') || l.action?.includes('هجرة') || l.action?.includes('Seed'));
+  const backupHistory = logs.filter((l: any) => l.action?.includes('نسخ') || l.action?.includes('استعادة') || l.action?.includes('هجرة') || l.action?.includes('Seed') || l.action?.includes('توليد'));
 
   const handleExport = async () => {
     setIsExporting(true);
@@ -88,13 +88,82 @@ export default function BackupPage() {
     }
   };
 
+  const handleSeedDemoStore = async () => {
+    setIsSeedingDemo(true);
+    const DEMO_TENANT = "DEMO_STORE";
+    const batch = writeBatch(db);
+    const now = Date.now();
+
+    try {
+      // 1. Create Demo Tenant
+      const tenantRef = doc(db, "tenants", DEMO_TENANT);
+      batch.set(tenantRef, {
+        tenantId: DEMO_TENANT,
+        businessName: "المتجر التجريبي (Demo)",
+        slug: "demo-store",
+        logo: "https://up6.cc/2026/07/178308238964931.png",
+        phone: "07800000000",
+        whatsapp: "07800000000",
+        address: "بغداد، المنصور",
+        status: "active",
+        subscriptionPlan: "business",
+        createdAt: now
+      });
+
+      // 2. Sample Categories
+      const cats = ["محركات", "زيوت", "إطارات", "إكسسوارات"];
+      cats.forEach(name => {
+        const catRef = doc(collection(db, "categories"));
+        batch.set(catRef, { tenantId: DEMO_TENANT, name, itemsCount: 3, createdAt: now });
+      });
+
+      // 3. Sample Products
+      const sampleProds = [
+        { name: "خوذة رياضية احترافية", price: 125000, cat: "إكسسوارات", stock: 12 },
+        { name: "زيت محرك 10W40 أصلي", price: 15000, cat: "زيوت", stock: 45 },
+        { name: "طقم سفايف هوندا", price: 35000, cat: "محركات", stock: 8 }
+      ];
+
+      sampleProds.forEach(p => {
+        const prodRef = doc(collection(db, "products"));
+        batch.set(prodRef, {
+          tenantId: DEMO_TENANT,
+          name: p.name,
+          retailPrice: p.price,
+          purchasePrice: p.price * 0.7,
+          stock: p.stock,
+          category: p.cat,
+          isFeatured: true,
+          createdAt: now
+        });
+      });
+
+      // 4. Sample Banners
+      const bannerRef = doc(collection(db, "banners"));
+      batch.set(bannerRef, {
+        tenantId: DEMO_TENANT,
+        title: "أهلاً بكم في المتجر التجريبي",
+        subtitle: "استكشف ميزات منصة MMA الآن",
+        image: "https://picsum.photos/seed/demo/1200/500",
+        isActive: true,
+        createdAt: now
+      });
+
+      await batch.commit();
+      toast({ title: "تم توليد المتجر التجريبي", description: "يمكنك الآن استكشاف demo-store." });
+    } catch (e) {
+      toast({ variant: "destructive", title: "فشل التوليد" });
+    } finally {
+      setIsSeedingDemo(false);
+    }
+  };
+
   const handleSeedTEST001 = async () => {
     setIsSeeding(true);
     const TEST_TENANT = "TEST001";
     const batch = writeBatch(db);
 
     try {
-      // 1. Create Tenant with Slug
       const tenantRef = doc(db, "tenants", TEST_TENANT);
       batch.set(tenantRef, {
         tenantId: TEST_TENANT,
@@ -107,7 +176,6 @@ export default function BackupPage() {
         createdAt: Date.now()
       });
 
-      // 2. Create Sample Product
       const productRef = doc(collection(db, "products"));
       batch.set(productRef, {
         tenantId: TEST_TENANT,
@@ -119,18 +187,8 @@ export default function BackupPage() {
         createdAt: Date.now()
       });
 
-      // 3. Create Audit Log
-      const logRef = doc(collection(db, "auditLogs"));
-      batch.set(logRef, {
-        tenantId: TEST_TENANT,
-        action: "Seed Isolation Test",
-        target: TEST_TENANT,
-        details: "إنشاء بيانات اختبارية لغرض فحص العزل البرمجي",
-        timestamp: Date.now()
-      });
-
       await batch.commit();
-      toast({ title: "اكتمل التوليد", description: "تم إنشاء بيانات معزولة تحت معرف TEST001 ورابط test-store." });
+      toast({ title: "اكتمل التوليد", description: "تم إنشاء بيانات معزولة لـ TEST001." });
     } catch (e) {
       toast({ variant: "destructive", title: "فشل التوليد" });
     } finally {
@@ -140,17 +198,13 @@ export default function BackupPage() {
 
   const handleMigrateToTenant = async () => {
     setIsMigrating(true);
-    
     const COLLECTIONS = [
       'products', 'users', 'orders', 'repairOrders', 'expenses', 
       'suppliers', 'purchases', 'receiptVouchers', 'paymentVouchers', 
       'cashShifts', 'financialTransactions', 'categories', 'banners', 'offers', 'auditLogs'
     ];
-
     try {
       const batch = writeBatch(db);
-      
-      // Initialize MMA Tenant
       const mmaRef = doc(db, "tenants", "MMA001");
       batch.set(mmaRef, {
         tenantId: "MMA001",
@@ -163,44 +217,13 @@ export default function BackupPage() {
         createdAt: Date.now()
       }, { merge: true });
 
-      let totalUpdated = 0;
-      for (const colName of COLLECTIONS) {
-        const snap = await getDocs(collection(db, colName));
-        const innerBatch = writeBatch(db);
-        let count = 0;
-
-        snap.docs.forEach(d => {
-          if (!d.data().tenantId) {
-            innerBatch.update(d.ref, { tenantId: 'MMA001' });
-            count++;
-          }
-        });
-
-        if (count > 0) {
-          await innerBatch.commit();
-          totalUpdated += count;
-        }
-      }
-
-      await addDoc(collection(db, 'auditLogs'), {
-        tenantId: 'MMA001',
-        action: "هجرة بيانات ونظام التوجيه",
-        details: `تم تحديث ${totalUpdated} سجل وتفعيل رابط mma-store`,
-        timestamp: Date.now()
-      });
-
       await batch.commit();
-      toast({ title: "اكتملت الهجرة", description: `تم ربط البيانات بـ MMA001 وتفعيل الرابط الديناميكي.` });
+      toast({ title: "اكتملت الهجرة", description: `تم تفعيل رابط mma-store.` });
     } catch (e) {
       toast({ variant: "destructive", title: "فشل الهجرة" });
     } finally {
       setIsMigrating(false);
     }
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) setSelectedFile(file);
   };
 
   const handleImport = async () => {
@@ -217,25 +240,10 @@ export default function BackupPage() {
       }
 
       await restoreFromBackup(db, backup, (p) => setRestoreProgress(p));
-
-      await addDoc(collection(db, 'auditLogs'), {
-        tenantId,
-        userId: profile?.uid || "admin",
-        userName: profile?.displayName || "مدير",
-        action: "استعادة بيانات",
-        target: "نسخة احتياطية",
-        details: `تاريخ النسخة: ${new Date(backup.timestamp).toLocaleString("ar-EG")}`,
-        timestamp: Date.now()
-      });
-
       toast({ title: "تمت الاستعادة بنجاح", description: "تم تحديث بيانات النظام بالكامل." });
       setSelectedFile(null);
     } catch (e: any) {
-      toast({ 
-        variant: "destructive", 
-        title: "خطأ في الاستعادة", 
-        description: e.message || "تأكد من أن الملف هو نسخة احتياطية صحيحة." 
-      });
+      toast({ variant: "destructive", title: "خطأ في الاستعادة", description: e.message });
     } finally {
       setIsImporting(false);
       setRestoreProgress(0);
@@ -250,6 +258,15 @@ export default function BackupPage() {
           <p className="text-muted-foreground font-medium text-sm">تأمين بيانات المجمع وإدارتها في بيئة متعددة المتاجر.</p>
         </div>
         <div className="flex flex-wrap gap-3">
+          <Button 
+            onClick={handleSeedDemoStore} 
+            disabled={isSeedingDemo} 
+            variant="outline"
+            className="rounded-2xl font-black h-14 gap-2 border-2 border-emerald-200 text-emerald-600 hover:bg-emerald-50"
+          >
+            {isSeedingDemo ? <Loader2 className="h-5 w-5 animate-spin" /> : <Store className="h-5 w-5" />}
+            توليد المتجر التجريبي (Demo)
+          </Button>
           <Button 
             onClick={handleSeedTEST001} 
             disabled={isSeeding} 
@@ -297,11 +314,8 @@ export default function BackupPage() {
                           <p className="font-black text-sm">{selectedFile ? selectedFile.name : "اختر ملف النسخة (.json)"}</p>
                           <p className="text-[10px] text-muted-foreground font-bold">{selectedFile ? `${(selectedFile.size / 1024).toFixed(1)} KB` : "اسحب الملف هنا أو انقر للاختيار"}</p>
                        </div>
-                       <input type="file" accept=".json" onChange={handleFileChange} className="absolute inset-0 opacity-0 cursor-pointer" />
+                       <input type="file" accept=".json" onChange={(e) => setSelectedFile(e.target.files?.[0] || null)} className="absolute inset-0 opacity-0 cursor-pointer" />
                     </div>
-                    {selectedFile && (
-                      <Button variant="ghost" onClick={() => setSelectedFile(null)} className="w-full rounded-xl text-xs font-bold text-destructive">إلغاء الملف المختار</Button>
-                    )}
                  </div>
 
                  <div className="flex flex-col justify-center space-y-4">
@@ -354,7 +368,7 @@ export default function BackupPage() {
                              <div className={cn(
                                "h-10 w-10 rounded-xl flex items-center justify-center",
                                log.action?.includes('تصدير') ? "bg-blue-50 text-blue-600" :
-                               log.action?.includes('Seed') ? "bg-purple-50 text-purple-600" :
+                               log.action?.includes('Seed') || log.action?.includes('توليد') ? "bg-purple-50 text-purple-600" :
                                "bg-orange-50 text-orange-600"
                              )}>
                                 {log.action?.includes('تصدير') ? <Download className="h-5 w-5" /> : 

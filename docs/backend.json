@@ -15,8 +15,10 @@
         "whatsapp": { "type": "string" },
         "address": { "type": "string" },
         "businessType": { "type": "string" },
-        "status": { "type": "string", "enum": ["active", "suspended", "expired"] },
-        "subscriptionPlan": { "type": "string" },
+        "status": { "type": "string", "enum": ["active", "trial", "expired", "suspended"] },
+        "subscriptionPlan": { "type": "string", "enum": ["trial", "starter", "business", "enterprise"] },
+        "trialStartDate": { "type": "number" },
+        "trialEndDate": { "type": "number" },
         "createdAt": { "type": "number" },
         "settings": { "type": "object" }
       },
@@ -32,7 +34,7 @@
         "displayName": { "type": "string" },
         "email": { "type": "string" },
         "phoneNumber": { "type": "string" },
-        "role": { "type": "string", "enum": ["owner", "admin", "sales_employee", "workshop_technician", "warehouse_employee", "retail_customer", "wholesale_customer"] },
+        "role": { "type": "string", "enum": ["super_admin", "owner", "admin", "sales_employee", "workshop_technician", "warehouse_employee", "retail_customer", "wholesale_customer"] },
         "currentBalance": { "type": "number" }
       },
       "required": ["uid", "tenantId", "role"]
