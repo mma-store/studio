@@ -35,38 +35,54 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { useState, useEffect, useMemo } from "react";
 import { toast } from "@/hooks/use-toast";
-import { useFirestore, useDoc } from "@/firebase";
-import { doc, setDoc } from "firebase/firestore";
+import { useFirestore, useDoc, useUser } from "@/firebase";
+import { doc, updateDoc } from "firebase/firestore";
 
 export default function AdminSettingsPage() {
   const db = useFirestore();
-  const settingsRef = useMemo(() => doc(db, 'settings', 'main'), [db]);
-  const { data: currentSettings, loading } = useDoc<any>(settingsRef);
+  const { tenantId } = useUser();
+  
+  // FIXED: Settings now scope to the tenant document directly for branding/metadata
+  const tenantRef = useMemo(() => tenantId ? doc(db, 'tenants', tenantId) : null, [db, tenantId]);
+  const { data: tenant, loading } = useDoc<any>(tenantRef);
   
   const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState<any>({
-    storeName: "مجمع محمد علاء",
-    description: "",
-    phone: "07700000000",
-    whatsapp: "07700000000",
-    address: "بغداد، الكرادة، ساحة كهرمانة",
-    printerName: "POS-80",
-    defaultPrintSize: "80mm",
-    notificationsEnabled: true,
-    stockAlertsEnabled: true,
+    businessName: "",
+    phone: "",
+    whatsapp: "",
+    address: "",
+    settings: {
+      printerName: "POS-80",
+      defaultPrintSize: "80mm",
+      notificationsEnabled: true,
+      stockAlertsEnabled: true,
+    }
   });
 
   useEffect(() => {
-    if (currentSettings) {
-      setFormData(currentSettings);
+    if (tenant) {
+      setFormData({
+        businessName: tenant.businessName || "",
+        phone: tenant.phone || "",
+        whatsapp: tenant.whatsapp || "",
+        address: tenant.address || "",
+        settings: {
+          printerName: tenant.settings?.printerName || "POS-80",
+          defaultPrintSize: tenant.settings?.defaultPrintSize || "80mm",
+          notificationsEnabled: tenant.settings?.notificationsEnabled ?? true,
+          stockAlertsEnabled: tenant.settings?.stockAlertsEnabled ?? true,
+        }
+      });
     }
-  }, [currentSettings]);
+  }, [tenant]);
 
   const handleSave = async () => {
+    if (!tenantRef) return;
     setIsSaving(true);
     try {
-      await setDoc(settingsRef, formData, { merge: true });
-      toast({ title: "تم الحفظ", description: "تم تحديث إعدادات النظام بنجاح." });
+      await updateDoc(tenantRef, formData);
+      toast({ title: "تم الحفظ", description: "تم تحديث إعدادات متجرك بنجاح." });
     } catch (e) {
       toast({ variant: "destructive", title: "خطأ", description: "فشل حفظ الإعدادات." });
     } finally {
@@ -109,11 +125,7 @@ export default function AdminSettingsPage() {
               <CardContent className="p-8 space-y-6">
                 <div className="space-y-2">
                   <Label className="font-black text-sm mr-1 uppercase tracking-widest opacity-60">اسم المجمع التجاري</Label>
-                  <Input value={formData.storeName} onChange={(e) => setFormData({...formData, storeName: e.target.value})} className="rounded-2xl h-14 bg-muted/30 border-none font-bold text-lg px-6" />
-                </div>
-                <div className="space-y-2">
-                  <Label className="font-black text-sm mr-1 uppercase tracking-widest opacity-60">الوصف التسويقي</Label>
-                  <Textarea value={formData.description} onChange={(e) => setFormData({...formData, description: e.target.value})} placeholder="اكتب وصفاً مختصراً للمجمع..." className="rounded-2xl bg-muted/30 border-none min-h-[120px] p-6 font-medium leading-relaxed" />
+                  <Input value={formData.businessName} onChange={(e) => setFormData({...formData, businessName: e.target.value})} className="rounded-2xl h-14 bg-muted/30 border-none font-bold text-lg px-6" />
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                   <div className="space-y-2">
@@ -157,8 +169,8 @@ export default function AdminSettingsPage() {
                  <div className="space-y-2">
                     <Label className="font-black">اسم الطابعة في النظام (System Printer Name)</Label>
                     <Input 
-                      value={formData.printerName} 
-                      onChange={(e) => setFormData({...formData, printerName: e.target.value})} 
+                      value={formData.settings.printerName} 
+                      onChange={(e) => setFormData({...formData, settings: {...formData.settings, printerName: e.target.value}})} 
                       placeholder="مثلاً: XP-80C أو Thermal-Printer"
                       className="rounded-xl h-12 bg-muted/30 border-none font-mono"
                     />
@@ -169,40 +181,13 @@ export default function AdminSettingsPage() {
                        {['58mm', '80mm', 'A4'].map(size => (
                          <button 
                           key={size}
-                          onClick={() => setFormData({...formData, defaultPrintSize: size})}
-                          className={`h-12 rounded-xl font-black border-2 transition-all ${formData.defaultPrintSize === size ? 'border-primary bg-primary/5 text-primary' : 'border-muted'}`}
+                          onClick={() => setFormData({...formData, settings: {...formData.settings, defaultPrintSize: size}})}
+                          className={`h-12 rounded-xl font-black border-2 transition-all ${formData.settings.defaultPrintSize === size ? 'border-primary bg-primary/5 text-primary' : 'border-muted'}`}
                          >
                             {size}
                          </button>
                        ))}
                     </div>
-                 </div>
-              </CardContent>
-           </Card>
-        </TabsContent>
-
-        <TabsContent value="integrations" className="space-y-8 animate-in slide-in-from-bottom-4">
-           <Card className="rounded-[40px] border-none shadow-sm max-w-3xl overflow-hidden">
-              <CardHeader className="bg-blue-500/5 p-8 border-b border-blue-500/10">
-                <CardTitle className="flex items-center gap-3 text-2xl font-black">
-                  <Cloud className="h-7 w-7 text-blue-500" /> تكامل Cloudinary (رفع الصور)
-                </CardTitle>
-                <CardDescription className="font-bold text-sm">إعدادات التخزين السحابي لصور المنتجات وأوامر الورشة.</CardDescription>
-              </CardHeader>
-              <CardContent className="p-8 space-y-8">
-                 <div className="flex items-center justify-between p-6 rounded-3xl bg-blue-500/5 border border-blue-500/10">
-                    <div className="flex items-center gap-4">
-                       <div className="h-12 w-12 rounded-2xl bg-white shadow-sm flex items-center justify-center">
-                          <Cloud className="h-6 w-6 text-blue-500" />
-                       </div>
-                       <div>
-                          <p className="font-black text-lg leading-none">حالة الاتصال: متصل</p>
-                          <p className="text-xs font-bold text-blue-600 mt-1 uppercase tracking-tighter">Connected via secure API</p>
-                       </div>
-                    </div>
-                    <Badge className="bg-green-100 text-green-700 border-none font-black px-4 py-1.5 rounded-full flex gap-1 items-center">
-                       <CheckCircle2 className="h-3 w-3" /> نشط ومستقر
-                    </Badge>
                  </div>
               </CardContent>
            </Card>
@@ -222,14 +207,14 @@ export default function AdminSettingsPage() {
                        <p className="font-black text-lg">إشعارات الطلبات الجديدة</p>
                        <p className="text-sm text-muted-foreground font-medium">إرسال إشعار فوري للمدراء عند استلام طلب شراء جديد.</p>
                     </div>
-                    <Switch checked={formData.notificationsEnabled} onCheckedChange={(c) => setFormData({...formData, notificationsEnabled: c})} className="scale-110 data-[state=checked]:bg-primary" />
+                    <Switch checked={formData.settings.notificationsEnabled} onCheckedChange={(c) => setFormData({...formData, settings: {...formData.settings, notificationsEnabled: c}})} className="scale-110 data-[state=checked]:bg-primary" />
                  </div>
                  <div className="flex items-center justify-between p-6 rounded-3xl bg-muted/20 hover:bg-muted/40 transition-colors">
                     <div className="space-y-1">
                        <p className="font-black text-lg">تنبيهات انخفاض المخزون</p>
                        <p className="text-sm text-muted-foreground font-medium">تنبيه المسؤولين عند وصول أي منتج للحد الأدنى (أقل من 5 قطع).</p>
                     </div>
-                    <Switch checked={formData.stockAlertsEnabled} onCheckedChange={(c) => setFormData({...formData, stockAlertsEnabled: c})} className="scale-110 data-[state=checked]:bg-primary" />
+                    <Switch checked={formData.settings.stockAlertsEnabled} onCheckedChange={(c) => setFormData({...formData, settings: {...formData.settings, stockAlertsEnabled: c}})} className="scale-110 data-[state=checked]:bg-primary" />
                  </div>
               </CardContent>
            </Card>
@@ -238,4 +223,3 @@ export default function AdminSettingsPage() {
     </div>
   );
 }
-

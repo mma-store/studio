@@ -32,7 +32,7 @@ import {
   CardDescription 
 } from "@/components/ui/card";
 import { useFirestore, useDoc, useCollection, useUser } from "@/firebase";
-import { doc, updateDoc, collection, query, serverTimestamp, increment, writeBatch, addDoc } from "firebase/firestore";
+import { doc, updateDoc, collection, query, serverTimestamp, increment, writeBatch, addDoc, where } from "firebase/firestore";
 import { useMemo, useState, useEffect } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import Link from "next/link";
@@ -47,7 +47,7 @@ export default function RepairOrderDetailsPage() {
   const params = useParams();
   const id = params?.id as string;
   const db = useFirestore();
-  const { profile } = useUser();
+  const { profile, tenantId } = useUser();
   
   const orderRef = useMemo(() => id && id !== 'default' ? doc(db, 'repairOrders', id) : null, [db, id]);
   const { data: order, loading } = useDoc<any>(orderRef);
@@ -59,7 +59,11 @@ export default function RepairOrderDetailsPage() {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiDiagnosis, setAiDiagnosis] = useState<any>(null);
 
-  const inventoryQuery = useMemo(() => query(collection(db, 'products')), [db]);
+  // FIXED: Tenant scoping added to inventory query to prevent cross-tenant leakage
+  const inventoryQuery = useMemo(() => query(
+    collection(db, 'products'),
+    where('tenantId', '==', tenantId)
+  ), [db, tenantId]);
   const { data: products } = useCollection(inventoryQuery);
 
   const filteredProducts = products.filter(p => 
@@ -101,7 +105,11 @@ export default function RepairOrderDetailsPage() {
     setSearchTerm("");
 
     if (orderRef) {
-      batch.update(orderRef, { partsUsed: updatedParts, updatedAt: Date.now(), totalAmount: subtotalParts + Number(laborCost) + product.retailPrice });
+      batch.update(orderRef, { 
+        partsUsed: updatedParts, 
+        updatedAt: Date.now(), 
+        totalAmount: subtotalParts + Number(laborCost) + product.retailPrice 
+      });
       batch.update(doc(db, "products", product.id), { stock: increment(-1) });
       
       batch.commit().catch(async (err) => {
@@ -117,7 +125,11 @@ export default function RepairOrderDetailsPage() {
 
     if (orderRef) {
       const batch = writeBatch(db);
-      batch.update(orderRef, { partsUsed: updatedParts, updatedAt: Date.now(), totalAmount: total - (part.price * part.quantity) });
+      batch.update(orderRef, { 
+        partsUsed: updatedParts, 
+        updatedAt: Date.now(), 
+        totalAmount: total - (part.price * part.quantity) 
+      });
       batch.update(doc(db, "products", part.productId), { stock: increment(part.quantity) });
       
       batch.commit().catch(async (err) => {
@@ -154,6 +166,7 @@ export default function RepairOrderDetailsPage() {
     .then(() => {
       toast({ title: "تم الحفظ", description: "تم حفظ تكاليف العمل." });
       addDoc(collection(db, "auditLogs"), {
+        tenantId,
         userId: profile?.uid || "workshop",
         userName: profile?.displayName || "فني الورشة",
         action: "تعديل فاتورة ورشة",
@@ -167,7 +180,7 @@ export default function RepairOrderDetailsPage() {
 
   const notifyCustomer = () => {
     if (!order) return;
-    const message = `مرحباً ${order.customerName}،\nحالة دراجتكم ${order.bikeBrand} هي الآن: *${order.status}*.\nالمبلغ: ${total.toLocaleString()} د.ع.\nشكراً لمجمع محمد علاء.`;
+    const message = `مرحباً ${order.customerName}،\nحالة دراجتكم ${order.bikeBrand} هي الآن: *${order.status}*.\nالمبلغ: ${total.toLocaleString()} د.ع.\nشكراً لطلبكم.`;
     window.open(`https://wa.me/${order.phoneNumber}?text=${encodeURIComponent(message)}`, '_blank');
   };
 

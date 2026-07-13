@@ -46,6 +46,7 @@ export default function ReceiptVouchersPage() {
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
+  // FIXED: Server-side tenant filtering for receipt vouchers
   const vouchersQuery = useMemo(() => query(
     collection(db, 'receiptVouchers'), 
     where('tenantId', '==', tenantId),
@@ -53,6 +54,7 @@ export default function ReceiptVouchersPage() {
   ), [db, tenantId]);
   const { data: vouchers, loading } = useCollection(vouchersQuery);
 
+  // FIXED: Server-side tenant filtering for users (customers) selection
   const usersQuery = useMemo(() => query(
     collection(db, 'users'),
     where('tenantId', '==', tenantId)
