@@ -28,19 +28,35 @@ import {
   AreaChart
 } from "recharts";
 import { StatsCard } from "@/components/admin/stats-card";
-import { useFirestore, useCollection } from "@/firebase";
-import { collection, query, orderBy } from "firebase/firestore";
+import { useFirestore, useCollection, useUser } from "@/firebase";
+import { collection, query, orderBy, where } from "firebase/firestore";
 import { useMemo } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function ReportsPage() {
   const db = useFirestore();
+  const { tenantId } = useUser();
   
-  // Memoizing queries to prevent infinite fetch loops
-  const ordersQuery = useMemo(() => query(collection(db, 'orders')), [db]);
-  const expensesQuery = useMemo(() => query(collection(db, 'expenses')), [db]);
-  const repairsQuery = useMemo(() => query(collection(db, 'repairOrders')), [db]);
-  const usersQuery = useMemo(() => query(collection(db, 'users')), [db]);
+  // FIXED: Scoped all queries to tenantId to prevent permission errors
+  const ordersQuery = useMemo(() => query(
+    collection(db, 'orders'),
+    where('tenantId', '==', tenantId)
+  ), [db, tenantId]);
+
+  const expensesQuery = useMemo(() => query(
+    collection(db, 'expenses'),
+    where('tenantId', '==', tenantId)
+  ), [db, tenantId]);
+
+  const repairsQuery = useMemo(() => query(
+    collection(db, 'repairOrders'),
+    where('tenantId', '==', tenantId)
+  ), [db, tenantId]);
+
+  const usersQuery = useMemo(() => query(
+    collection(db, 'users'),
+    where('tenantId', '==', tenantId)
+  ), [db, tenantId]);
 
   const { data: orders, loading: ordersLoading } = useCollection(ordersQuery);
   const { data: expenses, loading: expensesLoading } = useCollection(expensesQuery);
@@ -100,7 +116,7 @@ export default function ReportsPage() {
   );
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
+    <div className="space-y-8 animate-in fade-in duration-500 pb-20" dir="rtl">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div className="space-y-1">
           <h1 className="text-3xl font-black tracking-tight">التقارير والتحليلات الحقيقية</h1>
