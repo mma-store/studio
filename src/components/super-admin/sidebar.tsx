@@ -14,7 +14,8 @@ import {
   Globe,
   LifeBuoy,
   History,
-  CreditCard
+  CreditCard,
+  Building2
 } from "lucide-react";
 
 import {
@@ -80,39 +81,39 @@ export function SuperAdminSidebar() {
   };
 
   return (
-    <Sidebar collapsible="icon" className="border-l bg-slate-900 text-white" side="right">
-      <SidebarHeader className="h-28 flex flex-col items-center justify-center border-b border-white/10 px-6 bg-slate-950">
+    <Sidebar collapsible="icon" className="border-l bg-slate-950 text-white" side="right">
+      <SidebarHeader className="h-28 flex flex-col items-center justify-center border-b border-white/5 px-6 bg-black/20">
         <Link href="/super-admin" className="flex flex-col items-center gap-2">
-          <div className="relative h-12 w-32 shrink-0">
-            <Image src={LOGO_URL} alt="Platform" fill className="object-contain" />
+          <div className="relative h-12 w-36 shrink-0">
+            <Image src={LOGO_URL} alt="Platform" fill className="object-contain brightness-0 invert" />
           </div>
-          <span className="text-[10px] font-black text-primary uppercase tracking-[0.3em] opacity-80">Super Admin Panel</span>
+          <span className="text-[9px] font-black text-primary uppercase tracking-[0.4em] opacity-60 group-data-[collapsible=icon]:hidden">Master Portal</span>
         </Link>
       </SidebarHeader>
 
-      <SidebarContent className="py-6 px-3">
+      <SidebarContent className="py-8 px-4">
         {SUPER_ADMIN_MENU.map((group) => (
           <SidebarGroup key={group.label} className="mb-6">
-            <SidebarGroupLabel className="px-4 text-[10px] font-black uppercase tracking-widest text-white/30 group-data-[collapsible=icon]:hidden mb-3 text-right">
+            <SidebarGroupLabel className="px-4 text-[10px] font-black uppercase tracking-[0.2em] text-white/30 group-data-[collapsible=icon]:hidden mb-4 text-right">
               {group.label}
             </SidebarGroupLabel>
             <SidebarGroupContent>
-              <SidebarMenu className="gap-1.5">
+              <SidebarMenu className="gap-2">
                 {group.items.map((item) => {
-                  const isActive = pathname === item.href;
+                  const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
                   return (
                     <SidebarMenuItem key={item.title}>
                       <SidebarMenuButton 
                         asChild 
                         isActive={isActive}
                         className={cn(
-                          "h-12 px-4 transition-all duration-300 rounded-xl hover:bg-white/5 text-right flex-row justify-start gap-4",
-                          isActive ? "bg-primary text-white shadow-lg shadow-primary/20" : "text-white/60"
+                          "h-12 px-4 transition-all duration-300 rounded-[18px] hover:bg-white/5 text-right flex-row justify-start gap-4",
+                          isActive ? "bg-primary text-white shadow-2xl shadow-primary/40 scale-105" : "text-white/60"
                         )}
                         tooltip={item.title}
                       >
                         <Link href={item.href}>
-                          <item.icon className={cn("h-5 w-5 transition-transform duration-300", isActive ? "scale-110" : "opacity-50")} />
+                          <item.icon className={cn("h-5 w-5 transition-transform duration-500", isActive ? "scale-110" : "opacity-40")} />
                           <span className="font-black text-sm group-data-[collapsible=icon]:hidden">{item.title}</span>
                         </Link>
                       </SidebarMenuButton>
@@ -125,16 +126,16 @@ export function SuperAdminSidebar() {
         ))}
       </SidebarContent>
 
-      <SidebarFooter className="border-t border-white/10 p-6 space-y-4 bg-slate-950/50">
-        <div className="px-4 py-3 bg-white/5 rounded-2xl border border-white/10 group-data-[collapsible=icon]:hidden text-right">
-           <p className="text-[9px] font-black text-white/30 uppercase tracking-widest mb-1">Platform v2.5</p>
-           <p className="text-[11px] font-black text-white/80 leading-relaxed">بواسطة: <span className="text-primary">حسين صلاح</span></p>
+      <SidebarFooter className="border-t border-white/5 p-8 space-y-4 bg-black/10">
+        <div className="px-5 py-4 bg-white/5 rounded-2xl border border-white/5 group-data-[collapsible=icon]:hidden text-right">
+           <p className="text-[9px] font-black text-white/20 uppercase tracking-widest mb-1">Platform Identity</p>
+           <p className="text-[11px] font-black text-white/80 leading-relaxed">بواسطة <span className="text-primary">حسين صلاح</span></p>
         </div>
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton 
               onClick={handleLogout}
-              className="h-12 px-4 text-red-400 hover:bg-red-500/10 hover:text-red-300 w-full flex-row gap-4 rounded-xl"
+              className="h-12 px-4 text-red-400 hover:bg-red-500/10 hover:text-red-300 w-full flex-row gap-4 rounded-2xl transition-colors"
             >
               <LogOut className="h-5 w-5" />
               <span className="font-black group-data-[collapsible=icon]:hidden text-sm">تسجيل الخروج الآمن</span>

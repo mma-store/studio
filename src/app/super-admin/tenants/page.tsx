@@ -16,9 +16,10 @@ import {
   Edit3,
   ChevronRight,
   Filter,
-  ArrowUpDown,
+  User,
+  BadgeCheck,
   CreditCard,
-  User
+  Building2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,6 +31,14 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuLabel, 
+  DropdownMenuSeparator, 
+  DropdownMenuTrigger 
+} from "@/components/ui/dropdown-menu";
 
 export default function TenantsManagementPage() {
   const db = useFirestore();
@@ -44,26 +53,26 @@ export default function TenantsManagementPage() {
     t.ownerName?.toLowerCase().includes(search.toLowerCase())
   );
 
-  const toggleStatus = async (tenantId: string, currentStatus: string) => {
-    const newStatus = currentStatus === 'active' ? 'suspended' : 'active';
+  const updateTenantStatus = async (tenantId: string, newStatus: string) => {
     try {
       await updateDoc(doc(db, 'tenants', tenantId), { status: newStatus });
-      toast({ title: "تم تحديث حالة المتجر", description: `المتجر الآن ${newStatus === 'active' ? 'نشط' : 'معطل'}.` });
+      toast({ title: "تم التحديث", description: `حالة المتجر الآن: ${newStatus}` });
     } catch (e) {
       toast({ variant: "destructive", title: "خطأ في التحديث" });
     }
   };
 
-  const extendTrial = async (tenantId: string, currentEndDate: number) => {
-    const newEndDate = (currentEndDate || Date.now()) + (7 * 24 * 60 * 60 * 1000);
+  const extendSubscription = async (tenantId: string, currentEndDate: number) => {
+    const extraDays = 30 * 24 * 60 * 60 * 1000;
+    const newEndDate = (currentEndDate || Date.now()) + extraDays;
     try {
       await updateDoc(doc(db, 'tenants', tenantId), { 
         trialEndDate: newEndDate,
-        status: 'trial' 
+        status: 'active' 
       });
-      toast({ title: "تم تمديد الفترة", description: "تم إضافة 7 أيام إضافية للفترة التجريبية." });
+      toast({ title: "تم التمديد", description: "تم تمديد الاشتراك لمدة 30 يوماً إضافية." });
     } catch (e) {
-      toast({ variant: "destructive", title: "خطأ" });
+      toast({ variant: "destructive", title: "خطأ في التمديد" });
     }
   };
 
@@ -71,14 +80,13 @@ export default function TenantsManagementPage() {
     <div className="space-y-8 animate-in fade-in duration-500 pb-20" dir="rtl">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div className="space-y-1">
-          <h1 className="text-3xl font-black text-slate-900">إدارة المشتركين (Tenants)</h1>
-          <p className="text-muted-foreground font-medium">التحكم في كافة المتاجر المشتركة، مراجعة اشتراكاتهم، وإدارة حالات الوصول.</p>
+          <h1 className="text-3xl font-black text-slate-900">إدارة المشتركين</h1>
+          <p className="text-muted-foreground font-medium">التحكم في كافة المتاجر المشتركة ومتابعة حالات اشتراكاتهم.</p>
         </div>
         <div className="flex items-center gap-3">
-           <Button variant="outline" className="rounded-xl border-2 font-bold h-11 gap-2">
+           <Button variant="outline" className="rounded-xl border-2 font-black h-11 gap-2">
               <Filter className="h-4 w-4" /> تصفية النتائج
            </Button>
-           <Button className="rounded-xl font-black h-11 px-8 shadow-lg shadow-primary/20">تصدير بيانات المشتركين</Button>
         </div>
       </div>
 
@@ -94,91 +102,98 @@ export default function TenantsManagementPage() {
         </div>
       </div>
 
-      <div className="rounded-[32px] border-none bg-white shadow-sm overflow-hidden border">
+      <div className="rounded-[40px] border-none bg-white shadow-sm overflow-hidden border">
         <Table>
           <TableHeader>
-            <TableRow className="bg-slate-50/50">
-              <TableHead className="text-right py-6 px-6 font-black text-xs uppercase tracking-widest text-slate-500">المتجر والمالك</TableHead>
-              <TableHead className="text-right font-black text-xs uppercase tracking-widest text-slate-500">الرابط</TableHead>
-              <TableHead className="text-right font-black text-xs uppercase tracking-widest text-slate-500">الباقة</TableHead>
-              <TableHead className="text-right font-black text-xs uppercase tracking-widest text-slate-500">تاريخ الانتهاء</TableHead>
-              <TableHead className="text-right font-black text-xs uppercase tracking-widest text-slate-500">الحالة</TableHead>
-              <TableHead className="text-left px-6 font-black text-xs uppercase tracking-widest text-slate-500">إجراءات</TableHead>
+            <TableRow className="bg-slate-50/50 hover:bg-slate-50/50">
+              <TableHead className="text-right py-6 px-8 font-black text-[10px] uppercase tracking-[0.2em] text-slate-500">المتجر والمالك</TableHead>
+              <TableHead className="text-right font-black text-[10px] uppercase tracking-[0.2em] text-slate-500">الرابط المباشر</TableHead>
+              <TableHead className="text-right font-black text-[10px] uppercase tracking-[0.2em] text-slate-500">الخطة</TableHead>
+              <TableHead className="text-right font-black text-[10px] uppercase tracking-[0.2em] text-slate-500">حالة الاشتراك</TableHead>
+              <TableHead className="text-right font-black text-[10px] uppercase tracking-[0.2em] text-slate-500">تاريخ الانتهاء</TableHead>
+              <TableHead className="text-left px-8 font-black text-[10px] uppercase tracking-[0.2em] text-slate-500">الإجراءات</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
               Array(6).fill(0).map((_, i) => (
                 <TableRow key={i}>
-                  <TableCell colSpan={6} className="px-6 py-4"><Skeleton className="h-12 w-full rounded-2xl" /></TableCell>
+                  <TableCell colSpan={6} className="px-8 py-4"><Skeleton className="h-12 w-full rounded-2xl" /></TableCell>
                 </TableRow>
               ))
             ) : filtered.length > 0 ? (
               filtered.map((tenant: any) => (
-                <TableRow key={tenant.id} className="hover:bg-slate-50/80 transition-colors group">
-                  <TableCell className="px-6 py-4">
+                <TableRow key={tenant.id} className="hover:bg-slate-50/80 transition-colors border-b last:border-0 group">
+                  <TableCell className="px-8 py-5">
                     <div className="flex items-center gap-4">
-                       <div className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary font-black shadow-inner">
+                       <div className="h-14 w-14 rounded-[20px] bg-primary/5 flex items-center justify-center text-primary font-black shadow-inner border border-primary/10">
                           {tenant.businessName?.[0]}
                        </div>
                        <div className="flex flex-col">
                           <span className="font-black text-sm text-slate-800">{tenant.businessName}</span>
-                          <div className="flex items-center gap-2 text-[10px] font-bold text-muted-foreground">
-                             <User className="h-3 w-3" /> {tenant.ownerName || 'بدون مالك'}
-                             <span className="mx-1">•</span>
+                          <div className="flex items-center gap-2 text-[10px] font-bold text-muted-foreground mt-1">
+                             <User className="h-3 w-3" /> {tenant.ownerName || 'بدون اسم'}
+                             <span className="opacity-30">•</span>
                              <Phone className="h-3 w-3" /> <span dir="ltr">{tenant.phone}</span>
                           </div>
                        </div>
                     </div>
                   </TableCell>
-                  <TableCell className="font-mono text-xs text-primary font-bold">
-                     <Link href={`/store/${tenant.slug}`} target="_blank" className="hover:underline">/{tenant.slug}</Link>
+                  <TableCell className="font-mono text-[11px] text-primary font-bold">
+                     <Link href={`/store/${tenant.slug}`} target="_blank" className="hover:underline flex items-center gap-1">
+                        /{tenant.slug} <ExternalLink className="h-2.5 w-2.5" />
+                     </Link>
                   </TableCell>
                   <TableCell>
-                    <Badge variant="outline" className="rounded-full border-blue-200 text-blue-700 font-bold text-[10px] px-3 bg-blue-50/50">
+                    <Badge variant="outline" className="rounded-full border-primary/20 text-primary font-black text-[9px] px-3 py-0.5 bg-primary/5">
                        {tenant.subscriptionPlan?.toUpperCase() || 'TRIAL'}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-[10px] font-bold text-muted-foreground">
-                    {tenant.trialEndDate ? new Date(tenant.trialEndDate).toLocaleDateString("ar-EG") : '---'}
-                  </TableCell>
                   <TableCell>
                     <Badge className={cn(
-                      "rounded-full border-none font-black text-[10px] px-3",
-                      tenant.status === 'active' ? "bg-green-100 text-green-700" : 
-                      tenant.status === 'trial' ? "bg-blue-100 text-blue-700" :
-                      "bg-red-100 text-red-700"
+                      "rounded-full border-none font-black text-[9px] px-3 py-1",
+                      tenant.status === 'active' ? "bg-emerald-100 text-emerald-700" : 
+                      tenant.status === 'trial' ? "bg-blue-100 text-blue-700" : "bg-red-100 text-red-700"
                     )}>
                       {tenant.status === 'active' ? 'نشط' : tenant.status === 'trial' ? 'تجريبي' : 'معطل'}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-left px-6">
+                  <TableCell className="text-[10px] font-bold text-slate-500">
+                    {tenant.trialEndDate ? new Date(tenant.trialEndDate).toLocaleDateString("ar-EG") : 'غير محدد'}
+                  </TableCell>
+                  <TableCell className="text-left px-8">
                      <div className="flex items-center justify-end gap-2">
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className={cn("rounded-xl h-9 w-9", tenant.status === 'active' ? "text-red-600 hover:bg-red-50" : "text-green-600 hover:bg-green-50")}
-                          onClick={() => toggleStatus(tenant.id, tenant.status)}
-                          title={tenant.status === 'active' ? 'تعطيل المتجر' : 'تفعيل المتجر'}
-                        >
-                          {tenant.status === 'active' ? <ShieldX className="h-4 w-4" /> : <ShieldCheck className="h-4 w-4" />}
-                        </Button>
-                        
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="rounded-xl h-9 w-9 text-orange-600 hover:bg-orange-50"
-                          onClick={() => extendTrial(tenant.id, tenant.trialEndDate)}
-                          title="تمديد الفترة التجريبية (7 أيام)"
-                        >
-                           <Calendar className="h-4 w-4" />
-                        </Button>
-
                         <Link href={`/super-admin/tenants/${tenant.id}`}>
-                           <Button variant="ghost" size="icon" className="rounded-xl h-9 w-9 text-primary hover:bg-primary/5">
-                              <Edit3 className="h-4 w-4" />
+                           <Button variant="ghost" size="icon" className="rounded-xl h-10 w-10 text-primary bg-primary/5 hover:bg-primary/10">
+                              <Building2 className="h-4 w-4" />
                            </Button>
                         </Link>
+
+                        <DropdownMenu>
+                           <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="rounded-xl h-10 w-10"><MoreVertical className="h-5 w-5" /></Button>
+                           </DropdownMenuTrigger>
+                           <DropdownMenuContent align="end" className="rounded-2xl p-2 w-56 shadow-2xl border-none">
+                              <DropdownMenuLabel className="font-black text-[10px] uppercase opacity-50 px-2 py-1">إدارة المتجر</DropdownMenuLabel>
+                              <DropdownMenuItem className="rounded-xl gap-2 font-bold cursor-pointer" onClick={() => updateTenantStatus(tenant.id, 'active')}>
+                                 <ShieldCheck className="h-4 w-4 text-emerald-600" /> تفعيل المتجر
+                              </DropdownMenuItem>
+                              <DropdownMenuItem className="rounded-xl gap-2 font-bold cursor-pointer" onClick={() => updateTenantStatus(tenant.id, 'suspended')}>
+                                 <ShieldX className="h-4 w-4 text-red-600" /> تعطيل المتجر مؤقتاً
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem className="rounded-xl gap-2 font-bold cursor-pointer" onClick={() => extendSubscription(tenant.id, tenant.trialEndDate)}>
+                                 <Calendar className="h-4 w-4 text-blue-600" /> تمديد 30 يوم
+                              </DropdownMenuItem>
+                              <DropdownMenuItem className="rounded-xl gap-2 font-bold cursor-pointer">
+                                 <Edit3 className="h-4 w-4 text-orange-600" /> تعديل البيانات
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem className="rounded-xl gap-2 font-bold cursor-pointer text-red-600">
+                                 <Trash2 className="h-4 w-4" /> حذف المتجر نهائياً
+                              </DropdownMenuItem>
+                           </DropdownMenuContent>
+                        </DropdownMenu>
                      </div>
                   </TableCell>
                 </TableRow>
