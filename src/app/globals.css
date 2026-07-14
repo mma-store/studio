@@ -4,83 +4,78 @@
 
 @layer base {
   :root {
-    /* Primary: Vibrant Orange #FF6B00 - Tonal Palette MD3 */
-    --primary: 25 100% 50%;
-    --primary-foreground: 0 0% 100%;
+    /* Primary: Deep Navy SaaS Branding */
+    --primary: 222 47% 11%;
+    --primary-foreground: 210 40% 98%;
     
-    /* Background: Neutral Surface #FDF8F5 */
-    --background: 22 60% 98%;
-    --foreground: 240 3% 10%;
+    /* Background: Clean Neutral Surface */
+    --background: 210 40% 98%;
+    --foreground: 222 47% 11%;
     
     --card: 0 0% 100%;
-    --card-foreground: 240 3% 10%;
+    --card-foreground: 222 47% 11%;
     
     --popover: 0 0% 100%;
-    --popover-foreground: 240 3% 10%;
+    --popover-foreground: 222 47% 11%;
     
-    --secondary: 22 20% 90%;
-    --secondary-foreground: 25 100% 10%;
+    /* Modern Blue for Interactivity */
+    --secondary: 210 100% 50%;
+    --secondary-foreground: 210 40% 98%;
     
-    --muted: 22 20% 94%;
-    --muted-foreground: 240 3% 45%;
+    --muted: 214 32% 91%;
+    --muted-foreground: 215 16% 47%;
     
-    --accent: 25 100% 96%;
-    --accent-foreground: 25 100% 40%;
+    --accent: 217 91% 60%;
+    --accent-foreground: 222 47% 11%;
     
     --destructive: 0 84% 60%;
-    --destructive-foreground: 0 0% 98%;
+    --destructive-foreground: 210 40% 98%;
     
-    --border: 22 20% 90%;
-    --input: 22 20% 90%;
-    --ring: 25 100% 50%;
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 222 47% 11%;
     
     --radius: 1.75rem; /* 28px for MD3 Cards */
 
-    /* Sidebar Variables for the components */
-    --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 240 3% 10%;
-    --sidebar-primary: 25 100% 50%;
+    /* Sidebar Unification */
+    --sidebar-background: 222 47% 11%;
+    --sidebar-foreground: 210 40% 98%;
+    --sidebar-primary: 217 91% 60%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 25 100% 96%;
-    --sidebar-accent-foreground: 25 100% 40%;
-    --sidebar-border: 22 20% 90%;
-    --sidebar-ring: 25 100% 50%;
+    --sidebar-accent: 222 47% 15%;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-border: 222 47% 15%;
+    --sidebar-ring: 217 91% 60%;
   }
 
   .dark {
-    --background: 240 3% 8%;
-    --foreground: 0 0% 98%;
+    --background: 222 47% 6%;
+    --foreground: 210 40% 98%;
     
-    --card: 240 3% 12%;
-    --card-foreground: 0 0% 98%;
+    --card: 222 47% 9%;
+    --card-foreground: 210 40% 98%;
     
-    --popover: 240 3% 10%;
-    --popover-foreground: 0 0% 98%;
+    --popover: 222 47% 9%;
+    --popover-foreground: 210 40% 98%;
     
-    --primary: 25 100% 55%;
-    --primary-foreground: 0 0% 10%;
+    --primary: 217 91% 60%;
+    --primary-foreground: 222 47% 11%;
     
-    --secondary: 240 3% 20%;
-    --secondary-foreground: 0 0% 98%;
+    --secondary: 222 47% 15%;
+    --secondary-foreground: 210 40% 98%;
     
-    --muted: 240 3% 18%;
-    --muted-foreground: 240 3% 65%;
+    --muted: 222 47% 15%;
+    --muted-foreground: 215 20% 65%;
     
-    --accent: 25 100% 15%;
-    --accent-foreground: 25 100% 70%;
+    --accent: 217 91% 60%;
+    --accent-foreground: 210 40% 98%;
     
-    --border: 240 3% 20%;
-    --input: 240 3% 20%;
-    --ring: 25 100% 55%;
+    --border: 222 47% 15%;
+    --input: 222 47% 15%;
+    --ring: 217 91% 60%;
 
-    --sidebar-background: 240 3% 12%;
-    --sidebar-foreground: 0 0% 98%;
-    --sidebar-primary: 25 100% 55%;
-    --sidebar-primary-foreground: 0 0% 10%;
-    --sidebar-accent: 240 3% 20%;
-    --sidebar-accent-foreground: 0 0% 98%;
-    --sidebar-border: 240 3% 20%;
-    --sidebar-ring: 25 100% 55%;
+    --sidebar-background: 222 47% 4%;
+    --sidebar-foreground: 210 40% 98%;
   }
 }
 
@@ -89,7 +84,7 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground selection:bg-primary/30 antialiased;
+    @apply bg-background text-foreground selection:bg-primary/20 antialiased;
     font-feature-settings: "rlig" 1, "calt" 1;
     font-family: 'Almarai', sans-serif;
   }
@@ -107,7 +102,6 @@
   scrollbar-width: none;
 }
 
-/* Ensure images don't break layout */
 img {
   max-width: 100%;
   height: auto;

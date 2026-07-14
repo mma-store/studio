@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -119,28 +118,29 @@ export function AdminSidebar() {
   };
 
   return (
-    <Sidebar collapsible="icon" className="border-l bg-card">
-      <SidebarHeader className="h-28 flex items-center justify-center border-b px-6">
-        <Link href="/admin" className="flex items-center gap-3">
-          <div className="relative h-20 w-48 shrink-0">
+    <Sidebar collapsible="icon" className="border-l bg-primary text-white" side="right">
+      <SidebarHeader className="h-28 flex flex-col items-center justify-center border-b border-white/10 px-6 bg-black/20">
+        <Link href="/admin" className="flex flex-col items-center gap-2">
+          <div className="relative h-12 w-36 shrink-0">
             <Image 
               src={LOGO_URL} 
-              alt="MMA" 
+              alt="Platform" 
               fill 
-              className="object-contain"
+              className="object-contain brightness-0 invert"
             />
           </div>
+          <span className="text-[10px] font-black text-secondary uppercase tracking-[0.3em] opacity-80 group-data-[collapsible=icon]:hidden">Business Portal</span>
         </Link>
       </SidebarHeader>
 
-      <SidebarContent className="py-4">
+      <SidebarContent className="py-6 px-3">
         {ADMIN_MENU.map((group) => (
-          <SidebarGroup key={group.label}>
-            <SidebarGroupLabel className="px-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 group-data-[collapsible=icon]:hidden mt-4 mb-2 text-right">
+          <SidebarGroup key={group.label} className="mb-4">
+            <SidebarGroupLabel className="px-4 text-[10px] font-black uppercase tracking-widest text-white/40 group-data-[collapsible=icon]:hidden mb-3 text-right">
               {group.label}
             </SidebarGroupLabel>
             <SidebarGroupContent>
-              <SidebarMenu>
+              <SidebarMenu className="gap-1">
                 {group.items.map((item) => {
                   const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
                   return (
@@ -149,14 +149,14 @@ export function AdminSidebar() {
                         asChild 
                         isActive={isActive}
                         className={cn(
-                          "h-11 px-4 transition-all hover:bg-muted text-right flex-row-reverse justify-start gap-3",
-                          isActive ? "bg-primary text-primary-foreground hover:bg-primary/90" : "text-muted-foreground"
+                          "h-11 px-4 transition-all duration-300 rounded-xl hover:bg-white/5 text-right flex-row justify-start gap-4",
+                          isActive ? "bg-secondary text-white shadow-lg shadow-secondary/20" : "text-white/60"
                         )}
                         tooltip={item.title}
                       >
                         <Link href={item.href}>
-                          <item.icon className={cn("h-5 w-5", isActive ? "text-white" : "text-muted-foreground")} />
-                          <span className="font-bold text-sm group-data-[collapsible=icon]:hidden">{item.title}</span>
+                          <item.icon className={cn("h-5 w-5 transition-transform duration-300", isActive ? "scale-110" : "opacity-50")} />
+                          <span className="font-black text-sm group-data-[collapsible=icon]:hidden">{item.title}</span>
                         </Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
@@ -168,19 +168,19 @@ export function AdminSidebar() {
         ))}
       </SidebarContent>
 
-      <SidebarFooter className="border-t p-4 space-y-4">
-        <div className="px-4 py-3 bg-primary/5 rounded-[20px] border border-primary/10 group-data-[collapsible=icon]:hidden text-left" dir="ltr">
-           <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest mb-1">System Credits</p>
-           <p className="text-xs font-black text-foreground">Developed by: <span className="text-primary">Hussein Salah</span></p>
+      <SidebarFooter className="border-t border-white/10 p-6 space-y-4 bg-black/20">
+        <div className="px-4 py-3 bg-white/5 rounded-2xl border border-white/10 group-data-[collapsible=icon]:hidden text-right">
+           <p className="text-[9px] font-black text-white/30 uppercase tracking-widest mb-1">Developed by</p>
+           <p className="text-[11px] font-black text-white/80">Hussein Salah</p>
         </div>
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton 
               onClick={handleLogout}
-              className="h-11 px-4 text-destructive hover:bg-destructive/10 hover:text-destructive w-full flex-row-reverse gap-3"
+              className="h-11 px-4 text-red-300 hover:bg-red-500/10 hover:text-red-200 w-full flex-row gap-4 rounded-xl"
             >
               <LogOut className="h-5 w-5" />
-              <span className="font-bold group-data-[collapsible=icon]:hidden">تسجيل الخروج</span>
+              <span className="font-black group-data-[collapsible=icon]:hidden text-sm">خروج آمن</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
