@@ -18,7 +18,8 @@ import {
   Upload,
   History,
   Save,
-  AlertTriangle
+  AlertTriangle,
+  Zap
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -67,6 +68,7 @@ import { uploadToCloudinary, getOptimizedUrl } from "@/lib/cloudinary";
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import { useSubscription } from "@/hooks/use-subscription";
+import Link from "next/link";
 
 export default function ProductsManagementPage() {
   const db = useFirestore();
@@ -138,12 +140,12 @@ export default function ProductsManagementPage() {
     e.preventDefault();
     if (isSaving) return;
 
-    // Check Plan Limits
+    // Plan Enforcement
     if (!editingProduct && !subscription.canAddProduct(products.length)) {
        toast({ 
          variant: "destructive", 
          title: "تم الوصول للحد الأقصى", 
-         description: `خطتك الحالية (${subscription.plan}) تسمح بـ ${subscription.limits.maxProducts} منتج فقط. يرجى الترقية لزيادة الحد.` 
+         description: `خطتك الحالية تسمح بـ ${subscription.limits.maxProducts} منتج فقط.` 
        });
        return;
     }
@@ -228,10 +230,29 @@ export default function ProductsManagementPage() {
              <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto rounded-[32px] p-0 border-none shadow-2xl">
                 <div className="p-8 space-y-6">
                   {subscription.isExpired && (
-                    <div className="bg-red-50 text-red-600 p-4 rounded-2xl flex items-center gap-3 border border-red-100">
-                      <AlertTriangle className="h-5 w-5" />
-                      <p className="text-xs font-black">لا يمكنك إضافة منتجات جديدة لأن فترة الاشتراك قد انتهت.</p>
-                    </div>
+                    <Card className="bg-red-50 border-red-100 p-6 rounded-3xl flex flex-col items-center text-center gap-4">
+                      <AlertTriangle className="h-10 w-10 text-red-600" />
+                      <div className="space-y-1">
+                         <h3 className="font-black text-red-900">الاشتراك منتهي!</h3>
+                         <p className="text-xs text-red-700 font-bold">يرجى تجديد الاشتراك لتتمكن من إضافة أو تعديل المنتجات.</p>
+                      </div>
+                      <Button className="bg-red-600 hover:bg-red-700 rounded-xl" asChild>
+                         <Link href="/admin/billing">صفحة الفوترة</Link>
+                      </Button>
+                    </Card>
+                  )}
+
+                  {!subscription.canAddProduct(products.length) && !editingProduct && !subscription.isExpired && (
+                    <Card className="bg-orange-50 border-orange-100 p-6 rounded-3xl flex flex-col items-center text-center gap-4">
+                       <Zap className="h-10 w-10 text-orange-600" />
+                       <div className="space-y-1">
+                          <h3 className="font-black text-orange-900">وصلت للحد الأقصى!</h3>
+                          <p className="text-xs text-orange-700 font-bold">خطتك الحالية تسمح بـ {subscription.limits.maxProducts} منتج. قم بالترقية للزيادة.</p>
+                       </div>
+                       <Button className="bg-orange-600 hover:bg-orange-700 rounded-xl" asChild>
+                          <Link href="/admin/billing">ترقية الآن</Link>
+                       </Button>
+                    </Card>
                   )}
 
                   <DialogHeader>
@@ -263,16 +284,6 @@ export default function ProductsManagementPage() {
                             <Input name="retailPrice" defaultValue={editingProduct?.retailPrice} type="number" required className="rounded-2xl h-14 bg-muted/30 border-none text-center font-black text-xl text-primary" />
                           </div>
                         </div>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label className="font-bold">سعر الجملة</Label>
-                            <Input name="wholesalePrice" defaultValue={editingProduct?.wholesalePrice} type="number" className="rounded-2xl h-14 bg-muted/30 border-none text-center font-black text-xl" />
-                          </div>
-                          <div className="space-y-2">
-                            <Label className="font-bold">الكمية المتوفرة</Label>
-                            <Input name="stock" defaultValue={editingProduct?.stock} type="number" required className="rounded-2xl h-14 bg-muted/30 border-none text-center font-black text-xl" />
-                          </div>
-                        </div>
                       </div>
 
                       <div className="space-y-4">
@@ -296,18 +307,12 @@ export default function ProductsManagementPage() {
                           </Select>
                         </div>
                         <div className="space-y-2">
-                          <Label className="font-bold">موقع التخزين</Label>
-                          <Input name="storageLocation" defaultValue={editingProduct?.storageLocation} placeholder="مثال: رف A1" className="rounded-2xl h-14 bg-muted/30 border-none px-6" />
+                          <Label className="font-bold">الكمية المتوفرة</Label>
+                          <Input name="stock" defaultValue={editingProduct?.stock} type="number" required className="rounded-2xl h-14 bg-muted/30 border-none text-center font-black text-xl" />
                         </div>
                         <div className="space-y-2">
                           <Label className="font-bold">وصف المنتج</Label>
                           <Textarea name="description" defaultValue={editingProduct?.description} placeholder="اكتب تفاصيل إضافية..." className="rounded-2xl min-h-[120px] bg-muted/30 border-none p-6 text-sm font-medium" />
-                        </div>
-                        <div className="flex items-center gap-2 p-4 rounded-2xl bg-primary/5 border border-primary/10">
-                           <Checkbox name="isFeatured" id="isFeatured" defaultChecked={editingProduct?.isFeatured} />
-                           <label htmlFor="isFeatured" className="text-sm font-bold cursor-pointer select-none">
-                              تمييز المنتج في الواجهة الرئيسية
-                           </label>
                         </div>
                       </div>
                     </div>
@@ -332,7 +337,7 @@ export default function ProductsManagementPage() {
                     </div>
 
                     <DialogFooter className="pt-8 gap-4 flex-row justify-end" dir="rtl">
-                      <Button type="submit" className="rounded-2xl h-14 px-12 shadow-xl font-black text-lg gap-2" disabled={isUploading || isSaving || (subscription.isExpired && !editingProduct)}>
+                      <Button type="submit" className="rounded-2xl h-14 px-12 shadow-xl font-black text-lg gap-2" disabled={isUploading || isSaving || subscription.isExpired || (!editingProduct && !subscription.canAddProduct(products.length))}>
                         {isSaving ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}
                         {editingProduct ? "حفظ التعديلات" : "حفظ المنتج والنشـر"}
                       </Button>

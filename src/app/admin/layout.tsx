@@ -11,7 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { signOut } from "firebase/auth";
 import { useAuth } from "@/firebase";
-import { ShieldAlert, LogOut, AlertCircle, TrendingUp } from "lucide-react";
+import { ShieldAlert, LogOut, AlertCircle, TrendingUp, Zap } from "lucide-react";
 import { useSubscription } from "@/hooks/use-subscription";
 import Link from "next/link";
 
@@ -42,7 +42,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     }
   }, [user, profile, loading, router, tenantId]);
 
-  if (loading || subscription.loading) {
+  if (loading || (tenantId && subscription.loading)) {
     return (
       <div className="flex min-h-screen w-full flex-col items-center justify-center bg-background p-8 gap-8">
          <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-primary text-white shadow-2xl animate-bounce">
@@ -83,26 +83,29 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <SidebarInset className="flex flex-col min-w-0">
           <AdminHeader />
           
-          {/* Trial / Expiry Banner */}
+          {/* Subscription Banner System */}
           {tenantId !== 'MMA001' && (
             <div className="px-6 py-2">
               {subscription.isExpired ? (
-                <div className="bg-red-600 text-white px-4 py-3 rounded-2xl flex items-center justify-between animate-in slide-in-from-top duration-500">
-                   <div className="flex items-center gap-3">
-                      <AlertCircle className="h-5 w-5" />
-                      <span className="font-black text-sm">انتهت الفترة التجريبية للمتجر. يرجى الترقية للاستمرار في العمل.</span>
+                <div className="bg-red-600 text-white px-6 py-4 rounded-3xl flex items-center justify-between animate-in slide-in-from-top duration-500 shadow-xl shadow-red-600/20">
+                   <div className="flex items-center gap-4">
+                      <div className="h-10 w-10 rounded-full bg-white/20 flex items-center justify-center"><AlertCircle className="h-6 w-6" /></div>
+                      <div>
+                        <p className="font-black text-sm">انتهت صلاحية الاشتراك!</p>
+                        <p className="text-[10px] opacity-80 font-bold uppercase tracking-widest">بعض الميزات متوقفة حالياً حتى يتم التجديد.</p>
+                      </div>
                    </div>
-                   <Button variant="secondary" size="sm" className="rounded-xl font-black" asChild>
-                      <a href={`https://wa.me/9647858833838?text=${encodeURIComponent('أريد ترقية اشتراكي في المنصة')}`} target="_blank">تواصل مع الإدارة للترقية</a>
+                   <Button variant="secondary" size="lg" className="rounded-2xl font-black gap-2" asChild>
+                      <Link href="/admin/billing"><Zap className="h-4 w-4" /> جدد الآن</Link>
                    </Button>
                 </div>
-              ) : subscription.isTrial && (
-                <div className="bg-primary/10 border border-primary/20 text-primary px-4 py-2 rounded-2xl flex items-center justify-between text-xs font-bold">
-                   <div className="flex items-center gap-2">
-                      <TrendingUp className="h-4 w-4" />
-                      <span>أنت في الفترة التجريبية. يتبقى لك {subscription.daysRemaining} يوم.</span>
+              ) : subscription.daysRemaining <= 7 && (
+                <div className="bg-orange-500 text-white px-6 py-3 rounded-2xl flex items-center justify-between text-xs font-bold shadow-lg shadow-orange-500/20">
+                   <div className="flex items-center gap-3">
+                      <Clock className="h-5 w-5" />
+                      <span>تنبيه: متبقي لك {subscription.daysRemaining} أيام فقط على انتهاء الاشتراك.</span>
                    </div>
-                   <a href="https://wa.me/9647858833838" target="_blank" className="underline font-black">طلب اشتراك دائم</a>
+                   <Link href="/admin/billing" className="underline font-black hover:text-white/80">إدارة الفوترة</Link>
                 </div>
               )}
             </div>

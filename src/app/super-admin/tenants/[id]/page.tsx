@@ -24,12 +24,15 @@ import {
   Zap,
   LayoutDashboard,
   Clock,
-  ArrowRightLeft
+  ArrowRightLeft,
+  ExternalLink,
+  CreditCard,
+  Plus
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useFirestore, useDoc, useCollection } from "@/firebase";
-import { doc, collection, query, where, orderBy, limit, updateDoc, deleteDoc } from "firebase/firestore";
+import { doc, collection, query, where, orderBy, limit, updateDoc, deleteDoc, addDoc } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -42,22 +45,34 @@ import {
   SelectTrigger, 
   SelectValue 
 } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogTrigger,
+  DialogFooter
+} from "@/components/ui/dialog";
 
 export default function TenantDetailsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const db = useFirestore();
   const router = useRouter();
   const [isSaving, setIsSaving] = useState(false);
+  const [isInvoiceOpen, setIsInvoiceOpen] = useState(false);
 
   // Tenant Base Data
   const tenantRef = useMemo(() => doc(db, 'tenants', id), [db, id]);
   const { data: tenant, loading: tLoading } = useDoc<any>(tenantRef);
 
-  // Store-specific metrics (Real-time counts)
+  // Store-specific metrics
   const { data: products } = useCollection(query(collection(db, 'products'), where('tenantId', '==', id)));
   const { data: orders } = useCollection(query(collection(db, 'orders'), where('tenantId', '==', id)));
   const { data: staff } = useCollection(query(collection(db, 'users'), where('tenantId', '==', id)));
   const { data: logs } = useCollection(query(collection(db, 'auditLogs'), where('tenantId', '==', id), orderBy('timestamp', 'desc'), limit(15)));
+  const { data: invoices } = useCollection(query(collection(db, 'subscriptionInvoices'), where('tenantId', '==', id), orderBy('issueDate', 'desc')));
 
   const revenue = useMemo(() => orders.reduce((acc, o: any) => acc + (o.total || 0), 0), [orders]);
 
@@ -73,13 +88,43 @@ export default function TenantDetailsPage({ params }: { params: Promise<{ id: st
     }
   };
 
-  const updatePlan = async (subscriptionPlan: string) => {
+  const handleManualInvoice = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
     setIsSaving(true);
+    const fd = new FormData(e.currentTarget);
+    const amount = Number(fd.get('amount'));
+    const months = Number(fd.get('months'));
+    
     try {
-      await updateDoc(tenantRef, { subscriptionPlan });
-      toast({ title: "تم تغيير الباقة" });
+      const now = Date.now();
+      const currentExpiry = tenant.currentPeriodEnd || now;
+      const newExpiry = currentExpiry + (months * 30 * 24 * 60 * 60 * 1000);
+
+      // 1. Update Tenant
+      await updateDoc(tenantRef, {
+        status: 'active',
+        subscriptionPlan: fd.get('plan'),
+        currentPeriodStart: now,
+        currentPeriodEnd: newExpiry
+      });
+
+      // 2. Create Invoice
+      await addDoc(collection(db, 'subscriptionInvoices'), {
+        tenantId: id,
+        invoiceNumber: `INV-${Date.now().toString().slice(-6)}`,
+        planName: fd.get('plan'),
+        amountIQD: amount,
+        status: 'paid',
+        issueDate: now,
+        dueDate: now,
+        paymentDate: now,
+        notes: fd.get('notes') || 'تفعيل يدوي من السوبر أدمن'
+      });
+
+      toast({ title: "تم التفعيل بنجاح" });
+      setIsInvoiceOpen(false);
     } catch (e) {
-      toast({ variant: "destructive", title: "فشل التغيير" });
+      toast({ variant: "destructive", title: "خطأ في التفعيل" });
     } finally {
       setIsSaving(false);
     }
@@ -99,19 +144,63 @@ export default function TenantDetailsPage({ params }: { params: Promise<{ id: st
             <div className="flex items-center gap-3">
                <h1 className="text-3xl font-black text-slate-900">{tenant.businessName}</h1>
                <Badge className={cn(
-                 "rounded-full px-3 py-1 font-black text-[10px]",
-                 tenant.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                 "rounded-full px-3 py-1 font-black text-[10px] uppercase",
+                 tenant.status === 'active' ? 'bg-green-100 text-green-700' : 
+                 tenant.status === 'trial' ? 'bg-blue-100 text-blue-700' : 'bg-red-100 text-red-700'
                )}>{tenant.status}</Badge>
             </div>
-            <p className="text-muted-foreground font-medium">معرف المتجر السحابي: {tenant.tenantId}</p>
+            <p className="text-muted-foreground font-medium text-xs">معرف المتجر السحابي: {tenant.tenantId}</p>
           </div>
         </div>
         
         <div className="flex gap-3">
-           <Button variant="outline" className="rounded-xl border-2 font-bold h-11" onClick={() => router.push(`/store/${tenant.slug}`)} target="_blank">
-             <ExternalLink className="h-4 w-4 ml-2" /> معاينة المتجر
+           <Dialog open={isInvoiceOpen} onOpenChange={setIsInvoiceOpen}>
+              <DialogTrigger asChild>
+                 <Button className="rounded-xl font-black h-11 shadow-lg shadow-primary/20 gap-2 px-6">
+                    <Plus className="h-4 w-4" /> تفعيل اشتراك يدوي
+                 </Button>
+              </DialogTrigger>
+              <DialogContent className="rounded-[32px] max-w-md">
+                 <DialogHeader><DialogTitle className="text-xl font-black">تفعيل اشتراك المتجر</DialogTitle></DialogHeader>
+                 <form onSubmit={handleManualInvoice} className="space-y-5 pt-4">
+                    <div className="space-y-2">
+                       <Label className="font-bold">الباقة</Label>
+                       <Select name="plan" defaultValue="business">
+                          <SelectTrigger className="rounded-xl h-12 bg-muted/20 border-none"><SelectValue /></SelectTrigger>
+                          <SelectContent className="rounded-2xl">
+                             <SelectItem value="starter">Starter</SelectItem>
+                             <SelectItem value="business">Business</SelectItem>
+                             <SelectItem value="enterprise">Enterprise</SelectItem>
+                          </SelectContent>
+                       </Select>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                       <div className="space-y-2">
+                          <Label className="font-bold">المبلغ (IQD)</Label>
+                          <Input name="amount" type="number" required placeholder="15000" className="rounded-xl h-12 bg-muted/20 border-none" />
+                       </div>
+                       <div className="space-y-2">
+                          <Label className="font-bold">المدة (أشهر)</Label>
+                          <Input name="months" type="number" required defaultValue="1" className="rounded-xl h-12 bg-muted/20 border-none" />
+                       </div>
+                    </div>
+                    <div className="space-y-2">
+                       <Label className="font-bold">ملاحظات</Label>
+                       <Input name="notes" placeholder="اختياري..." className="rounded-xl h-12 bg-muted/20 border-none" />
+                    </div>
+                    <DialogFooter>
+                       <Button disabled={isSaving} type="submit" className="w-full h-14 rounded-2xl font-black text-lg">
+                          {isSaving ? <Loader2 className="h-5 w-5 animate-spin" /> : "إصدار فاتورة وتفعيل"}
+                       </Button>
+                    </DialogFooter>
+                 </form>
+              </DialogContent>
+           </Dialog>
+
+           <Button variant="outline" className="rounded-xl border-2 font-bold h-11" onClick={() => window.open(`/store/${tenant.slug}`, '_blank')}>
+             <ExternalLink className="h-4 w-4 ml-2" /> معاينة
            </Button>
-           <Button variant="destructive" className="rounded-xl font-bold h-11" onClick={() => { if(confirm('هل تريد حذف المتجر بالكامل؟')) deleteDoc(tenantRef).then(()=>router.replace('/super-admin/tenants')) }}>
+           <Button variant="destructive" size="icon" className="rounded-xl h-11 w-11" onClick={() => { if(confirm('هل تريد حذف المتجر بالكامل؟')) deleteDoc(tenantRef).then(()=>router.replace('/super-admin/tenants')) }}>
              <Trash2 className="h-4 w-4" />
            </Button>
         </div>
@@ -125,7 +214,7 @@ export default function TenantDetailsPage({ params }: { params: Promise<{ id: st
                     <User className="h-6 w-6 text-primary" /> بيانات المالك
                  </CardTitle>
               </CardHeader>
-              <CardContent className="p-8 space-y-6">
+              <CardContent className="p-8 space-y-4">
                  <div className="space-y-4">
                     <div className="flex items-center gap-4">
                        <div className="h-10 w-10 rounded-xl bg-slate-100 flex items-center justify-center"><User className="h-5 w-5 opacity-40" /></div>
@@ -135,10 +224,6 @@ export default function TenantDetailsPage({ params }: { params: Promise<{ id: st
                        <div className="h-10 w-10 rounded-xl bg-slate-100 flex items-center justify-center"><Phone className="h-5 w-5 opacity-40" /></div>
                        <div><p className="text-[10px] font-black text-muted-foreground uppercase">رقم الهاتف</p><p className="font-bold" dir="ltr">{tenant.phone}</p></div>
                     </div>
-                    <div className="flex items-center gap-4">
-                       <div className="h-10 w-10 rounded-xl bg-slate-100 flex items-center justify-center"><MapPin className="h-5 w-5 opacity-40" /></div>
-                       <div><p className="text-[10px] font-black text-muted-foreground uppercase">العنوان</p><p className="font-bold">{tenant.address}</p></div>
-                    </div>
                  </div>
               </CardContent>
            </Card>
@@ -146,53 +231,27 @@ export default function TenantDetailsPage({ params }: { params: Promise<{ id: st
            <Card className="rounded-[40px] border-none shadow-sm overflow-hidden bg-white">
               <CardHeader className="p-8 pb-4 border-b">
                  <CardTitle className="text-lg font-black flex items-center gap-3">
-                    <ShieldCheck className="h-6 w-6 text-primary" /> حالة الاشتراك
+                    <History className="h-6 w-6 text-primary" /> تاريخ الفوترة
                  </CardTitle>
               </CardHeader>
-              <CardContent className="p-8 space-y-6">
-                 <div className="space-y-4">
-                    <div className="space-y-2">
-                       <Label className="text-[10px] font-black uppercase opacity-40">الباقة الحالية</Label>
-                       <Select defaultValue={tenant.subscriptionPlan || 'trial'} onValueChange={updatePlan}>
-                          <SelectTrigger className="rounded-xl h-12 bg-muted/20 border-none font-bold">
-                             <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent className="rounded-2xl">
-                             <SelectItem value="trial">Trial (14 Days)</SelectItem>
-                             <SelectItem value="starter">Starter Plan</SelectItem>
-                             <SelectItem value="business">Business Plan</SelectItem>
-                             <SelectItem value="enterprise">Enterprise Plan</SelectItem>
-                          </SelectContent>
-                       </Select>
-                    </div>
-                    <div className="space-y-2">
-                       <Label className="text-[10px] font-black uppercase opacity-40">حالة المتجر</Label>
-                       <Select defaultValue={tenant.status} onValueChange={updateStatus}>
-                          <SelectTrigger className="rounded-xl h-12 bg-muted/20 border-none font-bold">
-                             <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent className="rounded-2xl">
-                             <SelectItem value="active">Active</SelectItem>
-                             <SelectItem value="suspended">Suspended</SelectItem>
-                             <SelectItem value="expired">Expired</SelectItem>
-                             <SelectItem value="trial">In Trial</SelectItem>
-                          </SelectContent>
-                       </Select>
-                    </div>
-                    <div className="pt-4 flex items-center justify-between text-xs font-bold text-slate-500">
-                       <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> تنتهي في:</span>
-                       <span className="font-black text-slate-900">{tenant.trialEndDate ? new Date(tenant.trialEndDate).toLocaleDateString("ar-EG") : '---'}</span>
-                    </div>
+              <CardContent className="p-0">
+                 <div className="divide-y max-h-[300px] overflow-y-auto">
+                    {invoices.map((inv: any) => (
+                      <div key={inv.id} className="p-4 flex items-center justify-between hover:bg-slate-50">
+                         <div>
+                            <p className="text-xs font-black text-slate-800">{inv.planName} - {inv.amountIQD?.toLocaleString()} د.ع</p>
+                            <p className="text-[9px] text-muted-foreground font-bold">{new Date(inv.issueDate).toLocaleDateString("ar-EG")}</p>
+                         </div>
+                         <Badge className="rounded-md text-[8px] bg-green-50 text-green-700 border-none font-black">{inv.status}</Badge>
+                      </div>
+                    ))}
                  </div>
-                 <Button disabled={isSaving} className="w-full h-14 rounded-2xl font-black text-lg gap-2 shadow-xl shadow-primary/20">
-                   {isSaving ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />} حفظ التغييرات
-                 </Button>
               </CardContent>
            </Card>
         </div>
 
         <div className="lg:col-span-2 space-y-8">
-           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="p-6 rounded-[32px] bg-white border shadow-sm space-y-2">
                  <Package className="h-5 w-5 text-blue-600" />
                  <p className="text-[10px] font-black uppercase text-slate-400">المنتجات</p>
@@ -211,20 +270,19 @@ export default function TenantDetailsPage({ params }: { params: Promise<{ id: st
               <div className="p-6 rounded-[32px] bg-white border shadow-sm space-y-2">
                  <TrendingUp className="h-5 w-5 text-orange-600" />
                  <p className="text-[10px] font-black uppercase text-slate-400">المبيعات</p>
-                 <p className="text-xl font-black">{revenue.toLocaleString()}</p>
+                 <p className="text-xl font-black text-primary">{revenue.toLocaleString()}</p>
               </div>
            </div>
 
            <Card className="rounded-[40px] border-none shadow-sm overflow-hidden bg-white">
               <CardHeader className="p-8 border-b">
                  <CardTitle className="text-xl font-black flex items-center gap-3">
-                    <History className="h-6 w-6 text-primary" /> سجل عمليات المتجر
+                    <History className="h-6 w-6 text-primary" /> سجل العمليات
                  </CardTitle>
-                 <CardDescription className="font-bold">مراقبة التحركات والعمليات الإدارية داخل هذا المتجر حصراً.</CardDescription>
               </CardHeader>
               <CardContent className="p-0">
-                 <div className="divide-y max-h-[500px] overflow-y-auto custom-scrollbar">
-                    {logs.length > 0 ? logs.map((log: any) => (
+                 <div className="divide-y max-h-[400px] overflow-y-auto">
+                    {logs.map((log: any) => (
                       <div key={log.id} className="p-6 flex items-center justify-between hover:bg-slate-50 transition-colors">
                          <div className="flex items-center gap-4">
                             <div className="h-10 w-10 rounded-xl bg-slate-100 flex items-center justify-center font-black text-slate-400 text-xs">
@@ -243,9 +301,7 @@ export default function TenantDetailsPage({ params }: { params: Promise<{ id: st
                             <p className="text-[10px] font-medium text-slate-500 italic truncate">{log.details}</p>
                          </div>
                       </div>
-                    )) : (
-                      <div className="p-20 text-center opacity-30 font-bold">لا يوجد سجل عمليات حالياً.</div>
-                    )}
+                    ))}
                  </div>
               </CardContent>
            </Card>
@@ -253,25 +309,4 @@ export default function TenantDetailsPage({ params }: { params: Promise<{ id: st
       </div>
     </div>
   );
-}
-
-function ExternalLink(props: any) {
-  return (
-    <svg
-      {...props}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M15 3h6v6" />
-      <path d="M10 14 21 3" />
-      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-    </svg>
-  )
 }

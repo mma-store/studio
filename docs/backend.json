@@ -15,14 +15,57 @@
         "whatsapp": { "type": "string" },
         "address": { "type": "string" },
         "businessType": { "type": "string" },
-        "status": { "type": "string", "enum": ["active", "trial", "expired", "suspended"] },
+        "status": { "type": "string", "enum": ["active", "trial", "expired", "suspended", "cancelled"] },
+        "subscriptionPlanId": { "type": "string" },
         "subscriptionPlan": { "type": "string", "enum": ["trial", "starter", "business", "enterprise"] },
         "trialStartDate": { "type": "number" },
         "trialEndDate": { "type": "number" },
+        "currentPeriodStart": { "type": "number" },
+        "currentPeriodEnd": { "type": "number" },
+        "autoRenew": { "type": "boolean" },
+        "suspendedReason": { "type": "string" },
         "createdAt": { "type": "number" },
         "settings": { "type": "object" }
       },
       "required": ["tenantId", "slug", "businessName"]
+    },
+    "SubscriptionPlan": {
+      "title": "SubscriptionPlan",
+      "description": "Global definitions of service tiers",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "priceIQD": { "type": "number" },
+        "billingCycle": { "type": "string", "enum": ["monthly", "yearly"] },
+        "maxProducts": { "type": "number" },
+        "maxEmployees": { "type": "number" },
+        "maxOrdersPerMonth": { "type": "number" },
+        "storageLimitMB": { "type": "number" },
+        "aiQuota": { "type": "number" },
+        "posEnabled": { "type": "boolean" },
+        "reportsEnabled": { "type": "boolean" },
+        "workshopEnabled": { "type": "boolean" },
+        "onlineStoreEnabled": { "type": "boolean" },
+        "customDomainEnabled": { "type": "boolean" },
+        "prioritySupport": { "type": "boolean" },
+        "isActive": { "type": "boolean" }
+      }
+    },
+    "SubscriptionInvoice": {
+      "title": "SubscriptionInvoice",
+      "description": "B2B Billing records for tenants",
+      "type": "object",
+      "properties": {
+        "invoiceNumber": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "planName": { "type": "string" },
+        "amountIQD": { "type": "number" },
+        "status": { "type": "string", "enum": ["paid", "pending", "overdue"] },
+        "issueDate": { "type": "number" },
+        "dueDate": { "type": "number" },
+        "paymentDate": { "type": "number" },
+        "notes": { "type": "string" }
+      }
     },
     "UserProfile": {
       "title": "UserProfile",
@@ -30,7 +73,7 @@
       "type": "object",
       "properties": {
         "uid": { "type": "string" },
-        "tenantId": { "type": "string", "description": "The ID of the business this user belongs to" },
+        "tenantId": { "type": "string" },
         "displayName": { "type": "string" },
         "email": { "type": "string" },
         "phoneNumber": { "type": "string" },
@@ -38,38 +81,6 @@
         "currentBalance": { "type": "number" }
       },
       "required": ["uid", "tenantId", "role"]
-    },
-    "Product": {
-      "title": "Product",
-      "description": "Motorcycle spare parts and accessories",
-      "type": "object",
-      "properties": {
-        "tenantId": { "type": "string" },
-        "name": { "type": "string" },
-        "barcode": { "type": "string" },
-        "purchasePrice": { "type": "number" },
-        "retailPrice": { "type": "number" },
-        "wholesalePrice": { "type": "number" },
-        "stock": { "type": "number" },
-        "category": { "type": "string" },
-        "storageLocation": { "type": "string" },
-        "status": { "type": "string", "enum": ["available", "out_of_stock", "discontinued"] }
-      },
-      "required": ["tenantId", "name"]
-    },
-    "Order": {
-      "title": "Order",
-      "description": "Sales records for POS or Online Shop",
-      "type": "object",
-      "properties": {
-        "tenantId": { "type": "string" },
-        "orderNumber": { "type": "string" },
-        "customerName": { "type": "string" },
-        "total": { "type": "number" },
-        "status": { "type": "string" },
-        "createdAt": { "type": "number" }
-      },
-      "required": ["tenantId", "orderNumber"]
     }
   },
   "auth": {
@@ -77,18 +88,11 @@
   },
   "firestore": {
     "/tenants/{tenantId}": { "schema": "Tenant", "description": "Tenant business configuration" },
+    "/plans/{planId}": { "schema": "SubscriptionPlan", "description": "Global subscription plan definitions" },
+    "/subscriptionInvoices/{invoiceId}": { "schema": "SubscriptionInvoice", "description": "Tenant billing records" },
     "/users/{userId}": { "schema": "UserProfile", "description": "Tenant-scoped user accounts" },
     "/products/{productId}": { "schema": "Product", "description": "Tenant-scoped inventory" },
     "/orders/{orderId}": { "schema": "Order", "description": "Tenant-scoped sales orders" },
-    "/repairOrders/{repairId}": { "schema": "object", "description": "Workshop records" },
-    "/suppliers/{supplierId}": { "schema": "object", "description": "Supplier information" },
-    "/purchases/{purchaseId}": { "schema": "object", "description": "Purchase invoices" },
-    "/expenses/{expenseId}": { "schema": "object", "description": "Business expenses" },
-    "/cashShifts/{shiftId}": { "schema": "object", "description": "Cash register shifts" },
-    "/financialTransactions/{transactionId}": { "schema": "object", "description": "Ledger for accounts" },
-    "/auditLogs/{logId}": { "schema": "object", "description": "Administrative actions" },
-    "/categories/{categoryId}": { "schema": "object", "description": "Product categories per tenant" },
-    "/banners/{bannerId}": { "schema": "object", "description": "Store banners" },
-    "/offers/{offerId}": { "schema": "object", "description": "Promotional offers" }
+    "/auditLogs/{logId}": { "schema": "object", "description": "Administrative actions" }
   }
 }
