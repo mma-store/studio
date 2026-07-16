@@ -19,14 +19,17 @@ import {
   User,
   BadgeCheck,
   CreditCard,
-  Building2
+  Building2,
+  ArrowUpDown,
+  History,
+  AlertTriangle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { useFirestore, useCollection } from "@/firebase";
-import { collection, query, orderBy, doc, updateDoc, deleteDoc } from "firebase/firestore";
+import { collection, query, orderBy, doc, updateDoc, deleteDoc, writeBatch } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -39,40 +42,76 @@ import {
   DropdownMenuSeparator, 
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from "@/components/ui/select";
 
 export default function TenantsManagementPage() {
   const db = useFirestore();
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [planFilter, setPlanFilter] = useState("all");
+  const [isProcessing, setIsProcessing] = useState<string | null>(null);
   
   const tenantsQuery = useMemo(() => query(collection(db, 'tenants'), orderBy('createdAt', 'desc')), [db]);
   const { data: tenants, loading } = useCollection(tenantsQuery);
 
-  const filtered = tenants.filter((t: any) => 
-    t.businessName?.toLowerCase().includes(search.toLowerCase()) || 
-    t.slug?.toLowerCase().includes(search.toLowerCase()) ||
-    t.ownerName?.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = useMemo(() => {
+    return tenants.filter((t: any) => {
+      const matchesSearch = t.businessName?.toLowerCase().includes(search.toLowerCase()) || 
+                          t.slug?.toLowerCase().includes(search.toLowerCase()) ||
+                          t.ownerName?.toLowerCase().includes(search.toLowerCase()) ||
+                          t.phone?.includes(search);
+      const matchesStatus = statusFilter === "all" || t.status === statusFilter;
+      const matchesPlan = planFilter === "all" || t.subscriptionPlan === planFilter;
+      return matchesSearch && matchesStatus && matchesPlan;
+    });
+  }, [tenants, search, statusFilter, planFilter]);
 
   const updateTenantStatus = async (tenantId: string, newStatus: string) => {
+    setIsProcessing(tenantId);
     try {
       await updateDoc(doc(db, 'tenants', tenantId), { status: newStatus });
       toast({ title: "تم التحديث", description: `حالة المتجر الآن: ${newStatus}` });
     } catch (e) {
       toast({ variant: "destructive", title: "خطأ في التحديث" });
+    } finally {
+      setIsProcessing(null);
     }
   };
 
   const extendSubscription = async (tenantId: string, currentEndDate: number) => {
     const extraDays = 30 * 24 * 60 * 60 * 1000;
     const newEndDate = (currentEndDate || Date.now()) + extraDays;
+    setIsProcessing(tenantId);
     try {
       await updateDoc(doc(db, 'tenants', tenantId), { 
         trialEndDate: newEndDate,
-        status: 'active' 
+        status: 'active',
+        subscriptionPlan: 'business'
       });
-      toast({ title: "تم التمديد", description: "تم تمديد الاشتراك لمدة 30 يوماً إضافية." });
+      toast({ title: "تم التمديد", description: "تم تفعيل الاشتراك لمدة 30 يوماً إضافية." });
     } catch (e) {
       toast({ variant: "destructive", title: "خطأ في التمديد" });
+    } finally {
+      setIsProcessing(null);
+    }
+  };
+
+  const deleteTenant = async (tenantId: string, name: string) => {
+    if (!confirm(`هل أنت متأكد من حذف متجر "${name}" نهائياً؟ لا يمكن التراجع عن هذا الإجراء.`)) return;
+    setIsProcessing(tenantId);
+    try {
+      await deleteDoc(doc(db, 'tenants', tenantId));
+      toast({ title: "تم الحذف", description: "تم مسح بيانات المتجر من المنصة." });
+    } catch (e) {
+      toast({ variant: "destructive", title: "فشل الحذف" });
+    } finally {
+      setIsProcessing(null);
     }
   };
 
@@ -83,15 +122,10 @@ export default function TenantsManagementPage() {
           <h1 className="text-3xl font-black text-slate-900">إدارة المشتركين</h1>
           <p className="text-muted-foreground font-medium">التحكم في كافة المتاجر المشتركة ومتابعة حالات اشتراكاتهم.</p>
         </div>
-        <div className="flex items-center gap-3">
-           <Button variant="outline" className="rounded-xl border-2 font-black h-11 gap-2">
-              <Filter className="h-4 w-4" /> تصفية النتائج
-           </Button>
-        </div>
       </div>
 
-      <div className="flex gap-4">
-        <div className="relative flex-1 max-w-lg">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="md:col-span-2 relative">
           <Search className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
           <Input 
             placeholder="بحث باسم المتجر، المالك، أو الرابط..." 
@@ -100,6 +134,30 @@ export default function TenantsManagementPage() {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+           <SelectTrigger className="h-14 rounded-2xl bg-white border-none shadow-sm font-bold">
+              <SelectValue placeholder="الحالة" />
+           </SelectTrigger>
+           <SelectContent className="rounded-2xl">
+              <SelectItem value="all">كل الحالات</SelectItem>
+              <SelectItem value="active">نشط</SelectItem>
+              <SelectItem value="trial">تجريبي</SelectItem>
+              <SelectItem value="suspended">معلق</SelectItem>
+              <SelectItem value="expired">منتهي</SelectItem>
+           </SelectContent>
+        </Select>
+        <Select value={planFilter} onValueChange={setPlanFilter}>
+           <SelectTrigger className="h-14 rounded-2xl bg-white border-none shadow-sm font-bold">
+              <SelectValue placeholder="الباقة" />
+           </SelectTrigger>
+           <SelectContent className="rounded-2xl">
+              <SelectItem value="all">كل الباقات</SelectItem>
+              <SelectItem value="trial">Trial</SelectItem>
+              <SelectItem value="starter">Starter</SelectItem>
+              <SelectItem value="business">Business</SelectItem>
+              <SelectItem value="enterprise">Enterprise</SelectItem>
+           </SelectContent>
+        </Select>
       </div>
 
       <div className="rounded-[40px] border-none bg-white shadow-sm overflow-hidden border">
@@ -107,11 +165,11 @@ export default function TenantsManagementPage() {
           <TableHeader>
             <TableRow className="bg-slate-50/50 hover:bg-slate-50/50">
               <TableHead className="text-right py-6 px-8 font-black text-[10px] uppercase tracking-[0.2em] text-slate-500">المتجر والمالك</TableHead>
-              <TableHead className="text-right font-black text-[10px] uppercase tracking-[0.2em] text-slate-500">الرابط المباشر</TableHead>
+              <TableHead className="text-right font-black text-[10px] uppercase tracking-[0.2em] text-slate-500">الرابط</TableHead>
               <TableHead className="text-right font-black text-[10px] uppercase tracking-[0.2em] text-slate-500">الخطة</TableHead>
-              <TableHead className="text-right font-black text-[10px] uppercase tracking-[0.2em] text-slate-500">حالة الاشتراك</TableHead>
-              <TableHead className="text-right font-black text-[10px] uppercase tracking-[0.2em] text-slate-500">تاريخ الانتهاء</TableHead>
-              <TableHead className="text-left px-8 font-black text-[10px] uppercase tracking-[0.2em] text-slate-500">الإجراءات</TableHead>
+              <TableHead className="text-right font-black text-[10px] uppercase tracking-[0.2em] text-slate-500">الحالة</TableHead>
+              <TableHead className="text-right font-black text-[10px] uppercase tracking-[0.2em] text-slate-500">الانتهاء</TableHead>
+              <TableHead className="text-left px-8 font-black text-[10px] uppercase tracking-[0.2em] text-slate-500">إجراءات</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -153,9 +211,10 @@ export default function TenantsManagementPage() {
                     <Badge className={cn(
                       "rounded-full border-none font-black text-[9px] px-3 py-1",
                       tenant.status === 'active' ? "bg-emerald-100 text-emerald-700" : 
-                      tenant.status === 'trial' ? "bg-blue-100 text-blue-700" : "bg-red-100 text-red-700"
+                      tenant.status === 'trial' ? "bg-blue-100 text-blue-700" : 
+                      tenant.status === 'suspended' ? "bg-orange-100 text-orange-700" : "bg-red-100 text-red-700"
                     )}>
-                      {tenant.status === 'active' ? 'نشط' : tenant.status === 'trial' ? 'تجريبي' : 'معطل'}
+                      {tenant.status === 'active' ? 'نشط' : tenant.status === 'trial' ? 'تجريبي' : tenant.status === 'suspended' ? 'معلق' : 'معطل'}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-[10px] font-bold text-slate-500">
@@ -163,37 +222,43 @@ export default function TenantsManagementPage() {
                   </TableCell>
                   <TableCell className="text-left px-8">
                      <div className="flex items-center justify-end gap-2">
-                        <Link href={`/super-admin/tenants/${tenant.id}`}>
-                           <Button variant="ghost" size="icon" className="rounded-xl h-10 w-10 text-primary bg-primary/5 hover:bg-primary/10">
-                              <Building2 className="h-4 w-4" />
-                           </Button>
-                        </Link>
+                        {isProcessing === tenant.id ? (
+                          <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                        ) : (
+                          <>
+                            <Link href={`/super-admin/tenants/${tenant.id}`}>
+                               <Button variant="ghost" size="icon" className="rounded-xl h-10 w-10 text-primary bg-primary/5 hover:bg-primary/10">
+                                  <Building2 className="h-4 w-4" />
+                               </Button>
+                            </Link>
 
-                        <DropdownMenu>
-                           <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="rounded-xl h-10 w-10"><MoreVertical className="h-5 w-5" /></Button>
-                           </DropdownMenuTrigger>
-                           <DropdownMenuContent align="end" className="rounded-2xl p-2 w-56 shadow-2xl border-none">
-                              <DropdownMenuLabel className="font-black text-[10px] uppercase opacity-50 px-2 py-1">إدارة المتجر</DropdownMenuLabel>
-                              <DropdownMenuItem className="rounded-xl gap-2 font-bold cursor-pointer" onClick={() => updateTenantStatus(tenant.id, 'active')}>
-                                 <ShieldCheck className="h-4 w-4 text-emerald-600" /> تفعيل المتجر
-                              </DropdownMenuItem>
-                              <DropdownMenuItem className="rounded-xl gap-2 font-bold cursor-pointer" onClick={() => updateTenantStatus(tenant.id, 'suspended')}>
-                                 <ShieldX className="h-4 w-4 text-red-600" /> تعطيل المتجر مؤقتاً
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem className="rounded-xl gap-2 font-bold cursor-pointer" onClick={() => extendSubscription(tenant.id, tenant.trialEndDate)}>
-                                 <Calendar className="h-4 w-4 text-blue-600" /> تمديد 30 يوم
-                              </DropdownMenuItem>
-                              <DropdownMenuItem className="rounded-xl gap-2 font-bold cursor-pointer">
-                                 <Edit3 className="h-4 w-4 text-orange-600" /> تعديل البيانات
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem className="rounded-xl gap-2 font-bold cursor-pointer text-red-600">
-                                 <Trash2 className="h-4 w-4" /> حذف المتجر نهائياً
-                              </DropdownMenuItem>
-                           </DropdownMenuContent>
-                        </DropdownMenu>
+                            <DropdownMenu>
+                               <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="rounded-xl h-10 w-10"><MoreVertical className="h-5 w-5" /></Button>
+                               </DropdownMenuTrigger>
+                               <DropdownMenuContent align="end" className="rounded-2xl p-2 w-56 shadow-2xl border-none">
+                                  <DropdownMenuLabel className="font-black text-[10px] uppercase opacity-50 px-2 py-1">إدارة المتجر</DropdownMenuLabel>
+                                  <DropdownMenuItem className="rounded-xl gap-2 font-bold cursor-pointer" onClick={() => updateTenantStatus(tenant.id, 'active')}>
+                                     <ShieldCheck className="h-4 w-4 text-emerald-600" /> تفعيل المتجر
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem className="rounded-xl gap-2 font-bold cursor-pointer" onClick={() => updateTenantStatus(tenant.id, 'suspended')}>
+                                     <ShieldX className="h-4 w-4 text-orange-600" /> تعليق مؤقت
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem className="rounded-xl gap-2 font-bold cursor-pointer" onClick={() => extendSubscription(tenant.id, tenant.trialEndDate)}>
+                                     <BadgeCheck className="h-4 w-4 text-blue-600" /> تفعيل اشتراك (30 يوم)
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem className="rounded-xl gap-2 font-bold cursor-pointer">
+                                     <Edit3 className="h-4 w-4 text-slate-600" /> تعديل البيانات
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem className="rounded-xl gap-2 font-bold cursor-pointer text-red-600" onClick={() => deleteTenant(tenant.id, tenant.businessName)}>
+                                     <Trash2 className="h-4 w-4" /> حذف المتجر نهائياً
+                                  </DropdownMenuItem>
+                               </DropdownMenuContent>
+                            </DropdownMenu>
+                          </>
+                        )}
                      </div>
                   </TableCell>
                 </TableRow>

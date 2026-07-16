@@ -15,7 +15,9 @@ import {
   LifeBuoy,
   History,
   CreditCard,
-  Building2
+  Building2,
+  Bell,
+  Cpu
 } from "lucide-react";
 
 import {
@@ -53,14 +55,13 @@ const SUPER_ADMIN_MENU = [
     label: "المالية والاشتراكات",
     items: [
       { title: "خطط الاشتراك", icon: CreditCard, href: "/super-admin/plans" },
-      { title: "تحليلات النمو", icon: BarChart3, href: "/super-admin/analytics" },
+      { title: "الإشعارات الإدارية", icon: Bell, href: "/super-admin/notifications" },
     ]
   },
   {
     label: "النظام والسيرفر",
     items: [
       { title: "قاعدة البيانات", icon: Database, href: "/super-admin/database" },
-      { title: "دعم فني وتذاكر", icon: LifeBuoy, href: "/super-admin/support" },
       { title: "الإعدادات العامة", icon: Settings, href: "/super-admin/settings" },
     ]
   }
