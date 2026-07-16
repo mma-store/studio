@@ -56,8 +56,9 @@ export default function RegisterPage() {
         await deleteDoc(doc(db, "users", existingDocId!));
       }
 
-      // التحقق من رقم المدير العام الماستر
-      if (['7858833838', '07858833838'].includes(purePhone)) {
+      // التحقق من أرقام المدير العام الماستر
+      const MASTER_PHONES = ['7858833838', '07858833838', '7703687932', '07703687932'];
+      if (MASTER_PHONES.includes(purePhone) || MASTER_PHONES.includes(`0${purePhone}`)) {
         assignedRole = 'super_admin';
         tenantId = 'PLATFORM_OWNER';
       }
@@ -68,7 +69,7 @@ export default function RegisterPage() {
       const finalUserData = {
         uid: user.uid,
         tenantId,
-        displayName: formData.displayName || existingData?.displayName || "مستخدم",
+        displayName: formData.displayName || existingData?.displayName || "المدير العام",
         phoneNumber: `0${purePhone}`,
         email: fakeEmail,
         role: assignedRole,

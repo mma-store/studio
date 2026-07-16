@@ -14,7 +14,7 @@ import { useAuth } from "@/firebase";
 import { ShieldAlert, LogOut } from "lucide-react";
 
 // تم تحديث أرقام المدير العام للمنصة (الرقم الشخصي الجديد)
-const MASTER_SUPER_ADMINS = ['7858833838', '07858833838'];
+const MASTER_SUPER_ADMINS = ['7858833838', '07858833838', '7703687932', '07703687932'];
 
 export default function SuperAdminLayout({ children }: { children: React.ReactNode }) {
   const { user, profile, loading } = useUser();

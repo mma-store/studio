@@ -15,7 +15,7 @@ import { ShieldAlert, LogOut, AlertCircle, TrendingUp } from "lucide-react";
 import { useSubscription } from "@/hooks/use-subscription";
 import Link from "next/link";
 
-const ADMIN_PHONES = ['7858833838', '07858833838'];
+const ADMIN_PHONES = ['7858833838', '07858833838', '7703687932', '07703687932'];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const { user, profile, loading, tenantId } = useUser();
