@@ -20,10 +20,12 @@ export function initializeFirebase() {
   if (!getApps().length) {
     app = initializeApp(firebaseConfig);
     // Enable offline persistence with multi-tab support
+    // experimentalAutoDetectLongPolling: true يساعد في البيئات التي قد تحظر بروتوكول gRPC مثل Workstations
     firestore = initializeFirestore(app, {
       localCache: persistentLocalCache({
         tabManager: persistentMultipleTabManager()
-      })
+      }),
+      experimentalAutoDetectLongPolling: true,
     });
     auth = getAuth(app);
   } else {
