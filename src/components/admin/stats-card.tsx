@@ -1,3 +1,4 @@
+
 'use client';
 
 import { Card, CardContent } from "@/components/ui/card";
@@ -44,7 +45,7 @@ export function StatsCard({ title, value, description, icon: Icon, trend, color 
                     {trend.isUp ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
                     {trend.value}
                   </div>
-                  <span className="text-[10px] font-bold text-slate-400">مقارنة بأمس</span>
+                  <span className="text-[10px] font-bold text-slate-400">مباشر</span>
                </div>
              )}
           </div>

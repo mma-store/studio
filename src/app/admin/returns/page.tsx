@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from "react";
@@ -5,10 +6,7 @@ import {
   ArrowLeftRight, 
   Search, 
   Plus, 
-  History, 
   RefreshCcw, 
-  Trash2, 
-  CheckCircle2, 
   Loader2,
   Package
 } from "lucide-react";
@@ -25,23 +23,26 @@ import {
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useFirestore, useCollection, useUser } from "@/firebase";
-import { collection, query, where, doc, getDoc, writeBatch, increment, addDoc, orderBy } from "firebase/firestore";
+import { collection, query, where, orderBy } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/hooks/use-toast";
 
 export default function ReturnsPage() {
   const db = useFirestore();
-  const { tenantId, profile } = useUser();
+  const { tenantId } = useUser();
   const [orderIdSearch, setOrderIdSearch] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [isModalOpen, setIsAddModalOpen] = useState(false);
 
-  // FIXED: Scoped to tenantId
-  const returnsQuery = useMemo(() => query(
-    collection(db, 'returns'), 
-    where('tenantId', '==', tenantId),
-    orderBy('timestamp', 'desc')
-  ), [db, tenantId]);
+  const returnsQuery = useMemo(() => {
+    if (!tenantId) return null;
+    return query(
+      collection(db, 'returns'), 
+      where('tenantId', '==', tenantId),
+      orderBy('timestamp', 'desc')
+    );
+  }, [db, tenantId]);
+  
   const { data: returns, loading } = useCollection(returnsQuery);
 
   const searchOrder = async () => {

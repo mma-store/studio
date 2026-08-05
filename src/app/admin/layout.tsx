@@ -11,7 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { signOut } from "firebase/auth";
 import { useAuth } from "@/firebase";
-import { ShieldAlert, LogOut, AlertCircle, TrendingUp, Zap, Clock } from "lucide-react";
+import { ShieldAlert, LogOut, AlertCircle, Zap, Clock } from "lucide-react";
 import { useSubscription } from "@/hooks/use-subscription";
 import Link from "next/link";
 import { ReliabilityProvider } from "@/components/reliability/reliability-provider";
@@ -47,7 +47,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     return (
       <div className="flex min-h-screen w-full flex-col items-center justify-center bg-background p-8 gap-8">
          <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-primary text-white shadow-2xl animate-bounce">
-            <span className="text-3xl font-black italic">M</span>
+            <span className="text-3xl font-black italic">P</span>
          </div>
          <div className="w-full max-w-4xl space-y-6">
             <Skeleton className="h-[400px] w-full rounded-[40px]" />
@@ -60,7 +60,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     return (
       <div className="flex min-h-screen items-center justify-center p-6 bg-slate-50" dir="rtl">
         <div className="max-w-md w-full space-y-6 text-center">
-          <div className="h-24 w-24 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto shadow-inner">
+          <div className="h-24 w-24 bg-red-100 text-red-600 rounded-[32px] flex items-center justify-center mx-auto shadow-inner">
             <ShieldAlert className="h-12 w-12" />
           </div>
           <div className="space-y-2">
@@ -85,11 +85,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <SidebarInset className="flex flex-col min-w-0">
             <AdminHeader />
             
-            {/* Subscription Banner System */}
-            {!isSuperAdmin && tenantId !== 'MMA001' && (
+            {!isSuperAdmin && (
               <div className="px-6 py-2">
                 {subscription.isExpired ? (
-                  <div className="bg-red-600 text-white px-6 py-4 rounded-3xl flex items-center justify-between animate-in slide-in-from-top duration-500 shadow-xl shadow-red-600/20">
+                  <div className="bg-red-600 text-white px-6 py-4 rounded-[28px] flex items-center justify-between animate-in slide-in-from-top duration-500 shadow-xl shadow-red-600/20">
                      <div className="flex items-center gap-4">
                         <div className="h-10 w-10 rounded-full bg-white/20 flex items-center justify-center"><AlertCircle className="h-6 w-6" /></div>
                         <div>
@@ -101,7 +100,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                         <Link href="/admin/billing"><Zap className="h-4 w-4" /> جدد الآن</Link>
                      </Button>
                   </div>
-                ) : subscription.daysRemaining <= 7 && (
+                ) : subscription.daysRemaining <= 7 && subscription.daysRemaining > 0 && (
                   <div className="bg-orange-500 text-white px-6 py-3 rounded-2xl flex items-center justify-between text-xs font-bold shadow-lg shadow-orange-500/20">
                      <div className="flex items-center gap-3">
                         <Clock className="h-5 w-5" />
@@ -113,7 +112,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               </div>
             )}
 
-            <main className="flex-1 p-4 md:p-6 lg:p-8 overflow-y-auto overflow-x-hidden">
+            <main className="flex-1 p-4 md:p-6 lg:p-8 overflow-y-auto overflow-x-hidden custom-scrollbar">
               <div className="mx-auto max-w-7xl w-full">
                 {children}
               </div>

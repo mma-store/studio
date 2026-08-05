@@ -28,7 +28,8 @@ import {
   Puzzle,
   Terminal,
   Key,
-  Webhook
+  Webhook,
+  FileText
 } from "lucide-react";
 
 import {
@@ -149,7 +150,7 @@ export function AdminSidebar() {
         </Link>
       </SidebarHeader>
 
-      <SidebarContent className="py-6 px-3">
+      <SidebarContent className="py-6 px-3 custom-scrollbar overflow-y-auto">
         {ADMIN_MENU.map((group) => (
           <SidebarGroup key={group.label} className="mb-4">
             <SidebarGroupLabel className="px-4 text-[10px] font-black uppercase tracking-widest text-white/40 group-data-[collapsible=icon]:hidden mb-3 text-right">
@@ -187,7 +188,7 @@ export function AdminSidebar() {
       <SidebarFooter className="border-t border-white/10 p-6 space-y-4 bg-black/20">
         <div className="px-4 py-3 bg-white/5 rounded-2xl border border-white/10 group-data-[collapsible=icon]:hidden text-right">
            <p className="text-[9px] font-black text-white/30 uppercase tracking-widest mb-1">Developed by</p>
-           <p className="text-[11px] font-black text-white/80">Hussein Salah</p>
+           <p className="text-[11px] font-black text-white/80">Platform Team</p>
         </div>
         <SidebarMenu>
           <SidebarMenuItem>

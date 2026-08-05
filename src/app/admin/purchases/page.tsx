@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from "react";
@@ -5,13 +6,8 @@ import {
   Plus, 
   Search, 
   Truck, 
-  Package, 
-  ShoppingCart, 
-  Trash2, 
-  Save, 
-  Loader2,
   Printer,
-  ArrowUpRight,
+  ChevronRight,
   Filter,
   FileText
 } from "lucide-react";
@@ -31,12 +27,15 @@ export default function PurchasesPage() {
   const router = useRouter();
   const [search, setSearch] = useState("");
 
-  // FIXED: Scoped to tenantId
-  const purchasesQuery = useMemo(() => query(
-    collection(db, 'purchases'), 
-    where('tenantId', '==', tenantId),
-    orderBy('timestamp', 'desc')
-  ), [db, tenantId]);
+  const purchasesQuery = useMemo(() => {
+    if (!tenantId) return null;
+    return query(
+      collection(db, 'purchases'), 
+      where('tenantId', '==', tenantId),
+      orderBy('timestamp', 'desc')
+    );
+  }, [db, tenantId]);
+  
   const { data: purchases, loading } = useCollection(purchasesQuery);
 
   const filtered = purchases.filter((p: any) => 
@@ -49,7 +48,7 @@ export default function PurchasesPage() {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-black text-slate-900">فواتير الشراء والتجهيز</h1>
-          <p className="text-muted-foreground font-medium">إدخال بضاعة جديدة للمخزن وإدارة حسابات الموردين.</p>
+          <p className="text-muted-foreground font-medium text-sm">إدخال بضاعة جديدة للمخزن وإدارة حسابات الموردين.</p>
         </div>
         
         <Link href="/admin/purchases/new">
