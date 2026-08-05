@@ -19,22 +19,24 @@ export function useUser() {
 
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
-      setUser(firebaseUser);
-      
       if (firebaseUser) {
+        setUser(firebaseUser);
         const profileRef = doc(db, 'users', firebaseUser.uid);
         const unsubscribeProfile = onSnapshot(profileRef, (docSnap) => {
           if (docSnap.exists()) {
-            const data = docSnap.data() as UserProfile;
-            setProfile(data);
+            setProfile(docSnap.data() as UserProfile);
           } else {
             setProfile(null);
           }
+          setLoading(false);
+        }, (err) => {
+          console.error("Profile fetch error:", err);
           setLoading(false);
         });
         
         return () => unsubscribeProfile();
       } else {
+        setUser(null);
         setProfile(null);
         setLoading(false);
       }
@@ -47,11 +49,14 @@ export function useUser() {
   const purePhone = profile?.phoneNumber?.replace(/\s/g, '').replace(/^(\+964|0)/, '') || '';
   const isSuperAdmin = profile?.role === 'super_admin' || MASTER_SUPER_ADMINS.includes(purePhone);
 
+  // التأكد من عدم إرجاع tenantId إلا بعد اكتمال التحميل
+  const resolvedTenantId = loading ? null : (isSuperAdmin ? (profile?.tenantId || 'PLATFORM_OWNER') : (profile?.tenantId || null));
+
   return { 
     user, 
     profile, 
     loading, 
     isSuperAdmin,
-    tenantId: isSuperAdmin ? (profile?.tenantId || 'PLATFORM_OWNER') : (profile?.tenantId || 'MMA001') 
+    tenantId: resolvedTenantId
   };
 }

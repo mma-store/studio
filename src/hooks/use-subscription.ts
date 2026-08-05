@@ -1,9 +1,9 @@
 
 'use client';
 
-import { useMemo, useEffect } from 'react';
+import { useMemo } from 'react';
 import { useFirestore, useDoc, useCollection } from '@/firebase';
-import { doc, collection, query, updateDoc, where } from 'firebase/firestore';
+import { doc, collection, query } from 'firebase/firestore';
 
 export type PlanLimits = {
   maxProducts: number;
@@ -12,7 +12,6 @@ export type PlanLimits = {
   features: string[];
 };
 
-// Fallback limits if no plan is found in DB
 const FALLBACK_PLAN_LIMITS: Record<string, PlanLimits> = {
   trial: {
     maxProducts: 10,
@@ -40,14 +39,12 @@ const FALLBACK_PLAN_LIMITS: Record<string, PlanLimits> = {
   },
 };
 
-export function useSubscription(tenantId: string) {
+export function useSubscription(tenantId: string | null) {
   const db = useFirestore();
   
-  // Fetch tenant doc
   const tenantRef = useMemo(() => tenantId ? doc(db, 'tenants', tenantId) : null, [db, tenantId]);
   const { data: tenant, loading: tenantLoading } = useDoc<any>(tenantRef);
 
-  // Fetch all plans to get limits dynamically
   const { data: allPlans } = useCollection(query(collection(db, 'plans')));
 
   const currentPlanData = useMemo(() => {
@@ -58,7 +55,6 @@ export function useSubscription(tenantId: string) {
   const plan = tenant?.subscriptionPlan || 'trial';
   const status = tenant?.status || 'trial';
   
-  // Resolve limits: DB Plan -> Hardcoded Fallback
   const limits = useMemo(() => {
     if (currentPlanData) {
       return {
@@ -79,25 +75,15 @@ export function useSubscription(tenantId: string) {
   }, [currentPlanData, plan]);
 
   const isExpired = useMemo(() => {
-    if (tenantId === 'MMA001') return false; // Grandfathered
+    if (!tenantId) return false;
+    if (tenantId === 'MMA001') return false;
     if (status === 'expired' || status === 'suspended' || status === 'cancelled') return true;
     
-    // Check Date
     const expiryDate = tenant?.trialEndDate || tenant?.currentPeriodEnd;
     if (expiryDate && Date.now() > expiryDate) return true;
     
     return false;
   }, [tenant, status, tenantId]);
-
-  // Auto-update status if expired on the client side (simple trigger)
-  useEffect(() => {
-    if (tenant && !tenantLoading && !isExpired && status !== 'expired') {
-      const expiryDate = tenant.trialEndDate || tenant.currentPeriodEnd;
-      if (expiryDate && Date.now() > expiryDate) {
-        updateDoc(doc(db, 'tenants', tenant.tenantId), { status: 'expired' });
-      }
-    }
-  }, [tenant, tenantLoading, isExpired, status, db]);
 
   const daysRemaining = useMemo(() => {
     const expiryDate = tenant?.trialEndDate || tenant?.currentPeriodEnd;
