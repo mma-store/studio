@@ -14,6 +14,7 @@ import { useAuth } from "@/firebase";
 import { ShieldAlert, LogOut, AlertCircle, TrendingUp, Zap, Clock } from "lucide-react";
 import { useSubscription } from "@/hooks/use-subscription";
 import Link from "next/link";
+import { ReliabilityProvider } from "@/components/reliability/reliability-provider";
 
 const MASTER_PHONES = ['7858833838', '7703687932'];
 
@@ -77,47 +78,49 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   if (!isAuthorized) return null;
 
   return (
-    <SidebarProvider>
-      <div className="flex min-h-screen w-full bg-[#F8F9FA] dark:bg-background/95 overflow-hidden">
-        <AdminSidebar />
-        <SidebarInset className="flex flex-col min-w-0">
-          <AdminHeader />
-          
-          {/* Subscription Banner System */}
-          {!isSuperAdmin && tenantId !== 'MMA001' && (
-            <div className="px-6 py-2">
-              {subscription.isExpired ? (
-                <div className="bg-red-600 text-white px-6 py-4 rounded-3xl flex items-center justify-between animate-in slide-in-from-top duration-500 shadow-xl shadow-red-600/20">
-                   <div className="flex items-center gap-4">
-                      <div className="h-10 w-10 rounded-full bg-white/20 flex items-center justify-center"><AlertCircle className="h-6 w-6" /></div>
-                      <div>
-                        <p className="font-black text-sm">انتهت صلاحية الاشتراك!</p>
-                        <p className="text-[10px] opacity-80 font-bold uppercase tracking-widest">بعض الميزات متوقفة حالياً حتى يتم التجديد.</p>
-                      </div>
-                   </div>
-                   <Button variant="secondary" size="lg" className="rounded-2xl font-black gap-2" asChild>
-                      <Link href="/admin/billing"><Zap className="h-4 w-4" /> جدد الآن</Link>
-                   </Button>
-                </div>
-              ) : subscription.daysRemaining <= 7 && (
-                <div className="bg-orange-500 text-white px-6 py-3 rounded-2xl flex items-center justify-between text-xs font-bold shadow-lg shadow-orange-500/20">
-                   <div className="flex items-center gap-3">
-                      <Clock className="h-5 w-5" />
-                      <span>تنبيه: متبقي لك {subscription.daysRemaining} أيام فقط على انتهاء الاشتراك.</span>
-                   </div>
-                   <Link href="/admin/billing" className="underline font-black hover:text-white/80">إدارة الفوترة</Link>
-                </div>
-              )}
-            </div>
-          )}
+    <ReliabilityProvider>
+      <SidebarProvider>
+        <div className="flex min-h-screen w-full bg-[#F8F9FA] dark:bg-background/95 overflow-hidden">
+          <AdminSidebar />
+          <SidebarInset className="flex flex-col min-w-0">
+            <AdminHeader />
+            
+            {/* Subscription Banner System */}
+            {!isSuperAdmin && tenantId !== 'MMA001' && (
+              <div className="px-6 py-2">
+                {subscription.isExpired ? (
+                  <div className="bg-red-600 text-white px-6 py-4 rounded-3xl flex items-center justify-between animate-in slide-in-from-top duration-500 shadow-xl shadow-red-600/20">
+                     <div className="flex items-center gap-4">
+                        <div className="h-10 w-10 rounded-full bg-white/20 flex items-center justify-center"><AlertCircle className="h-6 w-6" /></div>
+                        <div>
+                          <p className="font-black text-sm">انتهت صلاحية الاشتراك!</p>
+                          <p className="text-[10px] opacity-80 font-bold uppercase tracking-widest">بعض الميزات متوقفة حالياً حتى يتم التجديد.</p>
+                        </div>
+                     </div>
+                     <Button variant="secondary" size="lg" className="rounded-2xl font-black gap-2" asChild>
+                        <Link href="/admin/billing"><Zap className="h-4 w-4" /> جدد الآن</Link>
+                     </Button>
+                  </div>
+                ) : subscription.daysRemaining <= 7 && (
+                  <div className="bg-orange-500 text-white px-6 py-3 rounded-2xl flex items-center justify-between text-xs font-bold shadow-lg shadow-orange-500/20">
+                     <div className="flex items-center gap-3">
+                        <Clock className="h-5 w-5" />
+                        <span>تنبيه: متبقي لك {subscription.daysRemaining} أيام فقط على انتهاء الاشتراك.</span>
+                     </div>
+                     <Link href="/admin/billing" className="underline font-black hover:text-white/80">إدارة الفوترة</Link>
+                  </div>
+                )}
+              </div>
+            )}
 
-          <main className="flex-1 p-4 md:p-6 lg:p-8 overflow-y-auto overflow-x-hidden">
-            <div className="mx-auto max-w-7xl w-full">
-              {children}
-            </div>
-          </main>
-        </SidebarInset>
-      </div>
-    </SidebarProvider>
+            <main className="flex-1 p-4 md:p-6 lg:p-8 overflow-y-auto overflow-x-hidden">
+              <div className="mx-auto max-w-7xl w-full">
+                {children}
+              </div>
+            </main>
+          </SidebarInset>
+        </div>
+      </SidebarProvider>
+    </ReliabilityProvider>
   );
 }
