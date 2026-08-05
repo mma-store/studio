@@ -1,26 +1,37 @@
+
 /**
- * @fileOverview Cloudinary upload utility with client-side image optimization and transformation helpers.
+ * @fileOverview Enhanced Cloudinary utility with client-side compression and validation.
  */
 
 const CLOUD_NAME = 'dgnao6qwq';
 const UPLOAD_PRESET = 'MMA-store';
 
+export interface CloudinaryMetadata {
+  public_id: string;
+  secure_url: string;
+  bytes: number;
+  width: number;
+  height: number;
+  format: string;
+  created_at: string;
+}
+
 /**
- * Retries a function multiple times before failing.
+ * Validates file before upload.
  */
-async function retryFetch<T>(fn: () => Promise<T>, retries = 3, delay = 1000): Promise<T> {
-  try {
-    return await fn();
-  } catch (error) {
-    if (retries <= 0) throw error;
-    await new Promise(resolve => setTimeout(resolve, delay));
-    return retryFetch(fn, retries - 1, delay * 2);
+export function validateImage(file: File) {
+  const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/webp'];
+  if (!allowedTypes.includes(file.type)) {
+    throw new Error('نوع الملف غير مدعوم. يرجى اختيار صورة (JPG, PNG, WEBP).');
+  }
+  if (file.size > 10 * 1024 * 1024) { // 10MB limit
+    throw new Error('حجم الصورة كبير جداً. الحد الأقصى هو 10 ميجابايت.');
   }
 }
 
 /**
  * Compresses and resizes an image before uploading using Canvas API.
- * This saves bandwidth and speeds up the upload process.
+ * Saves bandwidth and storage costs.
  */
 async function optimizeImage(file: File): Promise<Blob> {
   return new Promise((resolve) => {
@@ -58,7 +69,7 @@ async function optimizeImage(file: File): Promise<Blob> {
         canvas.toBlob(
           (blob) => resolve(blob || file),
           'image/jpeg',
-          0.8 // Quality factor (0.0 to 1.0)
+          0.75 // Quality factor
         );
       };
     };
@@ -66,35 +77,28 @@ async function optimizeImage(file: File): Promise<Blob> {
 }
 
 /**
- * Uploads a file to Cloudinary with retry logic.
+ * Uploads an image to Cloudinary.
  */
 export async function uploadToCloudinary(file: File): Promise<string> {
-  const isImage = file.type.startsWith('image/');
-  const fileToUpload = isImage ? await optimizeImage(file) : file;
+  validateImage(file);
+  const optimizedBlob = await optimizeImage(file);
 
   const formData = new FormData();
-  formData.append('file', fileToUpload);
+  formData.append('file', optimizedBlob);
   formData.append('upload_preset', UPLOAD_PRESET);
 
-  const uploadAction = async () => {
-    const response = await fetch(
-      `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,
-      { method: 'POST', body: formData }
-    );
+  const response = await fetch(
+    `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,
+    { method: 'POST', body: formData }
+  );
 
-    if (!response.ok) throw new Error('Failed to upload to Cloudinary');
-    const data = await response.json();
-    return data.secure_url;
-  };
-
-  return retryFetch(uploadAction);
+  if (!response.ok) throw new Error('فشل الرفع إلى السحابة.');
+  const data = await response.json();
+  return data.secure_url;
 }
 
 /**
- * Generates an optimized Cloudinary URL with transformations.
- * f_auto: best format (WebP/AVIF)
- * q_auto: best compression
- * w, h, c: resizing and cropping
+ * Generates an optimized Cloudinary URL for UI display.
  */
 export function getOptimizedUrl(url: string, options: { width?: number; height?: number; crop?: string; thumbnail?: boolean } = {}) {
   if (!url || !url.includes('cloudinary')) return url;
@@ -105,7 +109,7 @@ export function getOptimizedUrl(url: string, options: { width?: number; height?:
   let transformations = 'f_auto,q_auto';
   
   if (options.thumbnail) {
-    transformations += ',w_300,h_300,c_thumb,g_auto';
+    transformations += ',w_400,h_400,c_thumb,g_auto';
   } else {
     if (options.width) transformations += `,w_${options.width}`;
     if (options.height) transformations += `,h_${options.height}`;

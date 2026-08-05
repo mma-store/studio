@@ -17,7 +17,8 @@ import {
   CreditCard,
   Building2,
   Bell,
-  Cpu
+  Cpu,
+  Activity
 } from "lucide-react";
 
 import {
