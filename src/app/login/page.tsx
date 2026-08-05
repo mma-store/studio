@@ -16,7 +16,9 @@ import { Loader2, Lock, Phone, HelpCircle, ArrowLeft } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 
-const MASTER_PHONES = ['7858833838', '07858833838', '7703687932', '07703687932'];
+// القائمة الموحدة لأرقام المدير العام الماستر
+const MASTER_PHONES = ['7858833838', '7703687932'];
+const BOOTSTRAP_PASSWORD = '2004#223';
 
 export default function LoginPage() {
   const auth = useAuth();
@@ -48,7 +50,7 @@ export default function LoginPage() {
       const userData = userSnap.data();
 
       // 3. آلية الترقية التلقائية لأرقام الماستر (Bootstrap)
-      const isMasterPhone = MASTER_PHONES.includes(purePhone) || MASTER_PHONES.includes(`0${purePhone}`);
+      const isMasterPhone = MASTER_PHONES.includes(purePhone);
       if (isMasterPhone && userData?.role !== 'super_admin') {
          await setDoc(doc(db, "users", user.uid), {
             role: 'super_admin',
@@ -70,10 +72,12 @@ export default function LoginPage() {
     } catch (error: any) {
       // في حال كان المستخدم رقم ماستر ولم يتم إنشاؤه بعد (أول مرة)
       if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
-        const isMaster = MASTER_PHONES.includes(purePhone) || MASTER_PHONES.includes(`0${purePhone}`);
-        if (isMaster && password === '2004#223') {
+        const purePhone = cleanPhone(phoneNumber);
+        const isMaster = MASTER_PHONES.includes(purePhone);
+        
+        if (isMaster && password === BOOTSTRAP_PASSWORD) {
            try {
-              toast({ title: "جاري تهيئة حساب المدير العام..." });
+              toast({ title: "جاري تهيئة حساب المدير العام الجديد..." });
               const res = await createUserWithEmailAndPassword(auth, fakeEmail, password);
               await setDoc(doc(db, "users", res.user.uid), {
                 uid: res.user.uid,
@@ -86,7 +90,9 @@ export default function LoginPage() {
               });
               router.push("/super-admin");
               return;
-           } catch (err) {}
+           } catch (err: any) {
+             console.error("Bootstrap Error:", err);
+           }
         }
       }
       
@@ -155,7 +161,7 @@ export default function LoginPage() {
                 <div className="space-y-2">
                   <div className="flex justify-between items-center px-1">
                     <Label className="font-black text-xs uppercase tracking-widest text-slate-400">كلمة المرور</Label>
-                    <a href="#" className="text-[10px] font-black text-secondary hover:underline flex items-center gap-1"><HelpCircle className="h-3 w-3" /> نسيت كلمة المرور؟</a>
+                    <a href={`https://wa.me/9647858833838`} target="_blank" className="text-[10px] font-black text-secondary hover:underline flex items-center gap-1"><HelpCircle className="h-3 w-3" /> نسيت كلمة المرور؟</a>
                   </div>
                   <div className="relative">
                     <Lock className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-300" />

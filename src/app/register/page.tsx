@@ -15,6 +15,9 @@ import { User, Phone, Lock, Loader2, Store, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 
+// القائمة الموحدة لأرقام المدير العام الماستر
+const MASTER_PHONES = ['7858833838', '7703687932'];
+
 export default function RegisterPage() {
   const auth = useAuth();
   const db = useFirestore();
@@ -53,12 +56,11 @@ export default function RegisterPage() {
         existingData = querySnapshot.docs[0].data();
         assignedRole = existingData.role;
         tenantId = existingData.tenantId || 'MMA001';
-        await deleteDoc(doc(db, "users", existingDocId!));
+        // لا نحذف الوثيقة، بل سنقوم بتحديثها لاحقاً باستخدام setDoc مع merge
       }
 
       // التحقق من أرقام المدير العام الماستر
-      const MASTER_PHONES = ['7858833838', '07858833838', '7703687932', '07703687932'];
-      if (MASTER_PHONES.includes(purePhone) || MASTER_PHONES.includes(`0${purePhone}`)) {
+      if (MASTER_PHONES.includes(purePhone)) {
         assignedRole = 'super_admin';
         tenantId = 'PLATFORM_OWNER';
       }
@@ -69,7 +71,7 @@ export default function RegisterPage() {
       const finalUserData = {
         uid: user.uid,
         tenantId,
-        displayName: formData.displayName || existingData?.displayName || "المدير العام",
+        displayName: formData.displayName || existingData?.displayName || (assignedRole === 'super_admin' ? "المدير العام" : "مستخدم"),
         phoneNumber: `0${purePhone}`,
         email: fakeEmail,
         role: assignedRole,

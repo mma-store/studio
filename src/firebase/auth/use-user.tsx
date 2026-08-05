@@ -7,8 +7,8 @@ import { doc, onSnapshot } from 'firebase/firestore';
 import { useAuth, useFirestore } from '../provider';
 import { UserProfile } from '@/lib/types/roles';
 
-// أرقام المدير العام الماستر للطوارئ والتهيئة
-const MASTER_SUPER_ADMINS = ['7858833838', '07858833838', '7703687932', '07703687932'];
+// القائمة الموحدة لأرقام المدير العام الماستر
+const MASTER_SUPER_ADMINS = ['7858833838', '7703687932'];
 
 export function useUser() {
   const auth = useAuth();
@@ -45,14 +45,13 @@ export function useUser() {
 
   // منطق التحقق من السوبر أدمن
   const purePhone = profile?.phoneNumber?.replace(/\s/g, '').replace(/^(\+964|0)/, '') || '';
-  const isSuperAdmin = profile?.role === 'super_admin' || MASTER_SUPER_ADMINS.includes(purePhone) || MASTER_SUPER_ADMINS.includes(`0${purePhone}`);
+  const isSuperAdmin = profile?.role === 'super_admin' || MASTER_SUPER_ADMINS.includes(purePhone);
 
   return { 
     user, 
     profile, 
     loading, 
     isSuperAdmin,
-    // السوبر أدمن لا يتقيد بـ MMA001 افتراضياً، بل ببيئة الإدارة العامة
     tenantId: isSuperAdmin ? (profile?.tenantId || 'PLATFORM_OWNER') : (profile?.tenantId || 'MMA001') 
   };
 }

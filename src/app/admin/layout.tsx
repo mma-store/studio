@@ -11,14 +11,14 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { signOut } from "firebase/auth";
 import { useAuth } from "@/firebase";
-import { ShieldAlert, LogOut, AlertCircle, TrendingUp, Zap } from "lucide-react";
+import { ShieldAlert, LogOut, AlertCircle, TrendingUp, Zap, Clock } from "lucide-react";
 import { useSubscription } from "@/hooks/use-subscription";
 import Link from "next/link";
 
-const ADMIN_PHONES = ['7858833838', '07858833838', '7703687932', '07703687932'];
+const MASTER_PHONES = ['7858833838', '7703687932'];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  const { user, profile, loading, tenantId } = useUser();
+  const { user, profile, loading, tenantId, isSuperAdmin } = useUser();
   const auth = useAuth();
   const router = useRouter();
   const [isAuthorized, setIsAuthorized] = useState(false);
@@ -30,17 +30,17 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         router.replace('/login');
       } else {
         const purePhone = profile?.phoneNumber?.replace(/\s/g, '').replace(/^(\+964|0)/, '');
-        const isMasterAdmin = purePhone && ADMIN_PHONES.includes(purePhone);
+        const isMasterAdmin = purePhone && MASTER_PHONES.includes(purePhone);
         const isMerchant = profile && ['owner', 'admin', 'sales_employee', 'workshop_technician', 'warehouse_employee'].includes(profile.role);
         
-        if ((isMerchant || isMasterAdmin) && tenantId) {
+        if (isSuperAdmin || isMasterAdmin || (isMerchant && tenantId)) {
           setIsAuthorized(true);
         } else {
           router.replace('/');
         }
       }
     }
-  }, [user, profile, loading, router, tenantId]);
+  }, [user, profile, loading, router, tenantId, isSuperAdmin]);
 
   if (loading || (tenantId && subscription.loading)) {
     return (
@@ -84,7 +84,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <AdminHeader />
           
           {/* Subscription Banner System */}
-          {tenantId !== 'MMA001' && (
+          {!isSuperAdmin && tenantId !== 'MMA001' && (
             <div className="px-6 py-2">
               {subscription.isExpired ? (
                 <div className="bg-red-600 text-white px-6 py-4 rounded-3xl flex items-center justify-between animate-in slide-in-from-top duration-500 shadow-xl shadow-red-600/20">
