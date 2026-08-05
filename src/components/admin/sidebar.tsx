@@ -25,7 +25,10 @@ import {
   Coins,
   Database,
   CreditCard,
-  Puzzle
+  Puzzle,
+  Terminal,
+  Key,
+  Webhook
 } from "lucide-react";
 
 import {
@@ -93,6 +96,14 @@ const ADMIN_MENU = [
       { title: "طلبات المتجر", icon: ClipboardList, href: "/admin/orders" },
       { title: "العملاء", icon: Users, href: "/admin/customers" },
       { title: "الموظفين", icon: ShieldCheck, href: "/admin/employees" },
+    ]
+  },
+  {
+    label: "المطورين",
+    items: [
+      { title: "مفاتيح الـ API", icon: Key, href: "/admin/developer/api-keys" },
+      { title: "الـ Webhooks", icon: Webhook, href: "/admin/developer/webhooks" },
+      { title: "دليل الربط برمجياً", icon: FileText, href: "/admin/developer/docs" },
     ]
   },
   {

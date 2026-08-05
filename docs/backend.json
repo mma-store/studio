@@ -29,36 +29,36 @@
       },
       "required": ["tenantId", "slug", "businessName"]
     },
-    "Integration": {
-      "title": "Integration",
-      "description": "Global third-party service definition",
+    "ApiKey": {
+      "title": "ApiKey",
+      "description": "Developer API access keys",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
+        "tenantId": { "type": "string" },
         "name": { "type": "string" },
-        "category": { "type": "string", "enum": ["payments", "delivery", "finance", "messaging", "maps", "ai", "analytics", "accounting", "marketing"] },
-        "logo": { "type": "string" },
-        "description": { "type": "string" },
-        "provider": { "type": "string" },
-        "status": { "type": "string", "enum": ["active", "beta", "coming_soon", "deprecated"] },
-        "enabled": { "type": "boolean" },
-        "supportedPlans": { "type": "array" },
-        "requiredConfiguration": { "type": "array" },
-        "createdAt": { "type": "number" }
+        "key": { "type": "string" },
+        "permissions": { "type": "array" },
+        "status": { "type": "string", "enum": ["active", "revoked", "expired"] },
+        "createdAt": { "type": "number" },
+        "expiresAt": { "type": "number" },
+        "lastUsed": { "type": "number" }
       }
     },
-    "TenantIntegration": {
-      "title": "TenantIntegration",
-      "description": "Specific tenant configuration for an integration",
+    "Webhook": {
+      "title": "Webhook",
+      "description": "Outbound event notifications",
       "type": "object",
       "properties": {
+        "id": { "type": "string" },
         "tenantId": { "type": "string" },
-        "integrationId": { "type": "string" },
+        "url": { "type": "string" },
+        "secret": { "type": "string" },
+        "events": { "type": "array" },
         "enabled": { "type": "boolean" },
-        "configuration": { "type": "object" },
-        "connectedAt": { "type": "number" },
-        "lastSync": { "type": "number" },
-        "status": { "type": "string" }
+        "status": { "type": "string" },
+        "createdAt": { "type": "number" },
+        "lastDelivery": { "type": "number" }
       }
     }
   },
@@ -67,11 +67,8 @@
   },
   "firestore": {
     "/tenants/{tenantId}": { "schema": "Tenant", "description": "Tenant business configuration" },
-    "/integrations/{integrationId}": { "schema": "Integration", "description": "Global integration catalog" },
-    "/tenantIntegrations/{id}": { "schema": "TenantIntegration", "description": "Tenant-specific integration settings" },
-    "/users/{userId}": { "schema": "UserProfile", "description": "Tenant-scoped user accounts" },
-    "/products/{productId}": { "schema": "Product", "description": "Tenant-scoped inventory" },
-    "/orders/{orderId}": { "schema": "Order", "description": "Tenant-scoped sales orders" },
-    "/auditLogs/{logId}": { "schema": "object", "description": "Administrative actions" }
+    "/apiKeys/{id}": { "schema": "ApiKey", "description": "Tenant API credentials" },
+    "/webhooks/{id}": { "schema": "Webhook", "description": "Tenant outbound webhooks" },
+    "/apiLogs/{id}": { "schema": "object", "description": "API request logs" }
   }
 }
