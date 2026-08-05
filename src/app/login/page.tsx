@@ -3,7 +3,7 @@
 
 import { useState } from "react";
 import { useAuth, useFirestore } from "@/firebase";
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from "firebase/auth";
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -12,9 +12,18 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
-import { Loader2, Lock, Phone, HelpCircle, ArrowLeft } from "lucide-react";
+import { Loader2, Lock, Phone, HelpCircle, ArrowLeft, Mail } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogTrigger,
+  DialogFooter,
+  DialogDescription
+} from "@/components/ui/dialog";
 
 // القائمة الموحدة لأرقام المدير العام الماستر
 const MASTER_PHONES = ['7858833838', '7703687932'];
@@ -25,11 +34,14 @@ export default function LoginPage() {
   const db = useFirestore();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
+  const [isResetOpen, setIsResetOpen] = useState(false);
   const LOGO_URL = "https://up6.cc/2026/07/178308238964931.png";
   
   const [phoneNumber, setPhoneNumber] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [resetEmail, setResetEmail] = useState("");
 
   const cleanPhone = (p: string) => p.replace(/\s/g, '').replace(/^(\+964|0)/, '');
 
@@ -41,15 +53,12 @@ export default function LoginPage() {
     const fakeEmail = `${purePhone}@platform.store`;
 
     try {
-      // 1. محاولة تسجيل الدخول
       const userCredential = await signInWithEmailAndPassword(auth, fakeEmail, password);
       const user = userCredential.user;
       
-      // 2. جلب البروفايل للتحقق من الرتبة
       const userSnap = await getDoc(doc(db, "users", user.uid));
       const userData = userSnap.data();
 
-      // 3. آلية الترقية التلقائية لأرقام الماستر (Bootstrap)
       const isMasterPhone = MASTER_PHONES.includes(purePhone);
       if (isMasterPhone && userData?.role !== 'super_admin') {
          await setDoc(doc(db, "users", user.uid), {
@@ -70,7 +79,6 @@ export default function LoginPage() {
         router.push("/");
       }
     } catch (error: any) {
-      // في حال كان المستخدم رقم ماستر ولم يتم إنشاؤه بعد (أول مرة)
       if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
         const purePhone = cleanPhone(phoneNumber);
         const isMaster = MASTER_PHONES.includes(purePhone);
@@ -119,6 +127,20 @@ export default function LoginPage() {
     }
   };
 
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setResetLoading(true);
+    try {
+      await sendPasswordResetEmail(auth, resetEmail);
+      toast({ title: "تم إرسال الرابط", description: "يرجى التحقق من بريدك الإلكتروني لإعادة تعيين كلمة المرور." });
+      setIsResetOpen(false);
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "خطأ", description: "فشل إرسال رابط الاستعادة. تأكد من البريد الإلكتروني." });
+    } finally {
+      setResetLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4 relative overflow-hidden">
       <div className="absolute top-0 right-0 h-[600px] w-[600px] bg-primary/5 rounded-full blur-[120px] -translate-y-1/2 translate-x-1/2" />
@@ -161,7 +183,9 @@ export default function LoginPage() {
                 <div className="space-y-2">
                   <div className="flex justify-between items-center px-1">
                     <Label className="font-black text-xs uppercase tracking-widest text-slate-400">كلمة المرور</Label>
-                    <a href={`https://wa.me/9647858833838`} target="_blank" className="text-[10px] font-black text-secondary hover:underline flex items-center gap-1"><HelpCircle className="h-3 w-3" /> نسيت كلمة المرور؟</a>
+                    <button type="button" onClick={() => setIsResetOpen(true)} className="text-[10px] font-black text-secondary hover:underline flex items-center gap-1">
+                      <HelpCircle className="h-3 w-3" /> نسيت كلمة المرور؟
+                    </button>
                   </div>
                   <div className="relative">
                     <Lock className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-300" />
@@ -181,7 +205,12 @@ export default function LoginPage() {
                   <Input type="email" placeholder="user@example.com" className="h-14 rounded-2xl px-6 bg-slate-50 border-none" value={email} onChange={(e) => setEmail(e.target.value)} required />
                 </div>
                 <div className="space-y-2">
-                  <Label className="font-black text-xs mr-2 uppercase tracking-widest text-slate-400">كلمة المرور</Label>
+                  <div className="flex justify-between items-center px-1">
+                    <Label className="font-black text-xs uppercase tracking-widest text-slate-400">كلمة المرور</Label>
+                    <button type="button" onClick={() => setIsResetOpen(true)} className="text-[10px] font-black text-secondary hover:underline flex items-center gap-1">
+                      <HelpCircle className="h-3 w-3" /> نسيت؟
+                    </button>
+                  </div>
                   <Input type="password" placeholder="••••••••" className="h-14 rounded-2xl px-6 bg-slate-50 border-none" value={password} onChange={(e) => setPassword(e.target.value)} required />
                 </div>
                 <Button type="submit" className="w-full h-16 rounded-[24px] font-black text-lg shadow-2xl mt-4 bg-primary" disabled={loading}>
@@ -196,6 +225,34 @@ export default function LoginPage() {
           <p className="text-sm text-slate-500 font-bold">ليس لديك متجر بعد؟ <Link href="/onboarding" className="text-secondary font-black hover:underline">أنشئ متجرك الآن</Link></p>
         </CardFooter>
       </Card>
+
+      <Dialog open={isResetOpen} onOpenChange={setIsResetOpen}>
+        <DialogContent className="rounded-[32px] max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-black">استعادة كلمة المرور</DialogTitle>
+            <DialogDescription className="text-xs font-bold">أدخل بريدك الإلكتروني المسجل وسنرسل لك رابطاً لإعادة تعيين كلمة المرور.</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleResetPassword} className="space-y-6 pt-4">
+             <div className="space-y-2">
+                <Label className="font-bold">البريد الإلكتروني</Label>
+                <div className="relative">
+                   <Mail className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-300" />
+                   <Input 
+                    required 
+                    type="email" 
+                    placeholder="example@mail.com" 
+                    className="h-14 rounded-2xl pr-12 bg-muted/20 border-none font-bold" 
+                    value={resetEmail}
+                    onChange={(e) => setResetEmail(e.target.value)}
+                   />
+                </div>
+             </div>
+             <Button disabled={resetLoading} type="submit" className="w-full h-14 rounded-2xl font-black text-lg gap-2">
+                {resetLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Lock className="h-5 w-5" />} إرسال رابط الاستعادة
+             </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

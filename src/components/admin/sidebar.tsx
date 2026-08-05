@@ -29,7 +29,8 @@ import {
   Terminal,
   Key,
   Webhook,
-  FileText
+  FileText,
+  Lock
 } from "lucide-react";
 
 import {
@@ -110,6 +111,7 @@ const ADMIN_MENU = [
   {
     label: "النظام",
     items: [
+      { title: "الأمان والحماية", icon: Lock, href: "/admin/settings/security" },
       { title: "الربط والتكامل", icon: Puzzle, href: "/admin/integrations" },
       { title: "الاشتراك والفوترة", icon: CreditCard, href: "/admin/billing" },
       { title: "البنرات والعروض", icon: ImageIcon, href: "/admin/banners" },
