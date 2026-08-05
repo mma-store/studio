@@ -4,7 +4,7 @@
 import { useState } from "react";
 import { useAuth, useFirestore } from "@/firebase";
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
-import { Loader2, Lock, Phone, HelpCircle, ArrowLeft, Mail } from "lucide-react";
+import { Loader2, Lock, Phone, HelpCircle, ArrowLeft, Mail, ShieldCheck } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { 
@@ -20,12 +20,11 @@ import {
   DialogContent, 
   DialogHeader, 
   DialogTitle, 
-  DialogTrigger,
   DialogFooter,
   DialogDescription
 } from "@/components/ui/dialog";
 
-// القائمة الموحدة لأرقام المدير العام الماستر
+// القائمة الموحدة والنهائية لأرقام المدير العام الماستر
 const MASTER_PHONES = ['7858833838', '7703687932'];
 const BOOTSTRAP_PASSWORD = '2004#223';
 
@@ -51,41 +50,48 @@ export default function LoginPage() {
     
     const purePhone = cleanPhone(phoneNumber);
     const fakeEmail = `${purePhone}@platform.store`;
+    const isMasterPhone = MASTER_PHONES.includes(purePhone);
 
     try {
+      // 1. محاولة الدخول الاعتيادية
       const userCredential = await signInWithEmailAndPassword(auth, fakeEmail, password);
       const user = userCredential.user;
       
-      const userSnap = await getDoc(doc(db, "users", user.uid));
-      const userData = userSnap.data();
-
-      const isMasterPhone = MASTER_PHONES.includes(purePhone);
-      if (isMasterPhone && userData?.role !== 'super_admin') {
-         await setDoc(doc(db, "users", user.uid), {
+      // 2. التحقق من السجل في Firestore وإصلاحه تلقائياً إذا كان ماستر
+      const userRef = doc(db, "users", user.uid);
+      const userSnap = await getDoc(userRef);
+      
+      if (isMasterPhone) {
+         // إصلاح تلقائي لصلاحيات السوبر أدمن فور الدخول الناجح
+         await setDoc(userRef, {
+            uid: user.uid,
             role: 'super_admin',
             tenantId: 'PLATFORM_OWNER',
+            displayName: userSnap.exists() ? (userSnap.data().displayName || "المدير العام") : "المدير العام",
+            phoneNumber: `0${purePhone}`,
+            email: fakeEmail,
             updatedAt: Date.now()
          }, { merge: true });
-         toast({ title: "تم تفعيل صلاحيات المدير العام" });
-      }
-
-      toast({ title: "تم تسجيل الدخول" });
-      
-      if (isMasterPhone || userData?.role === 'super_admin') {
-        router.push("/super-admin");
-      } else if (userData?.role && !['retail_customer', 'wholesale_customer'].includes(userData.role)) {
-        router.push("/admin");
+         
+         toast({ title: "تم تسجيل دخول المدير العام", description: "مرحباً بك في مركز التحكم." });
+         router.push("/super-admin");
       } else {
-        router.push("/");
+         const userData = userSnap.data();
+         if (userData?.role && !['retail_customer', 'wholesale_customer'].includes(userData.role)) {
+           router.push("/admin");
+         } else {
+           router.push("/");
+         }
+         toast({ title: "تم تسجيل الدخول" });
       }
     } catch (error: any) {
-      if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
-        const purePhone = cleanPhone(phoneNumber);
-        const isMaster = MASTER_PHONES.includes(purePhone);
-        
-        if (isMaster && password === BOOTSTRAP_PASSWORD) {
+      console.error("Login Error:", error.code);
+
+      // 3. آلية الـ Bootstrap للأرقام الماستر في حال فشل الدخول
+      if (isMasterPhone && password === BOOTSTRAP_PASSWORD) {
+        if (error.code === 'auth/user-not-found') {
            try {
-              toast({ title: "جاري تهيئة حساب المدير العام الجديد..." });
+              toast({ title: "جاري تهيئة حساب المدير العام..." });
               const res = await createUserWithEmailAndPassword(auth, fakeEmail, password);
               await setDoc(doc(db, "users", res.user.uid), {
                 uid: res.user.uid,
@@ -98,17 +104,23 @@ export default function LoginPage() {
               });
               router.push("/super-admin");
               return;
-           } catch (err: any) {
-             console.error("Bootstrap Error:", err);
+           } catch (createErr: any) {
+             toast({ variant: "destructive", title: "خطأ في التهيئة", description: createErr.message });
            }
+        } else if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+           toast({ 
+             variant: "destructive", 
+             title: "تنبيه أمني", 
+             description: "رقم الماستر مسجل مسبقاً بكلمة سر مختلفة. يرجى استخدام كلمة السر الصحيحة أو طلب إعادة تعيين." 
+           });
         }
+      } else {
+        toast({ 
+          variant: "destructive", 
+          title: "خطأ في الدخول", 
+          description: "تأكد من رقم الهاتف وكلمة المرور." 
+        });
       }
-      
-      toast({ 
-        variant: "destructive", 
-        title: "خطأ في الدخول", 
-        description: "تأكد من رقم الهاتف وكلمة المرور." 
-      });
     } finally {
       setLoading(false);
     }
@@ -135,7 +147,7 @@ export default function LoginPage() {
       toast({ title: "تم إرسال الرابط", description: "يرجى التحقق من بريدك الإلكتروني لإعادة تعيين كلمة المرور." });
       setIsResetOpen(false);
     } catch (e: any) {
-      toast({ variant: "destructive", title: "خطأ", description: "فشل إرسال رابط الاستعادة. تأكد من البريد الإلكتروني." });
+      toast({ variant: "destructive", title: "خطأ", description: "فشل إرسال رابط الاستعادة." });
     } finally {
       setResetLoading(false);
     }
