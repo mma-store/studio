@@ -18,7 +18,8 @@ import {
   Building2,
   Bell,
   Cpu,
-  Activity
+  Activity,
+  Puzzle
 } from "lucide-react";
 
 import {
@@ -60,8 +61,9 @@ const SUPER_ADMIN_MENU = [
     ]
   },
   {
-    label: "النظام والسيرفر",
+    label: "الربط والسيرفر",
     items: [
+      { title: "مركز التكامل", icon: Puzzle, href: "/super-admin/integrations" },
       { title: "قاعدة البيانات", icon: Database, href: "/super-admin/database" },
       { title: "الإعدادات العامة", icon: Settings, href: "/super-admin/settings" },
     ]

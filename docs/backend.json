@@ -29,58 +29,37 @@
       },
       "required": ["tenantId", "slug", "businessName"]
     },
-    "SubscriptionPlan": {
-      "title": "SubscriptionPlan",
-      "description": "Global definitions of service tiers",
+    "Integration": {
+      "title": "Integration",
+      "description": "Global third-party service definition",
       "type": "object",
       "properties": {
+        "id": { "type": "string" },
         "name": { "type": "string" },
-        "priceIQD": { "type": "number" },
-        "billingCycle": { "type": "string", "enum": ["monthly", "yearly"] },
-        "maxProducts": { "type": "number" },
-        "maxEmployees": { "type": "number" },
-        "maxOrdersPerMonth": { "type": "number" },
-        "storageLimitMB": { "type": "number" },
-        "aiQuota": { "type": "number" },
-        "posEnabled": { "type": "boolean" },
-        "reportsEnabled": { "type": "boolean" },
-        "workshopEnabled": { "type": "boolean" },
-        "onlineStoreEnabled": { "type": "boolean" },
-        "customDomainEnabled": { "type": "boolean" },
-        "prioritySupport": { "type": "boolean" },
-        "isActive": { "type": "boolean" }
+        "category": { "type": "string", "enum": ["payments", "delivery", "finance", "messaging", "maps", "ai", "analytics", "accounting", "marketing"] },
+        "logo": { "type": "string" },
+        "description": { "type": "string" },
+        "provider": { "type": "string" },
+        "status": { "type": "string", "enum": ["active", "beta", "coming_soon", "deprecated"] },
+        "enabled": { "type": "boolean" },
+        "supportedPlans": { "type": "array" },
+        "requiredConfiguration": { "type": "array" },
+        "createdAt": { "type": "number" }
       }
     },
-    "SubscriptionInvoice": {
-      "title": "SubscriptionInvoice",
-      "description": "B2B Billing records for tenants",
+    "TenantIntegration": {
+      "title": "TenantIntegration",
+      "description": "Specific tenant configuration for an integration",
       "type": "object",
       "properties": {
-        "invoiceNumber": { "type": "string" },
         "tenantId": { "type": "string" },
-        "planName": { "type": "string" },
-        "amountIQD": { "type": "number" },
-        "status": { "type": "string", "enum": ["paid", "pending", "overdue"] },
-        "issueDate": { "type": "number" },
-        "dueDate": { "type": "number" },
-        "paymentDate": { "type": "number" },
-        "notes": { "type": "string" }
+        "integrationId": { "type": "string" },
+        "enabled": { "type": "boolean" },
+        "configuration": { "type": "object" },
+        "connectedAt": { "type": "number" },
+        "lastSync": { "type": "number" },
+        "status": { "type": "string" }
       }
-    },
-    "UserProfile": {
-      "title": "UserProfile",
-      "description": "User account information linked to a tenant",
-      "type": "object",
-      "properties": {
-        "uid": { "type": "string" },
-        "tenantId": { "type": "string" },
-        "displayName": { "type": "string" },
-        "email": { "type": "string" },
-        "phoneNumber": { "type": "string" },
-        "role": { "type": "string", "enum": ["super_admin", "owner", "admin", "sales_employee", "workshop_technician", "warehouse_employee", "retail_customer", "wholesale_customer"] },
-        "currentBalance": { "type": "number" }
-      },
-      "required": ["uid", "tenantId", "role"]
     }
   },
   "auth": {
@@ -88,8 +67,8 @@
   },
   "firestore": {
     "/tenants/{tenantId}": { "schema": "Tenant", "description": "Tenant business configuration" },
-    "/plans/{planId}": { "schema": "SubscriptionPlan", "description": "Global subscription plan definitions" },
-    "/subscriptionInvoices/{invoiceId}": { "schema": "SubscriptionInvoice", "description": "Tenant billing records" },
+    "/integrations/{integrationId}": { "schema": "Integration", "description": "Global integration catalog" },
+    "/tenantIntegrations/{id}": { "schema": "TenantIntegration", "description": "Tenant-specific integration settings" },
     "/users/{userId}": { "schema": "UserProfile", "description": "Tenant-scoped user accounts" },
     "/products/{productId}": { "schema": "Product", "description": "Tenant-scoped inventory" },
     "/orders/{orderId}": { "schema": "Order", "description": "Tenant-scoped sales orders" },

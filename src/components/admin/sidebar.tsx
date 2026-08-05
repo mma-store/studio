@@ -24,7 +24,8 @@ import {
   Banknote,
   Coins,
   Database,
-  CreditCard
+  CreditCard,
+  Puzzle
 } from "lucide-react";
 
 import {
@@ -97,6 +98,7 @@ const ADMIN_MENU = [
   {
     label: "النظام",
     items: [
+      { title: "الربط والتكامل", icon: Puzzle, href: "/admin/integrations" },
       { title: "الاشتراك والفوترة", icon: CreditCard, href: "/admin/billing" },
       { title: "البنرات والعروض", icon: ImageIcon, href: "/admin/banners" },
       { title: "سجل العمليات", icon: History, href: "/admin/audit-log" },
