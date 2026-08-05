@@ -7,6 +7,9 @@ import { doc, onSnapshot } from 'firebase/firestore';
 import { useAuth, useFirestore } from '../provider';
 import { UserProfile } from '@/lib/types/roles';
 
+// أرقام المدير العام الماستر للطوارئ والتهيئة
+const MASTER_SUPER_ADMINS = ['7858833838', '07858833838', '7703687932', '07703687932'];
+
 export function useUser() {
   const auth = useAuth();
   const db = useFirestore();
@@ -19,13 +22,10 @@ export function useUser() {
       setUser(firebaseUser);
       
       if (firebaseUser) {
-        // Listen to profile changes in Firestore
         const profileRef = doc(db, 'users', firebaseUser.uid);
         const unsubscribeProfile = onSnapshot(profileRef, (docSnap) => {
           if (docSnap.exists()) {
             const data = docSnap.data() as UserProfile;
-            // Fallback for legacy users during migration
-            if (!data.tenantId) data.tenantId = 'MMA001';
             setProfile(data);
           } else {
             setProfile(null);
@@ -43,5 +43,16 @@ export function useUser() {
     return () => unsubscribeAuth();
   }, [auth, db]);
 
-  return { user, profile, loading, tenantId: profile?.tenantId || 'MMA001' };
+  // منطق التحقق من السوبر أدمن
+  const purePhone = profile?.phoneNumber?.replace(/\s/g, '').replace(/^(\+964|0)/, '') || '';
+  const isSuperAdmin = profile?.role === 'super_admin' || MASTER_SUPER_ADMINS.includes(purePhone) || MASTER_SUPER_ADMINS.includes(`0${purePhone}`);
+
+  return { 
+    user, 
+    profile, 
+    loading, 
+    isSuperAdmin,
+    // السوبر أدمن لا يتقيد بـ MMA001 افتراضياً، بل ببيئة الإدارة العامة
+    tenantId: isSuperAdmin ? (profile?.tenantId || 'PLATFORM_OWNER') : (profile?.tenantId || 'MMA001') 
+  };
 }

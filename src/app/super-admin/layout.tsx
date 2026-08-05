@@ -13,11 +13,8 @@ import { signOut } from "firebase/auth";
 import { useAuth } from "@/firebase";
 import { ShieldAlert, LogOut } from "lucide-react";
 
-// تم تحديث أرقام المدير العام للمنصة (الرقم الشخصي الجديد)
-const MASTER_SUPER_ADMINS = ['7858833838', '07858833838', '7703687932', '07703687932'];
-
 export default function SuperAdminLayout({ children }: { children: React.ReactNode }) {
-  const { user, profile, loading } = useUser();
+  const { user, isSuperAdmin, loading } = useUser();
   const auth = useAuth();
   const router = useRouter();
   const [isAuthorized, setIsAuthorized] = useState(false);
@@ -26,19 +23,14 @@ export default function SuperAdminLayout({ children }: { children: React.ReactNo
     if (!loading) {
       if (!user) {
         router.replace('/login');
+      } else if (isSuperAdmin) {
+        setIsAuthorized(true);
       } else {
-        const purePhone = profile?.phoneNumber?.replace(/\s/g, '').replace(/^(\+964|0)/, '');
-        const isMaster = purePhone && MASTER_SUPER_ADMINS.includes(purePhone);
-        const isExplicitSuper = profile?.role === 'super_admin';
-
-        if (isMaster || isExplicitSuper) {
-          setIsAuthorized(true);
-        } else {
-          router.replace('/admin'); // توجيه التجار للوحة التحكم الخاصة بهم
-        }
+        // إذا كان مستخدماً عادياً يحاول الدخول، يتم توجيهه للرئيسية أو لوحة التاجر
+        router.replace('/admin');
       }
     }
-  }, [user, profile, loading, router]);
+  }, [user, isSuperAdmin, loading, router]);
 
   if (loading) {
     return (
