@@ -1,6 +1,7 @@
+
 'use client';
 
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { useAuth, useFirestore } from "@/firebase";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { collection, doc, query, where, getDocs, writeBatch, orderBy, limit } from "firebase/firestore";
@@ -8,12 +9,13 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { toast } from "@/hooks/use-toast";
-import { Store, User, Phone, MapPin, Briefcase, Loader2, ArrowRight, CheckCircle2, ArrowLeft, ScrollText } from "lucide-react";
-import Image from "next/image";
+import { Loader2, ArrowRight, ArrowLeft, ScrollText } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import { errorEmitter } from "@/firebase/error-emitter";
+import { FirestorePermissionError } from "@/firebase/errors";
 
 export default function OnboardingPage() {
   const auth = useAuth();
@@ -44,41 +46,55 @@ export default function OnboardingPage() {
 
   const handleOnboarding = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (step === 1) {
+      setStep(2);
+      return;
+    }
+    
     setLoading(true);
 
     try {
       const slug = generateSlug(formData.businessName);
       
+      // 1. التحقق من توافر الرابط (Slug)
       const slugQuery = query(collection(db, "tenants"), where("slug", "==", slug));
-      const slugSnap = await getDocs(slugQuery);
-      if (!slugSnap.empty) {
-        toast({ variant: "destructive", title: "اسم المتجر مستخدم", description: "يرجى اختيار اسم متجر آخر." });
+      const slugSnap = await getDocs(slugQuery).catch(() => null);
+      
+      if (slugSnap && !slugSnap.empty) {
+        toast({ variant: "destructive", title: "اسم المتجر مستخدم", description: "يرجى اختيار اسم متجر آخر أو إضافة أرقام لتمييزه." });
         setLoading(false);
         return;
       }
 
-      const plansQuery = query(collection(db, "plans"), where("active", "==", true), orderBy("monthlyPrice", "asc"), limit(1));
-      const plansSnap = await getDocs(plansQuery);
-      let trialDays = 14; 
-      let trialPlanId = "";
+      // 2. محاولة الحصول على الخطة التجريبية الافتراضية
+      let trialDays = 14;
+      let trialPlanId = "trial_standard";
       
-      if (!plansSnap.empty) {
-        const trialPlan = plansSnap.docs[0].data();
-        trialDays = trialPlan.trialDays || 14;
-        trialPlanId = plansSnap.docs[0].id;
+      try {
+        const plansQuery = query(collection(db, "plans"), where("active", "==", true), orderBy("displayOrder", "asc"), limit(1));
+        const plansSnap = await getDocs(plansQuery);
+        if (!plansSnap.empty) {
+          const trialPlan = plansSnap.docs[0].data();
+          trialDays = trialPlan.trialDays || 14;
+          trialPlanId = plansSnap.docs[0].id;
+        }
+      } catch (err) {
+        console.warn("Using default trial settings (plans collection might be empty or restricted).");
       }
 
+      // 3. إنشاء حساب Firebase Auth
       const purePhone = formData.phoneNumber.replace(/\s/g, '').replace(/^(\+964|0)/, '');
       const email = `${purePhone}@platform.store`;
       const userCredential = await createUserWithEmailAndPassword(auth, email, formData.password);
       const user = userCredential.user;
 
+      // 4. كتابة البيانات باستخدام Batch لضمان التكامل
       const batch = writeBatch(db);
       const tenantId = `T-${Date.now().toString().slice(-6)}`;
       const now = Date.now();
       
       const tenantRef = doc(db, "tenants", tenantId);
-      batch.set(tenantRef, {
+      const tenantData = {
         tenantId,
         businessName: formData.businessName,
         slug,
@@ -91,11 +107,15 @@ export default function OnboardingPage() {
         subscriptionPlan: "trial",
         trialStartDate: now,
         trialEndDate: now + trialDays * 24 * 60 * 60 * 1000,
-        createdAt: now
-      });
+        createdAt: now,
+        settings: {
+          defaultPrintSize: "80mm",
+          notificationsEnabled: true
+        }
+      };
 
       const userRef = doc(db, "users", user.uid);
-      batch.set(userRef, {
+      const userData = {
         uid: user.uid,
         tenantId,
         displayName: formData.ownerName,
@@ -103,14 +123,29 @@ export default function OnboardingPage() {
         email,
         role: "owner",
         createdAt: now
-      });
+      };
 
-      await batch.commit();
-      toast({ title: "مبروك! تم تأسيس متجرك على دوبسار", description: "جاري توجيهك للوحة التحكم." });
-      router.push("/admin");
+      batch.set(tenantRef, tenantData);
+      batch.set(userRef, userData);
+
+      await batch.commit().then(() => {
+        toast({ title: "مبروك! تم تأسيس متجرك", description: "جاري تجهيز لوحة التحكم الخاصة بك." });
+        router.push("/admin");
+      }).catch(async (serverError) => {
+        const permissionError = new FirestorePermissionError({
+          path: `tenants/${tenantId}`,
+          operation: 'create',
+          requestResourceData: tenantData
+        });
+        errorEmitter.emit('permission-error', permissionError);
+        throw serverError;
+      });
       
     } catch (error: any) {
-      toast({ variant: "destructive", title: "خطأ في التسجيل", description: error.message });
+      let message = error.message;
+      if (error.code === 'auth/email-already-in-use') message = "رقم الهاتف هذا مسجل لمتجر آخر بالفعل.";
+      
+      toast({ variant: "destructive", title: "فشل التأسيس", description: message });
     } finally {
       setLoading(false);
     }
@@ -129,57 +164,55 @@ export default function OnboardingPage() {
              </div>
              <h2 className="text-3xl font-black text-primary tracking-tighter">تأسيس متجر دوبسار</h2>
           </div>
-          <CardDescription className="font-medium text-lg text-slate-500">امتلك نظاماً سحابياً متكاملاً بهوية عراقية عريقة.</CardDescription>
+          <CardDescription className="font-medium text-lg text-slate-500">ابدأ تجارتك السحابية اليوم بهوية عراقية أصيلة.</CardDescription>
         </CardHeader>
         <CardContent className="px-10 pb-10">
           <form onSubmit={handleOnboarding} className="space-y-6">
             {step === 1 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-in slide-in-from-right-4 duration-500">
                 <div className="space-y-2">
-                  <Label className="font-black text-xs mr-2 opacity-60 uppercase tracking-widest">اسم النشاط التجاري</Label>
+                  <Label className="font-black text-xs mr-2 opacity-60 uppercase tracking-widest">اسم المتجر / النشاط</Label>
                   <Input name="businessName" value={formData.businessName} onChange={handleChange} required placeholder="مثال: مجمع بابل" className="h-14 rounded-2xl bg-slate-50 border-none font-black px-6" />
                 </div>
                 <div className="space-y-2">
-                   <Label className="font-black text-xs mr-2 opacity-60 uppercase tracking-widest">اسم صاحب العمل</Label>
+                   <Label className="font-black text-xs mr-2 opacity-60 uppercase tracking-widest">اسم المدير المسؤول</Label>
                    <Input name="ownerName" value={formData.ownerName} onChange={handleChange} required placeholder="الاسم الكامل" className="h-14 rounded-2xl bg-slate-50 border-none font-black px-6" />
                 </div>
                 <div className="space-y-2">
-                   <Label className="font-black text-xs mr-2 opacity-60 uppercase tracking-widest">العنوان</Label>
+                   <Label className="font-black text-xs mr-2 opacity-60 uppercase tracking-widest">عنوان المحل</Label>
                    <Input name="address" value={formData.address} onChange={handleChange} required placeholder="المدينة، المنطقة" className="h-14 rounded-2xl bg-slate-50 border-none font-black px-6" />
                 </div>
                 <div className="space-y-2">
-                   <Label className="font-black text-xs mr-2 opacity-60 uppercase tracking-widest">نوع النشاط</Label>
+                   <Label className="font-black text-xs mr-2 opacity-60 uppercase tracking-widest">نوع العمل</Label>
                    <select name="businessType" value={formData.businessType} onChange={handleChange} className="w-full h-14 rounded-2xl bg-slate-50 border-none px-6 font-black appearance-none outline-none">
                      <option value="retail">تجارة مفرد</option>
                      <option value="wholesale">تجارة جملة</option>
                      <option value="workshop">ورشة وصيانة</option>
-                     <option value="general">متجر عام</option>
                    </select>
                 </div>
               </div>
             ) : (
               <div className="max-w-md mx-auto space-y-6 animate-in slide-in-from-left-4 duration-500">
                 <div className="space-y-2">
-                   <Label className="font-black text-xs mr-2 opacity-60 uppercase tracking-widest">رقم الهاتف الأساسي</Label>
+                   <Label className="font-black text-xs mr-2 opacity-60 uppercase tracking-widest">رقم الهاتف للدخول</Label>
                    <Input name="phoneNumber" value={formData.phoneNumber} onChange={handleChange} required placeholder="07XXXXXXXXX" className="h-14 rounded-2xl bg-slate-50 border-none text-left font-black px-6" dir="ltr" />
                 </div>
                 <div className="space-y-2">
-                  <Label className="font-black text-xs mr-2 opacity-60 uppercase tracking-widest">كلمة سر اللوحة</Label>
+                  <Label className="font-black text-xs mr-2 opacity-60 uppercase tracking-widest">كلمة السر (6 أرقام على الأقل)</Label>
                   <Input type="password" name="password" value={formData.password} onChange={handleChange} required placeholder="••••••••" className="h-14 rounded-2xl bg-slate-50 border-none text-left px-6" dir="ltr" />
                 </div>
               </div>
             )}
 
             <div className="pt-8 flex gap-4">
-              {step === 2 && <Button type="button" variant="ghost" onClick={() => setStep(1)} className="h-16 rounded-2xl font-black px-10">سابق</Button>}
+              {step === 2 && <Button type="button" variant="ghost" onClick={() => setStep(1)} className="h-16 rounded-2xl font-black px-10" disabled={loading}>سابق</Button>}
               <Button 
-                type={step === 1 ? "button" : "submit"} 
-                onClick={() => step === 1 && setStep(2)}
+                type="submit"
                 disabled={loading}
                 className="flex-1 h-16 rounded-[24px] font-black text-xl gap-3 shadow-2xl bg-primary"
               >
                 {loading ? <Loader2 className="h-6 w-6 animate-spin" /> : (
-                  <>{step === 1 ? "المتابعة" : "تأسيس المتجر الآن"}<ArrowRight className={cn("h-6 w-6", step === 2 && "hidden")} /></>
+                  <>{step === 1 ? "المتابعة للخطوة الأخيرة" : "تأسيس المتجر الآن"}<ArrowRight className={cn("h-6 w-6", step === 2 && "hidden")} /></>
                 )}
               </Button>
             </div>

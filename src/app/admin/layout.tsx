@@ -1,3 +1,4 @@
+
 'use client';
 
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
@@ -31,30 +32,45 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       } else {
         const purePhone = profile?.phoneNumber?.replace(/\s/g, '').replace(/^(\+964|0)/, '');
         const isMasterAdmin = purePhone && MASTER_PHONES.includes(purePhone);
+        
+        // السماح بالدخول إذا كان العضو يمتلك رتبة إدارية في متجر أو هو المدير العام
         const isMerchant = profile && ['owner', 'admin', 'sales_employee', 'workshop_technician', 'warehouse_employee'].includes(profile.role);
         
         if (isSuperAdmin || isMasterAdmin || (isMerchant && tenantId)) {
           setIsAuthorized(true);
         } else {
-          router.replace('/');
+          // إذا كان المستخدم زبوناً عادياً أو بلا ملف شخصي يحاول دخول لوحة الإدارة
+          if (profile && ['retail_customer', 'wholesale_customer'].includes(profile.role)) {
+            router.replace('/');
+          } else if (profile === null && !isMasterAdmin) {
+            // حالة خاصة: مستخدم جديد دخل ولم يكمل التأسيس
+            router.replace('/onboarding');
+          }
         }
       }
     }
   }, [user, profile, loading, router, tenantId, isSuperAdmin]);
 
+  // شاشة التحميل الأولية
   if (loading || (tenantId && subscription.loading)) {
     return (
-      <div className="flex min-h-screen w-full flex-col items-center justify-center bg-background p-8 gap-8">
+      <div className="flex min-h-screen w-full flex-col items-center justify-center bg-[#FDF8F5] p-8 gap-8">
          <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-primary text-white shadow-2xl animate-bounce">
             <ScrollText className="h-10 w-10" />
          </div>
          <div className="w-full max-w-4xl space-y-6">
-            <Skeleton className="h-[400px] w-full rounded-[40px]" />
+            <Skeleton className="h-[400px] w-full rounded-[40px] opacity-20" />
+            <div className="grid grid-cols-3 gap-4">
+              <Skeleton className="h-32 rounded-3xl opacity-20" />
+              <Skeleton className="h-32 rounded-3xl opacity-20" />
+              <Skeleton className="h-32 rounded-3xl opacity-20" />
+            </div>
          </div>
       </div>
     );
   }
 
+  // إذا تم الدخول ولكن لم يتم التصريح (بعد انتهاء التحميل)
   if (!isAuthorized && user) {
     return (
       <div className="flex min-h-screen items-center justify-center p-6 bg-slate-50" dir="rtl">
@@ -64,16 +80,17 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </div>
           <div className="space-y-2">
             <h1 className="text-2xl font-black">وصول غير مصرح به</h1>
-            <p className="text-muted-foreground font-medium">حسابك غير مرتبط بمتجر نشط أو لا يمتلك صلاحيات الإدارة في دوبسار.</p>
+            <p className="text-muted-foreground font-medium">حسابك غير مرتبـط بمتجر نشط حالياً أو لا يمتلك صلاحيات إدارة.</p>
           </div>
-          <Button onClick={() => signOut(auth)} className="w-full h-14 rounded-2xl font-black gap-2">
-             <LogOut className="h-5 w-5" /> تسجيل الخروج
+          <Button onClick={() => signOut(auth)} className="w-full h-14 rounded-2xl font-black gap-2 shadow-lg">
+             <LogOut className="h-5 w-5" /> تسجيل الخروج والعودة
           </Button>
         </div>
       </div>
     );
   }
 
+  // منع ظهور أي محتوى قبل اكتمال التحقق
   if (!isAuthorized) return null;
 
   return (
@@ -92,7 +109,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                         <div className="h-10 w-10 rounded-full bg-white/20 flex items-center justify-center"><AlertCircle className="h-6 w-6" /></div>
                         <div>
                           <p className="font-black text-sm">انتهت صلاحية الاشتراك!</p>
-                          <p className="text-[10px] opacity-80 font-bold uppercase tracking-widest">يرجى تجديد الاشتراك لتجنب توقف خدمات دوبسار عن العمل.</p>
+                          <p className="text-[10px] opacity-80 font-bold uppercase tracking-widest">يرجى تجديد الاشتراك لتجنب توقف خدمات متجرك.</p>
                         </div>
                      </div>
                      <Button variant="secondary" size="lg" className="rounded-2xl font-black gap-2" asChild>
@@ -103,7 +120,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                   <div className="bg-secondary/5 text-secondary px-6 py-3 rounded-2xl flex items-center justify-between border border-secondary/10 shadow-sm">
                      <div className="flex items-center gap-3">
                         <div className="h-8 w-8 rounded-full bg-secondary/10 flex items-center justify-center"><Clock className="h-4 w-4" /></div>
-                        <p className="text-xs font-black">فترة تجريبية في دوبسار: متبقي لك <span className="text-lg underline underline-offset-4">{subscription.daysRemaining}</span> أيام للوصول الكامل.</p>
+                        <p className="text-xs font-black">أنت في الفترة التجريبية: متبقي لك <span className="text-lg underline underline-offset-4">{subscription.daysRemaining}</span> أيام للوصول الكامل.</p>
                      </div>
                      <Link href="/admin/billing" className="text-[10px] font-black uppercase tracking-widest bg-secondary text-white px-4 py-1.5 rounded-full hover:bg-secondary/90 transition-colors">اشترك الآن</Link>
                   </div>
