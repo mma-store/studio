@@ -27,31 +27,37 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
     
-    const purePhone = normalizePhoneNumber(phoneNumber);
+    // 1. تنظيف المدخلات من المسافات والتنسيقات غير المرغوبة
+    const trimmedPhone = phoneNumber.trim();
+    const trimmedPassword = password.trim();
+    const purePhone = normalizePhoneNumber(trimmedPhone);
     
-    // قائمة بكافة احتمالات البريد الإلكتروني الداخلي لضمان التوافق مع كافة نسخ النظام
+    // 2. قائمة بكافة احتمالات البريد الإلكتروني الداخلي لضمان التوافق الشامل
     const emailAttempts = [
       getInternalEmail(purePhone),           // 7xxxxxxxx@dubsar.platform (القياسي الحالي)
       getInternalEmail(`0${purePhone}`),     // 07xxxxxxxx@dubsar.platform (القياسي البديل)
       `${purePhone}@mma.store`,              // 7xxxxxxxx@mma.store (القديم)
       `0${purePhone}@mma.store`              // 07xxxxxxxx@mma.store (القديم جداً)
-    ];
+    ].filter(Boolean) as string[];
 
     try {
       let userCredential = null;
       let lastError = null;
 
-      // محاولة تسجيل الدخول بكافة التنسيقات الممكنة
+      // محاولة تسجيل الدخول بكافة التنسيقات الممكنة في الخلفية
       for (const attemptEmail of emailAttempts) {
         try {
-          userCredential = await signInWithEmailAndPassword(auth, attemptEmail, password);
-          if (userCredential) break; // نجاح الدخول
+          console.log(`Attempting login with: ${attemptEmail}`);
+          userCredential = await signInWithEmailAndPassword(auth, attemptEmail, trimmedPassword);
+          if (userCredential) break; // نجاح الدخول، نخرج من الحلقة
         } catch (err: any) {
           lastError = err;
-          // نمر للمحاولة التالية فقط إذا كان الخطأ متعلقاً ببيانات الاعتماد
-          if (err.code !== 'auth/invalid-credential' && err.code !== 'auth/user-not-found') {
-            break; 
-          }
+          // نستمر للمحاولة التالية فقط إذا كان الخطأ متعلقاً ببيانات الاعتماد
+          const isAuthError = err.code === 'auth/invalid-credential' || 
+                             err.code === 'auth/user-not-found' || 
+                             err.code === 'auth/wrong-password';
+          
+          if (!isAuthError) break; // خطأ تقني آخر (مثل الإنترنت)، نتوقف فوراً
         }
       }
 
@@ -61,41 +67,47 @@ export default function LoginPage() {
       
       const user = userCredential.user;
 
-      // محاولة استباقية لمعرفة الوجهة وتحديث بيانات المستخدم
+      // محاولة تحديث بيانات الجلسة في Firestore دون تعطيل الدخول
       const userRef = doc(db, "users", user.uid);
-      const userSnap = await getDoc(userRef);
-      
-      if (userSnap.exists()) {
-        const userData = userSnap.data();
-        // تحديث سجل الدخول في الخلفية
-        updateDoc(userRef, { 
-          lastLogin: Date.now(),
-          phoneNumber: userData.phoneNumber?.startsWith('0') ? userData.phoneNumber : `0${purePhone}`
-        }).catch(() => {});
-        
-        const isMaster = purePhone === '7858833838' || purePhone === '7703687932';
-        
-        if (userData.role === 'super_admin' || isMaster) {
-          router.push("/super-admin");
-        } else if (['owner', 'admin', 'sales_employee', 'workshop_technician', 'warehouse_employee'].includes(userData.role)) {
-          router.push("/admin");
+      getDoc(userRef).then((userSnap) => {
+        if (userSnap.exists()) {
+          const userData = userSnap.data();
+          updateDoc(userRef, { 
+            lastLogin: Date.now(),
+            phoneNumber: userData.phoneNumber?.startsWith('0') ? userData.phoneNumber : `0${purePhone}`
+          }).catch(() => {});
+
+          // التوجيه الذكي بناءً على الرتبة
+          const isMaster = purePhone === '7858833838' || purePhone === '7703687932';
+          if (userData.role === 'super_admin' || isMaster) {
+            router.push("/super-admin");
+          } else if (['owner', 'admin', 'sales_employee', 'workshop_technician', 'warehouse_employee'].includes(userData.role)) {
+            router.push("/admin");
+          } else {
+            router.push("/");
+          }
         } else {
-          router.push("/");
+          // إذا لم يوجد ملف شخصي، نفترض أنه تاجر جديد لم يكمل التأسيس
+          router.push("/admin");
         }
-      } else {
-        // إذا نجح Auth وفشل Firestore، نرسله لـ /admin ليقوم الـ Layout بالمعالجة
+      }).catch(() => {
+        // في حال فشل قراءة Firestore (أذونات لحظية)، نرسله للوحة الإدارة وهي تتولى الفحص
         router.push("/admin");
-      }
+      });
       
       toast({ title: "تم تسجيل الدخول بنجاح" });
     } catch (error: any) {
-      console.error("Login Error:", error);
+      console.error("Final Login Error:", error);
       let message = "تأكد من رقم الهاتف وكلمة المرور.";
-      if (error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
-        message = "بيانات الدخول غير صحيحة.";
-      } else if (error.code === 'auth/too-many-requests') {
-        message = "محاولات كثيرة خاطئة. تم قفل الحساب مؤقتاً.";
+      
+      if (error.code === 'auth/too-many-requests') {
+        message = "محاولات كثيرة خاطئة. تم قفل الحساب مؤقتاً لحمايتك.";
+      } else if (error.code === 'auth/network-request-failed') {
+        message = "يرجى التحقق من اتصال الإنترنت الخاص بك.";
+      } else {
+        message = "رقم الهاتف أو كلمة المرور غير صحيحة.";
       }
+      
       toast({ variant: "destructive", title: "فشل الدخول", description: message });
     } finally {
       setLoading(false);

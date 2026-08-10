@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from "react";
@@ -36,6 +37,7 @@ export default function OnboardingPage() {
 
   const generateSlug = (name: string) => {
     return name
+      .trim()
       .toLowerCase()
       .replace(/[^\u0621-\u064A\u0660-\u0669a-zA-Z0-9\s]/g, "")
       .replace(/\s+/g, "-");
@@ -52,8 +54,9 @@ export default function OnboardingPage() {
 
     try {
       const slug = generateSlug(formData.businessName);
-      const purePhone = normalizePhoneNumber(formData.phoneNumber);
+      const purePhone = normalizePhoneNumber(formData.phoneNumber.trim());
       const email = getInternalEmail(purePhone);
+      const trimmedPassword = formData.password.trim();
       
       // 1. التحقق من توافر الرابط
       const slugQuery = query(collection(db, "tenants"), where("slug", "==", slug));
@@ -70,7 +73,7 @@ export default function OnboardingPage() {
       
       if (!targetUser) {
         try {
-          const userCredential = await createUserWithEmailAndPassword(auth, email, formData.password);
+          const userCredential = await createUserWithEmailAndPassword(auth, email, trimmedPassword);
           targetUser = userCredential.user;
         } catch (authError: any) {
           if (authError.code === 'auth/email-already-in-use') {
@@ -90,12 +93,12 @@ export default function OnboardingPage() {
       const tenantRef = doc(db, "tenants", tenantId);
       batch.set(tenantRef, {
         tenantId,
-        businessName: formData.businessName,
+        businessName: formData.businessName.trim(),
         slug,
-        ownerName: formData.ownerName,
+        ownerName: formData.ownerName.trim(),
         ownerUid: targetUser.uid,
         phone: `0${purePhone}`,
-        address: formData.address,
+        address: formData.address.trim(),
         businessType: formData.businessType,
         status: "trial",
         subscriptionPlan: "trial",
@@ -109,7 +112,7 @@ export default function OnboardingPage() {
       batch.set(userRef, {
         uid: targetUser.uid,
         tenantId,
-        displayName: formData.ownerName,
+        displayName: formData.ownerName.trim(),
         phoneNumber: `0${purePhone}`,
         email,
         role: "owner",
