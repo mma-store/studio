@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from "react";
@@ -31,16 +32,24 @@ export default function RegisterPage() {
     setLoading(true);
 
     try {
-      const purePhone = normalizePhoneNumber(formData.phoneNumber);
+      const trimmedPhone = formData.phoneNumber.trim();
+      const purePhone = normalizePhoneNumber(trimmedPhone);
+      
+      if (!purePhone || purePhone.length < 9) {
+        toast({ variant: "destructive", title: "رقم هاتف غير صالح" });
+        setLoading(false);
+        return;
+      }
+
       const email = getInternalEmail(purePhone);
 
-      const userCredential = await createUserWithEmailAndPassword(auth, email, formData.password);
+      const userCredential = await createUserWithEmailAndPassword(auth, email, formData.password.trim());
       const user = userCredential.user;
 
       await setDoc(doc(db, "users", user.uid), {
         uid: user.uid,
         tenantId: 'GUEST',
-        displayName: formData.displayName,
+        displayName: formData.displayName.trim(),
         phoneNumber: `0${purePhone}`,
         email,
         role: 'retail_customer',
@@ -51,11 +60,17 @@ export default function RegisterPage() {
       router.push("/");
       
     } catch (error: any) {
-      console.error("Register Error:", error);
+      let message = "فشل إنشاء الحساب.";
+      if (error.code === 'auth/email-already-in-use') {
+        message = "رقم الهاتف مسجل مسبقاً.";
+      } else if (error.code === 'auth/weak-password') {
+        message = "كلمة المرور ضعيفة جداً.";
+      }
+      
       toast({ 
         variant: "destructive", 
         title: "خطأ في التسجيل", 
-        description: error.code === 'auth/email-already-in-use' ? "رقم الهاتف مسجل مسبقاً." : "فشل إنشاء الحساب." 
+        description: message 
       });
     } finally {
       setLoading(false);

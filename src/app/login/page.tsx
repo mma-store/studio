@@ -27,37 +27,46 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
     
-    // 1. تنظيف المدخلات من المسافات والتنسيقات غير المرغوبة
     const trimmedPhone = phoneNumber.trim();
     const trimmedPassword = password.trim();
     const purePhone = normalizePhoneNumber(trimmedPhone);
     
-    // 2. قائمة بكافة احتمالات البريد الإلكتروني الداخلي لضمان التوافق الشامل
+    if (!purePhone || purePhone.length < 9) {
+      toast({ 
+        variant: "destructive", 
+        title: "رقم هاتف غير صالح", 
+        description: "يرجى إدخال رقم هاتف عراقي صحيح (مثلاً: 078XXXXXXXX)." 
+      });
+      setLoading(false);
+      return;
+    }
+
+    // قائمة بكافة احتمالات البريد الإلكتروني الداخلي لضمان التوافق مع الحسابات القديمة والجديدة
     const emailAttempts = [
-      getInternalEmail(purePhone),           // 7xxxxxxxx@dubsar.platform (القياسي الحالي)
-      getInternalEmail(`0${purePhone}`),     // 07xxxxxxxx@dubsar.platform (القياسي البديل)
-      `${purePhone}@mma.store`,              // 7xxxxxxxx@mma.store (القديم)
-      `0${purePhone}@mma.store`              // 07xxxxxxxx@mma.store (القديم جداً)
+      getInternalEmail(purePhone),           // 7xxxxxxxx@dubsar.platform
+      getInternalEmail(`0${purePhone}`),     // 07xxxxxxxx@dubsar.platform
+      `${purePhone}@mma.store`,              // Legacy format
+      `0${purePhone}@mma.store`              // Very old legacy format
     ].filter(Boolean) as string[];
 
     try {
       let userCredential = null;
       let lastError = null;
 
-      // محاولة تسجيل الدخول بكافة التنسيقات الممكنة في الخلفية
+      // محاولة تسجيل الدخول بكافة التنسيقات الممكنة
       for (const attemptEmail of emailAttempts) {
         try {
-          console.log(`Attempting login with: ${attemptEmail}`);
           userCredential = await signInWithEmailAndPassword(auth, attemptEmail, trimmedPassword);
-          if (userCredential) break; // نجاح الدخول، نخرج من الحلقة
+          if (userCredential) break; 
         } catch (err: any) {
           lastError = err;
-          // نستمر للمحاولة التالية فقط إذا كان الخطأ متعلقاً ببيانات الاعتماد
-          const isAuthError = err.code === 'auth/invalid-credential' || 
-                             err.code === 'auth/user-not-found' || 
-                             err.code === 'auth/wrong-password';
+          // إذا كان الخطأ ليس متعلقاً ببيانات الاعتماد (مثل مشكلة إنترنت)، نتوقف فوراً ونظهره
+          const isCredentialError = 
+            err.code === 'auth/invalid-credential' || 
+            err.code === 'auth/user-not-found' || 
+            err.code === 'auth/wrong-password';
           
-          if (!isAuthError) break; // خطأ تقني آخر (مثل الإنترنت)، نتوقف فوراً
+          if (!isCredentialError) break;
         }
       }
 
@@ -67,7 +76,7 @@ export default function LoginPage() {
       
       const user = userCredential.user;
 
-      // محاولة تحديث بيانات الجلسة في Firestore دون تعطيل الدخول
+      // تحديث بيانات الجلسة في Firestore
       const userRef = doc(db, "users", user.uid);
       getDoc(userRef).then((userSnap) => {
         if (userSnap.exists()) {
@@ -77,7 +86,7 @@ export default function LoginPage() {
             phoneNumber: userData.phoneNumber?.startsWith('0') ? userData.phoneNumber : `0${purePhone}`
           }).catch(() => {});
 
-          // التوجيه الذكي بناءً على الرتبة
+          // التوجيه الذكي
           const isMaster = purePhone === '7858833838' || purePhone === '7703687932';
           if (userData.role === 'super_admin' || isMaster) {
             router.push("/super-admin");
@@ -87,28 +96,27 @@ export default function LoginPage() {
             router.push("/");
           }
         } else {
-          // إذا لم يوجد ملف شخصي، نفترض أنه تاجر جديد لم يكمل التأسيس
           router.push("/admin");
         }
       }).catch(() => {
-        // في حال فشل قراءة Firestore (أذونات لحظية)، نرسله للوحة الإدارة وهي تتولى الفحص
         router.push("/admin");
       });
       
       toast({ title: "تم تسجيل الدخول بنجاح" });
     } catch (error: any) {
-      console.error("Final Login Error:", error);
       let message = "تأكد من رقم الهاتف وكلمة المرور.";
       
       if (error.code === 'auth/too-many-requests') {
-        message = "محاولات كثيرة خاطئة. تم قفل الحساب مؤقتاً لحمايتك.";
+        message = "محاولات كثيرة خاطئة. تم قفل الحساب مؤقتاً.";
       } else if (error.code === 'auth/network-request-failed') {
-        message = "يرجى التحقق من اتصال الإنترنت الخاص بك.";
-      } else {
-        message = "رقم الهاتف أو كلمة المرور غير صحيحة.";
+        message = "يرجى التحقق من اتصال الإنترنت.";
       }
       
-      toast({ variant: "destructive", title: "فشل الدخول", description: message });
+      toast({ 
+        variant: "destructive", 
+        title: "فشل الدخول", 
+        description: message 
+      });
     } finally {
       setLoading(false);
     }
