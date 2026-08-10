@@ -1,12 +1,9 @@
-
 'use client';
 
 import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
 import { 
   getFirestore, 
-  Firestore, 
-  initializeFirestore, 
-  persistentLocalCache
+  Firestore
 } from 'firebase/firestore';
 import { getAuth, Auth } from 'firebase/auth';
 import { firebaseConfig } from './config';
@@ -18,12 +15,10 @@ let auth: Auth;
 export function initializeFirebase() {
   if (!getApps().length) {
     app = initializeApp(firebaseConfig);
-    // تبسيط التخزين المحلي لحل مشاكل تعارض الحالة (Assertion Failed)
-    // تم إزالة persistentMultipleTabManager لضمان استقرار المزامنة في بيئات الـ Workstations
-    firestore = initializeFirestore(app, {
-      localCache: persistentLocalCache({}),
-      experimentalAutoDetectLongPolling: true,
-    });
+    // العودة إلى استخدام getFirestore القياسي لضمان أقصى درجات الاستقرار.
+    // الأخطاء من نوع (Assertion Failed) غالباً ما تنتج عن تعارض في إعدادات localCache
+    // داخل المتصفحات في بيئات التطوير السحابية.
+    firestore = getFirestore(app);
     auth = getAuth(app);
   } else {
     app = getApps()[0];
