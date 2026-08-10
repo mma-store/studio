@@ -6,8 +6,7 @@ import {
   getFirestore, 
   Firestore, 
   initializeFirestore, 
-  persistentLocalCache, 
-  persistentMultipleTabManager 
+  persistentLocalCache
 } from 'firebase/firestore';
 import { getAuth, Auth } from 'firebase/auth';
 import { firebaseConfig } from './config';
@@ -19,12 +18,10 @@ let auth: Auth;
 export function initializeFirebase() {
   if (!getApps().length) {
     app = initializeApp(firebaseConfig);
-    // Enable offline persistence with multi-tab support
-    // experimentalAutoDetectLongPolling: true يساعد في البيئات التي قد تحظر بروتوكول gRPC مثل Workstations
+    // تبسيط التخزين المحلي لحل مشاكل تعارض الحالة (Assertion Failed)
+    // تم إزالة persistentMultipleTabManager لضمان استقرار المزامنة في بيئات الـ Workstations
     firestore = initializeFirestore(app, {
-      localCache: persistentLocalCache({
-        tabManager: persistentMultipleTabManager()
-      }),
+      localCache: persistentLocalCache({}),
       experimentalAutoDetectLongPolling: true,
     });
     auth = getAuth(app);
