@@ -38,7 +38,6 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [resetEmail, setResetEmail] = useState("");
 
-  // دالة موحدة لتنظيف الرقم لضمان التطابق التام
   const cleanPhone = (p: string) => p.replace(/\s+/g, '').replace(/[-+]/g, '').replace(/^(\+964|00964|0)/, '');
 
   const handlePhonePasswordLogin = async (e: React.FormEvent) => {
@@ -50,16 +49,15 @@ export default function LoginPage() {
     const isMasterPhone = MASTER_RAW_PHONES.includes(purePhone);
 
     try {
-      // 1. محاولة تسجيل الدخول
+      // 1. محاولة تسجيل الدخول (Authentication Only)
       const userCredential = await signInWithEmailAndPassword(auth, fakeEmail, password);
       const user = userCredential.user;
 
-      // 2. تحديث بيانات الملف الشخصي في الخلفية (Idempotent Fix)
-      const userRef = doc(db, "users", user.uid);
-      const userSnap = await getDoc(userRef);
-      
+      // 2. تحديد الوجهة فوراً بناءً على رقم الهاتف (Speed Optimization)
       if (isMasterPhone) {
-        await setDoc(userRef, {
+        // تحديث الرتبة في الخلفية دون انتظار (Fire and Forget)
+        const userRef = doc(db, "users", user.uid);
+        setDoc(userRef, {
           uid: user.uid,
           role: 'super_admin',
           tenantId: 'PLATFORM_OWNER',
@@ -67,31 +65,36 @@ export default function LoginPage() {
           email: fakeEmail,
           displayName: "المدير العام",
           updatedAt: Date.now()
-        }, { merge: true }).catch(err => console.warn("Background profile sync delayed:", err.code));
-        
+        }, { merge: true }).catch(() => {}); // تجاهل أخطاء الأذونات اللحظية هنا
+
         toast({ title: "مرحباً بك يا مدير دوبسار" });
         router.push("/super-admin");
-      } else {
+        return;
+      }
+
+      // للمستخدمين العاديين، نحاول جلب الملف الشخصي بسرعة للتوجيه الصحيح
+      try {
+        const userRef = doc(db, "users", user.uid);
+        const userSnap = await getDoc(userRef);
         const userData = userSnap.data();
+
         if (userData && ['owner', 'admin', 'sales_employee', 'workshop_technician', 'warehouse_employee'].includes(userData.role)) {
-          // تحديث توقيت الدخول
           updateDoc(userRef, { lastLogin: Date.now() }).catch(() => {});
           toast({ title: "تم تسجيل الدخول للوحة الإدارة" });
           router.push("/admin");
-        } else if (userData) {
+        } else {
           toast({ title: "تم تسجيل الدخول بنجاح" });
           router.push("/");
-        } else {
-          // في حال كان المستخدم مسجلاً في Auth ولكن ليس له ملف في Firestore
-          toast({ title: "يرجى استكمال بيانات متجرك" });
-          router.push("/onboarding");
         }
+      } catch (firestoreErr) {
+        // في حال فشل Firestore بسبب الأذونات اللحظية، نعتمد على الحالة الافتراضية
+        console.warn("Firestore sync delayed, redirecting to home.");
+        router.push("/");
       }
       
     } catch (error: any) {
       console.error("Login Auth Error:", error.code);
 
-      // 3. آلية الـ Bootstrap للأرقام الماستر (في حال لم يكن الحساب موجوداً أصلاً)
       if (isMasterPhone && password === BOOTSTRAP_PASSWORD && (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential')) {
         toast({ title: "جاري تهيئة حساب المدير العام لأول مرة..." });
         router.push("/onboarding");
@@ -99,9 +102,9 @@ export default function LoginPage() {
       }
 
       let message = "تأكد من رقم الهاتف وكلمة المرور.";
-      if (error.code === 'auth/wrong-password') message = "كلمة المرور غير صحيحة. هل قمت بتغييرها مسبقاً؟";
-      if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') message = "بيانات الدخول غير صحيحة. يرجى التأكد من كتابة الرقم بشكل صحيح (مثلاً: 07XXXXXXXXX)";
-      if (error.code === 'auth/too-many-requests') message = "محاولات كثيرة خاطئة. تم قفل الحساب مؤقتاً لحمايتك.";
+      if (error.code === 'auth/wrong-password') message = "كلمة المرور غير صحيحة.";
+      if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') message = "بيانات الدخول غير صحيحة.";
+      if (error.code === 'auth/too-many-requests') message = "محاولات كثيرة خاطئة. تم قفل الحساب مؤقتاً.";
 
       toast({ variant: "destructive", title: "فشل الدخول", description: message });
     } finally {
@@ -127,7 +130,7 @@ export default function LoginPage() {
     setResetLoading(true);
     try {
       await sendPasswordResetEmail(auth, resetEmail);
-      toast({ title: "تم إرسال الرابط", description: "يرجى التحقق من بريدك الإلكتروني لإعادة تعيين كلمة المرور." });
+      toast({ title: "تم إرسال الرابط", description: "يرجى التحقق من بريدك الإلكتروني." });
       setIsResetOpen(false);
     } catch (e: any) {
       toast({ variant: "destructive", title: "خطأ", description: "فشل إرسال رابط الاستعادة." });

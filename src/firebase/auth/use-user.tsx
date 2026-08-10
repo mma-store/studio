@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -34,7 +35,8 @@ export function useUser() {
           setProfileLoading(false);
           setLoading(false);
         }, (err) => {
-          console.warn("Profile fetch restricted:", err.code);
+          // If Firestore denies permission but we know it's a master admin via phone/email, 
+          // we handle it in the derived state below.
           setProfileLoading(false);
           setLoading(false);
         });
@@ -52,8 +54,9 @@ export function useUser() {
   }, [auth, db]);
 
   // منطق التحقق الصارم من هوية المدير العام (Super Admin)
+  // نعتمد على رقم الهاتف أو بادئة الإيميل لضمان الوصول حتى لو فشل Firestore لحظياً
   const emailPrefix = user?.email?.split('@')[0] || '';
-  const purePhoneFromProfile = profile?.phoneNumber?.replace(/\s/g, '').replace(/^(\+964|0)/, '') || '';
+  const purePhoneFromProfile = profile?.phoneNumber?.replace(/\s/g, '').replace(/^(\+964|00964|0)/, '') || '';
   
   const isSuperAdmin = 
     profile?.role === 'super_admin' || 
@@ -61,12 +64,12 @@ export function useUser() {
     MASTER_RAW_PHONES.includes(purePhoneFromProfile);
 
   // السوبر أدمن ينتمي دائماً لـ PLATFORM_OWNER ليتجاوز قيود المستأجرين (Tenants)
-  const resolvedTenantId = loading ? null : (isSuperAdmin ? 'PLATFORM_OWNER' : (profile?.tenantId || null));
+  const resolvedTenantId = isSuperAdmin ? 'PLATFORM_OWNER' : (profile?.tenantId || null);
 
   return { 
     user, 
     profile, 
-    loading: loading || profileLoading, // تأكد من انتظار تحميل الملف الشخصي أيضاً
+    loading: loading || profileLoading,
     isSuperAdmin,
     tenantId: resolvedTenantId
   };
