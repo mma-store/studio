@@ -12,16 +12,19 @@ import {
   ShieldCheck, 
   Download,
   Calendar,
-  Loader2
+  Loader2,
+  Package,
+  TrendingUp,
+  Users
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useUser, useFirestore, useCollection } from "@/firebase";
 import { useSubscription } from "@/hooks/use-subscription";
-import { collection, query, where, orderBy } from "firebase/firestore";
+import { collection, query, where, orderBy, doc, getDocs } from "firebase/firestore";
 import { useMemo } from "react";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
@@ -40,15 +43,21 @@ export default function BillingPage() {
   
   const { data: invoices, loading: invoicesLoading } = useCollection(invoicesQuery);
   const { data: products } = useCollection(query(collection(db, 'products'), where('tenantId', '==', tenantId)));
-  const { data: staff } = useCollection(query(collection(db, 'users'), where('tenantId', '==', tenantId), where('role', '!=', 'retail_customer'), where('role', '!=', 'wholesale_customer')));
+  const { data: staff } = useCollection(query(collection(db, 'users'), where('tenantId', '==', tenantId), where('role', 'in', ['admin', 'owner', 'sales_employee', 'workshop_technician', 'warehouse_employee'])));
+
+  // Dynamic Plans for upgrade
+  const plansQuery = useMemo(() => query(collection(db, 'plans'), where('active', '==', true), orderBy('displayOrder', 'asc')), [db]);
+  const { data: availablePlans } = useCollection(plansQuery);
 
   if (subscription.loading) return <div className="p-8"><Skeleton className="h-[400px] w-full rounded-[40px]" /></div>;
 
   const productUsage = (products.length / (subscription.limits.maxProducts || 1)) * 100;
   const staffUsage = (staff.length / (subscription.limits.maxEmployees || 1)) * 100;
 
+  const WHATSAPP_NUMBER = "9647858833838";
+
   return (
-    <div className="space-y-8 animate-in fade-in duration-500 pb-20">
+    <div className="space-y-12 animate-in fade-in duration-500 pb-20" dir="rtl">
       <div className="flex flex-col gap-2">
         <h1 className="text-3xl font-black tracking-tight">الاشتراك والفوترة</h1>
         <p className="text-muted-foreground font-medium">إدارة باقة الاشتراك، استهلاك الموارد، وتاريخ المدفوعات.</p>
@@ -63,7 +72,7 @@ export default function BillingPage() {
           <CardHeader className="p-8 border-b bg-muted/30">
             <div className="flex items-center justify-between">
               <div className="space-y-1">
-                <CardTitle className="text-2xl font-black">الباقة الحالية: {subscription.plan.toUpperCase()}</CardTitle>
+                <CardTitle className="text-2xl font-black">الباقة الحالية: {subscription.planName}</CardTitle>
                 <CardDescription className="font-bold">
                   {subscription.isExpired ? 'الاشتراك منتهي الصلاحية' : `ينتهي الاشتراك خلال ${subscription.daysRemaining} يوم`}
                 </CardDescription>
@@ -73,44 +82,41 @@ export default function BillingPage() {
                 subscription.status === 'active' ? "bg-green-100 text-green-700" : 
                 subscription.status === 'trial' ? "bg-blue-100 text-blue-700" : "bg-red-100 text-red-700"
               )}>
-                {subscription.status}
+                {subscription.status === 'active' ? 'نشط' : subscription.status === 'trial' ? 'تجريبي' : 'منتهي'}
               </Badge>
             </div>
           </CardHeader>
-          <CardContent className="p-8 space-y-8">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-               <div className="space-y-3">
-                  <div className="flex justify-between text-xs font-black uppercase">
-                     <span>استهلاك المنتجات</span>
-                     <span>{products.length} / {subscription.limits.maxProducts || '∞'}</span>
+          <CardContent className="p-8 space-y-10">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+               <div className="space-y-4">
+                  <div className="flex justify-between items-end">
+                     <div className="space-y-1">
+                        <p className="text-[10px] font-black uppercase text-slate-400">استهلاك المنتجات</p>
+                        <p className="text-2xl font-black">{products.length} <span className="text-xs text-muted-foreground">/ {subscription.limits.maxProducts || '∞'}</span></p>
+                     </div>
+                     <Package className="h-8 w-8 text-primary/20" />
                   </div>
-                  <Progress value={productUsage} className="h-2 rounded-full" />
+                  <Progress value={productUsage} className="h-2.5 rounded-full" />
                </div>
-               <div className="space-y-3">
-                  <div className="flex justify-between text-xs font-black uppercase">
-                     <span>عدد الموظفين</span>
-                     <span>{staff.length} / {subscription.limits.maxEmployees || '∞'}</span>
+               <div className="space-y-4">
+                  <div className="flex justify-between items-end">
+                     <div className="space-y-1">
+                        <p className="text-[10px] font-black uppercase text-slate-400">عدد الموظفين</p>
+                        <p className="text-2xl font-black">{staff.length} <span className="text-xs text-muted-foreground">/ {subscription.limits.maxEmployees || '∞'}</span></p>
+                     </div>
+                     <Users className="h-8 w-8 text-primary/20" />
                   </div>
-                  <Progress value={staffUsage} className="h-2 rounded-full" />
+                  <Progress value={staffUsage} className="h-2.5 rounded-full" />
                </div>
             </div>
 
             <div className="flex flex-wrap gap-3">
                {subscription.limits.features.map(f => (
-                 <div key={f} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary/5 text-primary text-[10px] font-black border border-primary/10">
-                    <CheckCircle2 className="h-3.5 w-3.5" />
-                    {f.replace('_', ' ').toUpperCase()}
+                 <div key={f} className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-primary/5 text-primary text-xs font-black border border-primary/10">
+                    <CheckCircle2 className="h-4 w-4" />
+                    {f}
                  </div>
                ))}
-            </div>
-
-            <div className="pt-4 flex gap-4">
-               <Button className="rounded-2xl h-14 px-10 font-black text-lg shadow-xl shadow-primary/20 gap-2 bg-primary">
-                  <Zap className="h-5 w-5" /> ترقية الاشتراك
-               </Button>
-               <Button variant="outline" className="rounded-2xl h-14 px-8 font-black border-2" asChild>
-                  <a href="https://wa.me/9647858833838" target="_blank">تواصل مع الدعم</a>
-               </Button>
             </div>
           </CardContent>
         </Card>
@@ -121,18 +127,61 @@ export default function BillingPage() {
                  <CreditCard className="h-8 w-8" />
               </div>
               <div className="space-y-2">
-                 <h3 className="text-2xl font-black">الدفع السريع</h3>
+                 <h3 className="text-2xl font-black italic">الدفع والاشتراك</h3>
                  <p className="text-sm text-slate-400 font-medium leading-relaxed">
-                    يمكنك تجديد اشتراكك عبر تحويل المبلغ إلى المحفظة السحابية للمنصة وإرسال صورة الوصل للدعم الفني.
+                    لتجديد اشتراكك أو ترقية الباقة، يرجى تحويل المبلغ عبر المحفظة الإلكترونية (زين كاش) ثم إرسال صورة الوصل للدعم الفني لتفعيل حسابك فوراً.
                  </p>
               </div>
-              <div className="bg-white/5 p-4 rounded-2xl border border-white/10 space-y-2">
-                 <p className="text-[10px] font-black uppercase opacity-40">زين كاش / آسي حوالة</p>
-                 <p className="text-lg font-mono font-black">07858833838</p>
+              <div className="bg-white/5 p-5 rounded-3xl border border-white/10 space-y-2 text-center">
+                 <p className="text-[10px] font-black uppercase opacity-40">رقم تحويل زين كاش</p>
+                 <p className="text-2xl font-mono font-black text-primary tracking-widest">07858833838</p>
               </div>
+              <Button className="w-full h-14 rounded-2xl font-black shadow-lg" asChild>
+                 <a href={`https://wa.me/${WHATSAPP_NUMBER}`} target="_blank">تأكيد الدفع عبر واتساب</a>
+              </Button>
            </div>
            <ShieldCheck className="absolute -right-10 -bottom-10 h-40 w-40 opacity-5" />
         </Card>
+      </div>
+
+      {/* Upgrade Options */}
+      <div className="space-y-8">
+         <h2 className="text-2xl font-black flex items-center gap-3">
+            <Zap className="h-6 w-6 text-primary" /> الخطط المتاحة للترقية
+         </h2>
+         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {availablePlans.map((plan: any) => (
+              <Card key={plan.id} className={cn(
+                "rounded-[40px] border-2 p-8 flex flex-col space-y-6 transition-all",
+                plan.id === tenantId ? "border-primary bg-primary/5" : "border-slate-100 hover:border-primary/20"
+              )}>
+                 <div className="flex justify-between items-start">
+                    <div className="space-y-1">
+                       <h3 className="font-black text-xl">{plan.name}</h3>
+                       <p className="text-xs font-bold text-muted-foreground">{plan.description}</p>
+                    </div>
+                    {plan.highlighted && <Badge className="bg-primary text-white rounded-full text-[8px] font-black">RECOMMENDED</Badge>}
+                 </div>
+                 <div className="flex items-baseline gap-1">
+                    <span className="text-3xl font-black">{plan.monthlyPrice.toLocaleString()}</span>
+                    <span className="text-xs font-bold opacity-60">د.ع / شهر</span>
+                 </div>
+                 <div className="space-y-3 flex-1">
+                    {plan.features?.slice(0, 4).map((f: string, i: number) => (
+                      <div key={i} className="flex items-center gap-2 text-xs font-bold">
+                         <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+                         {f}
+                      </div>
+                    ))}
+                 </div>
+                 <Button className="w-full rounded-2xl h-12 font-black" variant={plan.id === tenantId ? "outline" : "default"} asChild>
+                    <a href={`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent('أريد الاشتراك في باقة: ' + plan.name)}`}>
+                       {plan.id === tenantId ? 'باقتك الحالية' : 'اطلب هذه الباقة'}
+                    </a>
+                 </Button>
+              </Card>
+            ))}
+         </div>
       </div>
 
       {/* Invoice History */}

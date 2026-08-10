@@ -93,20 +93,20 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                         <div className="h-10 w-10 rounded-full bg-white/20 flex items-center justify-center"><AlertCircle className="h-6 w-6" /></div>
                         <div>
                           <p className="font-black text-sm">انتهت صلاحية الاشتراك!</p>
-                          <p className="text-[10px] opacity-80 font-bold uppercase tracking-widest">بعض الميزات متوقفة حالياً حتى يتم التجديد.</p>
+                          <p className="text-[10px] opacity-80 font-bold uppercase tracking-widest">يرجى تجديد الاشتراك لتجنب توقف الخدمات وحذف البيانات المؤقتة.</p>
                         </div>
                      </div>
                      <Button variant="secondary" size="lg" className="rounded-2xl font-black gap-2" asChild>
                         <Link href="/admin/billing"><Zap className="h-4 w-4" /> جدد الآن</Link>
                      </Button>
                   </div>
-                ) : subscription.daysRemaining <= 7 && subscription.daysRemaining > 0 && (
-                  <div className="bg-orange-500 text-white px-6 py-3 rounded-2xl flex items-center justify-between text-xs font-bold shadow-lg shadow-orange-500/20">
+                ) : subscription.isTrial && (
+                  <div className="bg-primary/5 text-primary px-6 py-3 rounded-2xl flex items-center justify-between border border-primary/10 shadow-sm">
                      <div className="flex items-center gap-3">
-                        <Clock className="h-5 w-5" />
-                        <span>تنبيه: متبقي لك {subscription.daysRemaining} أيام فقط على انتهاء الاشتراك.</span>
+                        <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center"><Clock className="h-4 w-4" /></div>
+                        <p className="text-xs font-black">أنت في الفترة التجريبية: متبقي لك <span className="text-lg underline underline-offset-4">{subscription.daysRemaining}</span> أيام للوصول الكامل.</p>
                      </div>
-                     <Link href="/admin/billing" className="underline font-black hover:text-white/80">إدارة الفوترة</Link>
+                     <Link href="/admin/billing" className="text-[10px] font-black uppercase tracking-widest bg-primary text-white px-4 py-1.5 rounded-full hover:bg-primary/90 transition-colors">اشترك الآن</Link>
                   </div>
                 )}
               </div>

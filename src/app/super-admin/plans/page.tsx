@@ -3,7 +3,6 @@
 
 import { useState, useMemo } from "react";
 import { 
-  ShieldCheck, 
   Plus, 
   Check, 
   Edit2, 
@@ -12,13 +11,13 @@ import {
   Rocket,
   Save,
   Loader2,
-  Clock,
   X,
   Package,
   Users,
-  HardDrive,
-  Cpu,
-  Star
+  Star,
+  Settings2,
+  CheckCircle2,
+  AlertCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,7 +34,7 @@ import {
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { useFirestore, useCollection } from "@/firebase";
-import { collection, query, orderBy, addDoc, doc, updateDoc, deleteDoc } from "firebase/firestore";
+import { collection, query, orderBy, addDoc, doc, updateDoc, deleteDoc, where, getDocs } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 
@@ -45,7 +44,7 @@ export default function PlansManagementPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [editingPlan, setEditingPlan] = useState<any>(null);
 
-  const plansQuery = useMemo(() => query(collection(db, 'plans'), orderBy('price')), [db]);
+  const plansQuery = useMemo(() => query(collection(db, 'plans'), orderBy('displayOrder', 'asc')), [db]);
   const { data: plans, loading } = useCollection(plansQuery);
 
   const handleAction = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -55,15 +54,17 @@ export default function PlansManagementPage() {
     
     const planData = {
       name: formData.get('name'),
-      price: Number(formData.get('price')),
-      billingCycle: formData.get('billingCycle'),
+      description: formData.get('description'),
+      monthlyPrice: Number(formData.get('monthlyPrice')),
+      yearlyPrice: Number(formData.get('yearlyPrice')),
+      currency: "IQD",
+      trialDays: Number(formData.get('trialDays')),
       maxProducts: Number(formData.get('maxProducts')),
       maxEmployees: Number(formData.get('maxEmployees')),
+      displayOrder: Number(formData.get('displayOrder')),
+      highlighted: formData.get('highlighted') === 'on',
+      active: formData.get('active') === 'on',
       features: (formData.get('features') as string).split('\n').filter(f => f.trim()),
-      isPOS: formData.get('isPOS') === 'on',
-      isWorkshop: formData.get('isWorkshop') === 'on',
-      isReports: formData.get('isReports') === 'on',
-      isActive: true,
       updatedAt: Date.now()
     };
 
@@ -89,9 +90,24 @@ export default function PlansManagementPage() {
     setIsAddOpen(true);
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("هل تريد أرشفة هذه الباقة؟ لن تظهر للمشتركين الجدد.")) return;
-    await updateDoc(doc(db, 'plans', id), { isActive: false });
+  const handleDelete = async (plan: any) => {
+    // Check if any merchant is using this plan
+    const tenantsRef = collection(db, 'tenants');
+    const q = query(tenantsRef, where('subscriptionPlanId', '==', plan.id));
+    const snap = await getDocs(q);
+
+    if (!snap.empty) {
+      toast({ 
+        variant: "destructive", 
+        title: "لا يمكن الحذف", 
+        description: "توجد متاجر مفعلة على هذه الباقة حالياً. يمكنك تعطيلها (Deactivate) بدلاً من الحذف." 
+      });
+      return;
+    }
+
+    if (!confirm("هل أنت متأكد من حذف هذه الباقة نهائياً؟")) return;
+    await deleteDoc(doc(db, 'plans', plan.id));
+    toast({ title: "تم الحذف" });
   };
 
   return (
@@ -99,7 +115,7 @@ export default function PlansManagementPage() {
       <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <div className="space-y-1">
           <h1 className="text-3xl font-black text-slate-900">إدارة خطط الاشتراك</h1>
-          <p className="text-muted-foreground font-medium text-sm">تحديد أسعار الباقات والميزات والقيود المتاحة لكل فئة.</p>
+          <p className="text-muted-foreground font-medium text-sm">تحديد أسعار الباقات، الفترات التجريبية، والقيود التقنية لكل فئة.</p>
         </div>
         
         <Dialog open={isAddOpen} onOpenChange={(o) => { setIsAddOpen(o); if(!o) setEditingPlan(null); }}>
@@ -108,77 +124,81 @@ export default function PlansManagementPage() {
                <Plus className="h-5 w-5" /> إضافة باقة جديدة
             </Button>
           </DialogTrigger>
-          <DialogContent className="rounded-[40px] max-w-2xl p-0 overflow-hidden border-none shadow-2xl">
-            <DialogHeader className="p-8 bg-primary text-white space-y-0">
-               <div className="flex justify-between items-center w-full">
-                  <div>
-                     <DialogTitle className="text-2xl font-black text-right">{editingPlan ? 'تعديل باقة' : 'إنشاء باقة جديدة'}</DialogTitle>
-                     <p className="text-[10px] font-bold opacity-60 uppercase tracking-widest mt-1">SaaS Plan Architect</p>
-                  </div>
-                  <button onClick={() => setIsAddOpen(false)}><X className="h-6 w-6" /></button>
-               </div>
+          <DialogContent className="rounded-[40px] max-w-3xl p-0 overflow-hidden border-none shadow-2xl">
+            <DialogHeader className="p-8 bg-slate-900 text-white">
+               <DialogTitle className="text-2xl font-black text-right">{editingPlan ? 'تعديل بيانات الباقة' : 'إنشاء باقة اشتراك جديدة'}</DialogTitle>
+               <DialogDescription className="text-slate-400 font-bold">حدد الخصائص المالية والتقنية للباقة.</DialogDescription>
             </DialogHeader>
             <form onSubmit={handleAction} className="p-8 space-y-6 max-h-[70vh] overflow-y-auto custom-scrollbar text-right">
-               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label className="font-black text-xs uppercase opacity-60">اسم الباقة</Label>
-                    <Input name="name" defaultValue={editingPlan?.name} required placeholder="مثلاً: باقة الأعمال" className="rounded-2xl h-14 bg-muted/30 border-none font-bold px-6" />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div className="space-y-4">
                     <div className="space-y-2">
-                      <Label className="font-black text-xs uppercase opacity-60">السعر (د.ع)</Label>
-                      <Input name="price" type="number" defaultValue={editingPlan?.price} required placeholder="15,000" className="rounded-2xl h-14 bg-muted/30 border-none font-black text-center text-xl text-primary" />
+                       <Label className="font-black text-xs uppercase opacity-60">اسم الباقة (بالعربية)</Label>
+                       <Input name="name" defaultValue={editingPlan?.name} required placeholder="مثلاً: الباقة الاحترافية" className="rounded-2xl h-14 bg-muted/30 border-none font-bold px-6" />
                     </div>
                     <div className="space-y-2">
-                      <Label className="font-black text-xs uppercase opacity-60">الدورة</Label>
-                      <Input name="billingCycle" defaultValue={editingPlan?.billingCycle || 'شهري'} required className="rounded-2xl h-14 bg-muted/30 border-none text-center font-black" />
+                       <Label className="font-black text-xs uppercase opacity-60">وصف قصير</Label>
+                       <Input name="description" defaultValue={editingPlan?.description} required placeholder="مثلاً: للشركات المتوسطة" className="rounded-2xl h-14 bg-muted/30 border-none px-6" />
                     </div>
-                  </div>
-               </div>
-
-               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label className="font-black text-xs uppercase opacity-60">الحد الأقصى للمنتجات</Label>
-                    <Input name="maxProducts" type="number" defaultValue={editingPlan?.maxProducts} required placeholder="999" className="rounded-2xl h-14 bg-muted/30 border-none font-black text-center" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="font-black text-xs uppercase opacity-60">الحد الأقصى للموظفين</Label>
-                    <Input name="maxEmployees" type="number" defaultValue={editingPlan?.maxEmployees} required placeholder="3" className="rounded-2xl h-14 bg-muted/30 border-none font-black text-center" />
-                  </div>
-               </div>
-
-               <div className="space-y-4 pt-4 border-t">
-                  <Label className="font-black text-sm uppercase opacity-60">الميزات المتاحة</Label>
-                  <div className="grid grid-cols-3 gap-4">
-                     {[
-                       { id: 'isPOS', label: 'نظام POS', icon: Cpu },
-                       { id: 'isReports', label: 'تقارير مالية', icon: Rocket },
-                       { id: 'isWorkshop', label: 'نظام الورشة', icon: Zap }
-                     ].map(m => (
-                       <div key={m.id} className="flex items-center justify-between p-4 rounded-2xl bg-muted/20">
-                          <div className="flex items-center gap-2">
-                             <m.icon className="h-4 w-4 opacity-40" />
-                             <span className="text-xs font-bold">{m.label}</span>
-                          </div>
-                          <Switch name={m.id} defaultChecked={editingPlan ? editingPlan[m.id] : true} />
+                    <div className="grid grid-cols-2 gap-4">
+                       <div className="space-y-2">
+                          <Label className="font-black text-xs uppercase opacity-60">السعر الشهري (د.ع)</Label>
+                          <Input name="monthlyPrice" type="number" defaultValue={editingPlan?.monthlyPrice} required className="rounded-2xl h-14 bg-muted/30 border-none font-black text-center text-xl text-primary" />
                        </div>
-                     ))}
+                       <div className="space-y-2">
+                          <Label className="font-black text-xs uppercase opacity-60">السعر السنوي (د.ع)</Label>
+                          <Input name="yearlyPrice" type="number" defaultValue={editingPlan?.yearlyPrice} required className="rounded-2xl h-14 bg-muted/30 border-none font-black text-center text-xl text-emerald-600" />
+                       </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                       <div className="space-y-2">
+                          <Label className="font-black text-xs uppercase opacity-60">الأيام التجريبية</Label>
+                          <Input name="trialDays" type="number" defaultValue={editingPlan?.trialDays || 0} required className="rounded-2xl h-14 bg-muted/30 border-none font-black text-center" />
+                       </div>
+                       <div className="space-y-2">
+                          <Label className="font-black text-xs uppercase opacity-60">ترتيب العرض</Label>
+                          <Input name="displayOrder" type="number" defaultValue={editingPlan?.displayOrder || 0} required className="rounded-2xl h-14 bg-muted/30 border-none font-black text-center" />
+                       </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                       <div className="space-y-2">
+                          <Label className="font-black text-xs uppercase opacity-60">حد المنتجات</Label>
+                          <Input name="maxProducts" type="number" defaultValue={editingPlan?.maxProducts || 999} required className="rounded-2xl h-14 bg-muted/30 border-none font-black text-center" />
+                       </div>
+                       <div className="space-y-2">
+                          <Label className="font-black text-xs uppercase opacity-60">حد الموظفين</Label>
+                          <Input name="maxEmployees" type="number" defaultValue={editingPlan?.maxEmployees || 1} required className="rounded-2xl h-14 bg-muted/30 border-none font-black text-center" />
+                       </div>
+                    </div>
+                    <div className="flex items-center gap-8 pt-4">
+                       <div className="flex items-center gap-3">
+                          <Switch name="active" defaultChecked={editingPlan ? editingPlan.active : true} />
+                          <Label className="font-black">مفعلة</Label>
+                       </div>
+                       <div className="flex items-center gap-3">
+                          <Switch name="highlighted" defaultChecked={editingPlan?.highlighted} />
+                          <Label className="font-black">تمييز (Recommended)</Label>
+                       </div>
+                    </div>
                   </div>
                </div>
 
                <div className="space-y-2">
-                  <Label className="font-black text-xs uppercase tracking-widest opacity-60">الميزات النصية (فواصل بالأسطر)</Label>
+                  <Label className="font-black text-xs uppercase tracking-widest opacity-60">قائمة المميزات (سطر لكل ميزة)</Label>
                   <textarea 
                     name="features"
                     defaultValue={editingPlan?.features?.join('\n')}
-                    className="w-full h-32 rounded-[24px] bg-muted/30 border-none p-6 text-sm font-bold focus:ring-2 focus:ring-primary/20 outline-none" 
-                    placeholder="ميزة 1&#10;ميزة 2..." 
+                    className="w-full h-40 rounded-[24px] bg-muted/30 border-none p-6 text-sm font-bold focus:ring-2 focus:ring-primary/20 outline-none" 
+                    placeholder="نظام POS متكامل&#10;تقارير يومية&#10;متجر إلكتروني..." 
                   />
                </div>
                
                <Button type="submit" disabled={isSaving} className="w-full h-16 rounded-[24px] font-black text-xl shadow-2xl shadow-primary/20">
                   {isSaving ? <Loader2 className="h-6 w-6 animate-spin" /> : <Save className="h-6 w-6 ml-2" />}
-                  {editingPlan ? 'حفظ التعديلات' : 'نشر الباقة الآن'}
+                  {editingPlan ? 'حفظ التعديلات' : 'نشر الخطة الآن'}
                </Button>
             </form>
           </DialogContent>
@@ -187,27 +207,29 @@ export default function PlansManagementPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
         {loading ? (
-          Array(3).fill(0).map((_, i) => <Skeleton key={i} className="h-96 rounded-[48px]" />)
+          Array(3).fill(0).map((_, i) => <Skeleton key={i} className="h-[500px] rounded-[48px]" />)
         ) : plans.map((plan) => (
           <Card key={plan.id} className={cn(
             "rounded-[48px] border-none shadow-sm flex flex-col overflow-hidden relative transition-all duration-500 hover:shadow-2xl bg-white",
-            !plan.isActive && "opacity-60 grayscale"
+            !plan.active && "opacity-60 grayscale",
+            plan.highlighted && "ring-4 ring-primary ring-offset-4"
           )}>
-            <CardHeader className={cn("p-12 text-center space-y-6 bg-slate-50")}>
-               <div className="h-20 w-20 bg-primary/10 rounded-[28px] flex items-center justify-center mx-auto shadow-inner text-primary">
-                  {plan.price > 25000 ? <Rocket className="h-10 w-10" /> : <Zap className="h-10 w-10" />}
+            <CardHeader className={cn("p-12 text-center space-y-4 bg-slate-50")}>
+               <div className="h-16 w-16 bg-primary/10 rounded-3xl flex items-center justify-center mx-auto text-primary">
+                  {plan.monthlyPrice === 0 ? <Star className="h-8 w-8" /> : plan.highlighted ? <Rocket className="h-8 w-8" /> : <Zap className="h-8 w-8" />}
                </div>
                <div className="space-y-1">
                   <h3 className="text-2xl font-black">{plan.name}</h3>
-                  <Badge variant="outline" className="rounded-full border-primary/20 text-primary font-bold text-[9px] uppercase">{plan.isActive ? 'نشطة' : 'مؤرشفة'}</Badge>
+                  <p className="text-xs text-muted-foreground font-bold">{plan.description}</p>
                </div>
             </CardHeader>
-            <CardContent className="p-12 flex-1 space-y-10">
+            <CardContent className="p-12 flex-1 space-y-8">
                <div className="text-center">
-                  <div className="flex items-baseline justify-center gap-2">
-                     <span className="text-5xl font-black tracking-tighter">{plan.price.toLocaleString()}</span>
-                     <span className="text-xs font-bold text-muted-foreground">د.ع / {plan.billingCycle}</span>
+                  <div className="flex items-baseline justify-center gap-1">
+                     <span className="text-4xl font-black">{plan.monthlyPrice.toLocaleString()}</span>
+                     <span className="text-xs font-bold text-muted-foreground">د.ع / شهرياً</span>
                   </div>
+                  <p className="text-[10px] font-black text-emerald-600 mt-1">أو {plan.yearlyPrice.toLocaleString()} د.ع / سنوياً</p>
                </div>
                <div className="space-y-4">
                   <div className="flex items-center gap-3 text-xs font-bold text-slate-500">
@@ -220,7 +242,7 @@ export default function PlansManagementPage() {
                   </div>
                   {plan.features?.map((feature: string, idx: number) => (
                     <div key={idx} className="flex items-center gap-3 text-sm font-bold text-slate-600">
-                       <Check className="h-4 w-4 text-emerald-500" strokeWidth={4} />
+                       <CheckCircle2 className="h-4 w-4 text-emerald-500" />
                        {feature}
                     </div>
                   ))}
@@ -228,7 +250,7 @@ export default function PlansManagementPage() {
             </CardContent>
             <CardFooter className="p-10 pt-0 flex gap-3">
                <Button variant="outline" className="flex-1 rounded-2xl h-14 font-black border-2 gap-2" onClick={() => handleEdit(plan)}><Edit2 className="h-4 w-4" /> تعديل</Button>
-               <Button variant="ghost" className="rounded-2xl h-14 w-14 text-red-500 bg-red-50 hover:bg-red-100" onClick={() => handleDelete(plan.id)}><Trash2 className="h-5 w-5" /></Button>
+               <Button variant="ghost" className="rounded-2xl h-14 w-14 text-red-500 bg-red-50 hover:bg-red-100" onClick={() => handleDelete(plan)}><Trash2 className="h-5 w-5" /></Button>
             </CardFooter>
           </Card>
         ))}

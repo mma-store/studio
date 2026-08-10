@@ -3,7 +3,7 @@
 
 import { useMemo } from 'react';
 import { useFirestore, useDoc, useCollection } from '@/firebase';
-import { doc, collection, query } from 'firebase/firestore';
+import { doc, collection, query, where } from 'firebase/firestore';
 
 export type PlanLimits = {
   maxProducts: number;
@@ -12,101 +12,80 @@ export type PlanLimits = {
   features: string[];
 };
 
-const FALLBACK_PLAN_LIMITS: Record<string, PlanLimits> = {
-  trial: {
-    maxProducts: 10,
-    maxEmployees: 1,
-    maxOrdersPerMonth: 50,
-    features: ['storefront', 'pos'],
-  },
-  starter: {
-    maxProducts: 50,
-    maxEmployees: 3,
-    maxOrdersPerMonth: 200,
-    features: ['storefront', 'pos', 'basic_reports'],
-  },
-  business: {
-    maxProducts: 9999,
-    maxEmployees: 10,
-    maxOrdersPerMonth: 9999,
-    features: ['storefront', 'advanced_reports', 'pos', 'workshop', 'employee_roles'],
-  },
-  enterprise: {
-    maxProducts: 99999,
-    maxEmployees: 99,
-    maxOrdersPerMonth: 99999,
-    features: ['all'],
-  },
-};
-
 export function useSubscription(tenantId: string | null) {
   const db = useFirestore();
   
   const tenantRef = useMemo(() => tenantId ? doc(db, 'tenants', tenantId) : null, [db, tenantId]);
   const { data: tenant, loading: tenantLoading } = useDoc<any>(tenantRef);
 
-  const { data: allPlans } = useCollection(query(collection(db, 'plans')));
+  // Fetch all plans to find the match or dynamic details
+  const plansQuery = useMemo(() => query(collection(db, 'plans'), where('active', '==', true)), [db]);
+  const { data: allPlans } = useCollection(plansQuery);
 
-  const currentPlanData = useMemo(() => {
+  const currentPlan = useMemo(() => {
     if (!tenant) return null;
-    return allPlans.find(p => p.id === tenant.subscriptionPlanId || p.name === tenant.subscriptionPlan);
+    return allPlans.find(p => p.id === tenant.subscriptionPlanId);
   }, [allPlans, tenant]);
 
-  const plan = tenant?.subscriptionPlan || 'trial';
+  const planName = currentPlan?.name || tenant?.subscriptionPlan || 'trial';
   const status = tenant?.status || 'trial';
   
   const limits = useMemo(() => {
-    if (currentPlanData) {
+    if (currentPlan) {
       return {
-        maxProducts: currentPlanData.maxProducts || 0,
-        maxEmployees: currentPlanData.maxEmployees || 0,
-        maxOrdersPerMonth: currentPlanData.maxOrdersPerMonth || 999,
-        features: [
-          currentPlanData.posEnabled ? 'pos' : '',
-          currentPlanData.reportsEnabled ? 'reports' : '',
-          currentPlanData.workshopEnabled ? 'workshop' : '',
-          currentPlanData.onlineStoreEnabled ? 'storefront' : '',
-          currentPlanData.customDomainEnabled ? 'custom_domain' : '',
-          currentPlanData.prioritySupport ? 'priority_support' : '',
-        ].filter(Boolean)
+        maxProducts: currentPlan.maxProducts || 9999,
+        maxEmployees: currentPlan.maxEmployees || 99,
+        maxOrdersPerMonth: 99999,
+        features: currentPlan.features || []
       } as PlanLimits;
     }
-    return FALLBACK_PLAN_LIMITS[plan] || FALLBACK_PLAN_LIMITS.trial;
-  }, [currentPlanData, plan]);
+    // Fallback for trials or legacy
+    return {
+      maxProducts: 10,
+      maxEmployees: 1,
+      maxOrdersPerMonth: 50,
+      features: ['storefront', 'pos']
+    } as PlanLimits;
+  }, [currentPlan]);
 
   const isExpired = useMemo(() => {
-    if (!tenantId) return false;
-    if (tenantId === 'MMA001') return false;
-    if (status === 'expired' || status === 'suspended' || status === 'cancelled') return true;
+    if (!tenantId || tenantId === 'PLATFORM_OWNER') return false;
     
-    const expiryDate = tenant?.trialEndDate || tenant?.currentPeriodEnd;
-    if (expiryDate && Date.now() > expiryDate) return true;
+    // Explicit suspended status
+    if (status === 'suspended' || status === 'cancelled') return true;
+    
+    const now = Date.now();
+    
+    // Check trial expiration
+    if (status === 'trial') {
+      return tenant?.trialEndDate ? now > tenant.trialEndDate : false;
+    }
+
+    // Check subscription period expiration
+    if (tenant?.currentPeriodEnd) {
+      return now > tenant.currentPeriodEnd;
+    }
     
     return false;
   }, [tenant, status, tenantId]);
 
   const daysRemaining = useMemo(() => {
-    const expiryDate = tenant?.trialEndDate || tenant?.currentPeriodEnd;
+    const expiryDate = status === 'trial' ? tenant?.trialEndDate : tenant?.currentPeriodEnd;
     if (!expiryDate) return 0;
     const diff = expiryDate - Date.now();
     return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
-  }, [tenant]);
+  }, [tenant, status]);
 
   return {
     tenant,
-    plan,
+    planName,
     status,
     limits,
     isExpired,
     daysRemaining,
     loading: tenantLoading,
-    canAddProduct: (currentCount: number) => !isExpired && currentCount < (limits.maxProducts || 9999),
-    canAddEmployee: (currentCount: number) => !isExpired && currentCount < (limits.maxEmployees || 9999),
-    canAccessFeature: (feature: string) => {
-      if (isExpired) return false;
-      if (limits.features.includes('all')) return true;
-      return limits.features.includes(feature);
-    },
+    canAddProduct: (currentCount: number) => !isExpired && currentCount < (limits.maxProducts),
+    canAddEmployee: (currentCount: number) => !isExpired && currentCount < (limits.maxEmployees),
     isTrial: status === 'trial',
   };
 }
