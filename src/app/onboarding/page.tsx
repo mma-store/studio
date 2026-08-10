@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo } from "react";
@@ -11,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { toast } from "@/hooks/use-toast";
-import { Store, User, Phone, MapPin, Briefcase, Loader2, ArrowRight, CheckCircle2, ArrowLeft } from "lucide-react";
+import { Store, User, Phone, MapPin, Briefcase, Loader2, ArrowRight, CheckCircle2, ArrowLeft, ScrollText } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
@@ -22,7 +21,6 @@ export default function OnboardingPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState(1);
-  const LOGO_URL = "https://up6.cc/2026/07/178308238964931.png";
 
   const [formData, setFormData] = useState({
     businessName: "",
@@ -30,7 +28,7 @@ export default function OnboardingPage() {
     phoneNumber: "",
     password: "",
     address: "",
-    businessType: "motorcycle_parts",
+    businessType: "retail",
   });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -59,10 +57,9 @@ export default function OnboardingPage() {
         return;
       }
 
-      // Find the trial plan duration from Firestore
       const plansQuery = query(collection(db, "plans"), where("active", "==", true), orderBy("monthlyPrice", "asc"), limit(1));
       const plansSnap = await getDocs(plansQuery);
-      let trialDays = 14; // Default if no plans configured
+      let trialDays = 14; 
       let trialPlanId = "";
       
       if (!plansSnap.empty) {
@@ -109,7 +106,7 @@ export default function OnboardingPage() {
       });
 
       await batch.commit();
-      toast({ title: "مبروك! تم إنشاء متجرك", description: "جاري توجيهك للوحة التحكم." });
+      toast({ title: "مبروك! تم تأسيس متجرك على دوبسار", description: "جاري توجيهك للوحة التحكم." });
       router.push("/admin");
       
     } catch (error: any) {
@@ -120,50 +117,55 @@ export default function OnboardingPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4 relative overflow-hidden">
+    <div className="min-h-screen flex items-center justify-center bg-[#FDF8F5] p-4 relative overflow-hidden">
       <Card className="w-full max-w-2xl rounded-[48px] border-none shadow-2xl overflow-hidden bg-white">
         <div className="p-8 pt-10">
            <Link href="/"><Button variant="ghost" size="sm" className="rounded-full gap-2 font-bold mb-4"><ArrowLeft className="h-4 w-4 rotate-180" /> العودة</Button></Link>
         </div>
         <CardHeader className="space-y-4 pt-0 pb-6 text-center">
-          <div className="mx-auto relative h-16 w-40"><Image src={LOGO_URL} alt="Platform" fill className="object-contain" priority /></div>
-          <CardTitle className="text-3xl font-black text-primary">ابدأ تجارتك السحابية</CardTitle>
-          <CardDescription className="font-medium text-lg text-slate-500">امتلك نظام مبيعات وموقع إلكتروني متكامل خلال دقائق.</CardDescription>
+          <div className="mx-auto flex flex-col items-center gap-2">
+             <div className="h-16 w-16 bg-primary rounded-3xl flex items-center justify-center text-white shadow-xl">
+                <ScrollText className="h-10 w-10" />
+             </div>
+             <h2 className="text-3xl font-black text-primary tracking-tighter">تأسيس متجر دوبسار</h2>
+          </div>
+          <CardDescription className="font-medium text-lg text-slate-500">امتلك نظاماً سحابياً متكاملاً بهوية عراقية عريقة.</CardDescription>
         </CardHeader>
         <CardContent className="px-10 pb-10">
           <form onSubmit={handleOnboarding} className="space-y-6">
             {step === 1 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-in slide-in-from-right-4 duration-500">
                 <div className="space-y-2">
-                  <Label className="font-black text-xs mr-2 opacity-60">اسم المحل / المجمع</Label>
-                  <Input name="businessName" value={formData.businessName} onChange={handleChange} required placeholder="مثال: مجمع السلام" className="h-14 rounded-2xl bg-slate-50 border-none font-black" />
+                  <Label className="font-black text-xs mr-2 opacity-60 uppercase tracking-widest">اسم النشاط التجاري</Label>
+                  <Input name="businessName" value={formData.businessName} onChange={handleChange} required placeholder="مثال: مجمع بابل" className="h-14 rounded-2xl bg-slate-50 border-none font-black px-6" />
                 </div>
                 <div className="space-y-2">
-                   <Label className="font-black text-xs mr-2 opacity-60">اسم صاحب العمل</Label>
-                   <Input name="ownerName" value={formData.ownerName} onChange={handleChange} required placeholder="الاسم الكامل" className="h-14 rounded-2xl bg-slate-50 border-none font-black" />
+                   <Label className="font-black text-xs mr-2 opacity-60 uppercase tracking-widest">اسم صاحب العمل</Label>
+                   <Input name="ownerName" value={formData.ownerName} onChange={handleChange} required placeholder="الاسم الكامل" className="h-14 rounded-2xl bg-slate-50 border-none font-black px-6" />
                 </div>
                 <div className="space-y-2">
-                   <Label className="font-black text-xs mr-2 opacity-60">العنوان</Label>
-                   <Input name="address" value={formData.address} onChange={handleChange} required placeholder="المدينة، المنطقة" className="h-14 rounded-2xl bg-slate-50 border-none font-black" />
+                   <Label className="font-black text-xs mr-2 opacity-60 uppercase tracking-widest">العنوان</Label>
+                   <Input name="address" value={formData.address} onChange={handleChange} required placeholder="المدينة، المنطقة" className="h-14 rounded-2xl bg-slate-50 border-none font-black px-6" />
                 </div>
                 <div className="space-y-2">
-                   <Label className="font-black text-xs mr-2 opacity-60">نوع النشاط</Label>
-                   <select name="businessType" value={formData.businessType} onChange={handleChange} className="w-full h-14 rounded-2xl bg-slate-50 border-none px-4 font-black appearance-none outline-none">
-                     <option value="motorcycle_parts">قطع غيار دراجات</option>
-                     <option value="car_parts">قطع غيار سيارات</option>
-                     <option value="general_store">متجر عام</option>
+                   <Label className="font-black text-xs mr-2 opacity-60 uppercase tracking-widest">نوع النشاط</Label>
+                   <select name="businessType" value={formData.businessType} onChange={handleChange} className="w-full h-14 rounded-2xl bg-slate-50 border-none px-6 font-black appearance-none outline-none">
+                     <option value="retail">تجارة مفرد</option>
+                     <option value="wholesale">تجارة جملة</option>
+                     <option value="workshop">ورشة وصيانة</option>
+                     <option value="general">متجر عام</option>
                    </select>
                 </div>
               </div>
             ) : (
               <div className="max-w-md mx-auto space-y-6 animate-in slide-in-from-left-4 duration-500">
                 <div className="space-y-2">
-                   <Label className="font-black text-xs mr-2 opacity-60">رقم الهاتف</Label>
-                   <Input name="phoneNumber" value={formData.phoneNumber} onChange={handleChange} required placeholder="07XXXXXXXXX" className="h-14 rounded-2xl bg-slate-50 border-none text-left font-black" dir="ltr" />
+                   <Label className="font-black text-xs mr-2 opacity-60 uppercase tracking-widest">رقم الهاتف الأساسي</Label>
+                   <Input name="phoneNumber" value={formData.phoneNumber} onChange={handleChange} required placeholder="07XXXXXXXXX" className="h-14 rounded-2xl bg-slate-50 border-none text-left font-black px-6" dir="ltr" />
                 </div>
                 <div className="space-y-2">
-                  <Label className="font-black text-xs mr-2 opacity-60">كلمة السر</Label>
-                  <Input type="password" name="password" value={formData.password} onChange={handleChange} required placeholder="••••••••" className="h-14 rounded-2xl bg-slate-50 border-none text-left" dir="ltr" />
+                  <Label className="font-black text-xs mr-2 opacity-60 uppercase tracking-widest">كلمة سر اللوحة</Label>
+                  <Input type="password" name="password" value={formData.password} onChange={handleChange} required placeholder="••••••••" className="h-14 rounded-2xl bg-slate-50 border-none text-left px-6" dir="ltr" />
                 </div>
               </div>
             )}
@@ -177,7 +179,7 @@ export default function OnboardingPage() {
                 className="flex-1 h-16 rounded-[24px] font-black text-xl gap-3 shadow-2xl bg-primary"
               >
                 {loading ? <Loader2 className="h-6 w-6 animate-spin" /> : (
-                  <>{step === 1 ? "المتابعة للخطوة الأخيرة" : "إنشاء متجري والبدء الآن"}<ArrowRight className={cn("h-6 w-6", step === 2 && "hidden")} /></>
+                  <>{step === 1 ? "المتابعة" : "تأسيس المتجر الآن"}<ArrowRight className={cn("h-6 w-6", step === 2 && "hidden")} /></>
                 )}
               </Button>
             </div>

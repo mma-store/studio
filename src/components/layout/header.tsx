@@ -1,6 +1,6 @@
 "use client";
 
-import { Bell, Search, ShoppingCart } from "lucide-react";
+import { Bell, Search, ShoppingCart, ScrollText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import Image from "next/image";
@@ -21,23 +21,34 @@ interface HeaderProps {
 
 export function Header({ logo, storeName, slug }: HeaderProps) {
   const { totalItems } = useCart();
-  const DEFAULT_LOGO = "https://up6.cc/2026/07/178308238964931.png";
   const homeHref = slug ? `/store/${slug}` : "/";
 
   return (
     <header className="sticky top-0 z-40 w-full border-b bg-background/80 backdrop-blur-md">
-      <div className="container flex h-20 items-center justify-between px-4">
+      <div className="container flex h-20 items-center justify-between px-4 max-w-7xl mx-auto">
         <div className="flex items-center gap-4">
           <Link href={homeHref} className="flex items-center gap-3">
-            <div className="relative h-14 w-40">
-              <Image 
-                src={logo || DEFAULT_LOGO} 
-                alt={storeName || "مجمع محمد علاء"} 
-                fill 
-                className="object-contain"
-                priority
-              />
-            </div>
+            {logo ? (
+              <div className="relative h-14 w-40">
+                <Image 
+                  src={logo} 
+                  alt={storeName || "متجر دوبسار"} 
+                  fill 
+                  className="object-contain"
+                  priority
+                />
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                 <div className="h-10 w-10 bg-primary rounded-xl flex items-center justify-center text-white shadow-lg">
+                    <ScrollText className="h-6 w-6" />
+                 </div>
+                 <div className="flex flex-col">
+                    <span className="text-xl font-black tracking-tighter text-primary">{storeName || 'دوبسار'}</span>
+                    <span className="text-[8px] font-black text-secondary uppercase tracking-[0.3em] opacity-80 leading-none">DUBSAR STORE</span>
+                 </div>
+              </div>
+            )}
           </Link>
         </div>
 

@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -30,7 +29,8 @@ import {
   Key,
   Webhook,
   FileText,
-  Lock
+  Lock,
+  ScrollText
 } from "lucide-react";
 
 import {
@@ -52,8 +52,6 @@ import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/firebase";
 import { signOut } from "firebase/auth";
 import { toast } from "@/hooks/use-toast";
-
-const LOGO_URL = "https://up6.cc/2026/07/178308238964931.png";
 
 const ADMIN_MENU = [
   {
@@ -140,15 +138,15 @@ export function AdminSidebar() {
     <Sidebar collapsible="icon" className="border-l bg-primary text-white" side="right">
       <SidebarHeader className="h-28 flex flex-col items-center justify-center border-b border-white/10 px-6 bg-black/20">
         <Link href="/admin" className="flex flex-col items-center gap-2">
-          <div className="relative h-12 w-36 shrink-0">
-            <Image 
-              src={LOGO_URL} 
-              alt="Platform" 
-              fill 
-              className="object-contain brightness-0 invert"
-            />
+          <div className="flex items-center gap-2">
+             <div className="h-10 w-10 bg-white rounded-xl flex items-center justify-center text-primary shadow-lg">
+                <ScrollText className="h-6 w-6" />
+             </div>
+             <div className="flex flex-col group-data-[collapsible=icon]:hidden">
+                <span className="text-xl font-black tracking-tighter text-white">دوبسار</span>
+                <span className="text-[8px] font-black text-secondary tracking-[0.3em] uppercase opacity-80 leading-none">DUBSAR</span>
+             </div>
           </div>
-          <span className="text-[10px] font-black text-secondary uppercase tracking-[0.3em] opacity-80 group-data-[collapsible=icon]:hidden">Business Portal</span>
         </Link>
       </SidebarHeader>
 
@@ -189,8 +187,8 @@ export function AdminSidebar() {
 
       <SidebarFooter className="border-t border-white/10 p-6 space-y-4 bg-black/20">
         <div className="px-4 py-3 bg-white/5 rounded-2xl border border-white/10 group-data-[collapsible=icon]:hidden text-right">
-           <p className="text-[9px] font-black text-white/30 uppercase tracking-widest mb-1">Developed by</p>
-           <p className="text-[11px] font-black text-white/80">Platform Team</p>
+           <p className="text-[9px] font-black text-white/30 uppercase tracking-widest mb-1">Heritage Powered</p>
+           <p className="text-[11px] font-black text-white/80 leading-tight">بوابة دوبسار</p>
         </div>
         <SidebarMenu>
           <SidebarMenuItem>
@@ -205,5 +203,24 @@ export function AdminSidebar() {
         </SidebarMenu>
       </SidebarFooter>
     </Sidebar>
+  );
+}
+
+function Wrench(props: any) {
+  return (
+    <svg
+      {...props}
+      xmlns="http://www.w3.org/2000/svg"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
+    </svg>
   );
 }

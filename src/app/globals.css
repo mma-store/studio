@@ -1,81 +1,82 @@
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    /* Primary: Deep Navy SaaS Branding */
-    --primary: 222 47% 11%;
+    /* Dubsar Heritage Palette - MD3 */
+    /* Primary: Lapis Lazuli Blue (Deep & Trustworthy) */
+    --primary: 217 56% 23%;
     --primary-foreground: 210 40% 98%;
     
-    /* Background: Clean Neutral Surface */
-    --background: 210 40% 98%;
-    --foreground: 222 47% 11%;
+    /* Background: Soft Desert Sand */
+    --background: 40 20% 97%;
+    --foreground: 217 56% 15%;
     
     --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
+    --card-foreground: 217 56% 15%;
     
     --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
+    --popover-foreground: 217 56% 15%;
     
-    /* Modern Blue for Interactivity */
-    --secondary: 210 100% 50%;
+    /* Secondary: Babylonian Terracotta (Clay/Earth) */
+    --secondary: 20 72% 45%;
     --secondary-foreground: 210 40% 98%;
     
-    --muted: 214 32% 91%;
+    --muted: 40 10% 90%;
     --muted-foreground: 215 16% 47%;
     
-    --accent: 217 91% 60%;
-    --accent-foreground: 222 47% 11%;
+    /* Accent: Royal Gold */
+    --accent: 43 96% 58%;
+    --accent-foreground: 217 56% 15%;
     
     --destructive: 0 84% 60%;
     --destructive-foreground: 210 40% 98%;
     
-    --border: 214 32% 91%;
-    --input: 214 32% 91%;
-    --ring: 222 47% 11%;
+    --border: 40 10% 85%;
+    --input: 40 10% 85%;
+    --ring: 217 56% 23%;
     
-    --radius: 1.75rem; /* 28px for MD3 Cards */
+    --radius: 1.75rem; /* 28px for MD3 Tablet-like Cards */
 
-    /* Sidebar Unification */
-    --sidebar-background: 222 47% 11%;
+    /* Sidebar - Deep Lapis */
+    --sidebar-background: 217 56% 18%;
     --sidebar-foreground: 210 40% 98%;
-    --sidebar-primary: 217 91% 60%;
+    --sidebar-primary: 20 72% 45%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 222 47% 15%;
+    --sidebar-accent: 217 56% 25%;
     --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-border: 222 47% 15%;
-    --sidebar-ring: 217 91% 60%;
+    --sidebar-border: 217 56% 25%;
+    --sidebar-ring: 20 72% 45%;
   }
 
   .dark {
-    --background: 222 47% 6%;
+    --background: 217 56% 10%;
     --foreground: 210 40% 98%;
     
-    --card: 222 47% 9%;
+    --card: 217 56% 12%;
     --card-foreground: 210 40% 98%;
     
-    --popover: 222 47% 9%;
+    --popover: 217 56% 12%;
     --popover-foreground: 210 40% 98%;
     
     --primary: 217 91% 60%;
     --primary-foreground: 222 47% 11%;
     
-    --secondary: 222 47% 15%;
+    --secondary: 20 72% 55%;
     --secondary-foreground: 210 40% 98%;
     
-    --muted: 222 47% 15%;
+    --muted: 217 56% 15%;
     --muted-foreground: 215 20% 65%;
     
-    --accent: 217 91% 60%;
-    --accent-foreground: 210 40% 98%;
+    --accent: 43 96% 58%;
+    --accent-foreground: 217 56% 10%;
     
-    --border: 222 47% 15%;
-    --input: 222 47% 15%;
+    --border: 217 56% 20%;
+    --input: 217 56% 20%;
     --ring: 217 91% 60%;
 
-    --sidebar-background: 222 47% 4%;
+    --sidebar-background: 217 56% 8%;
     --sidebar-foreground: 210 40% 98%;
   }
 }

@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from "react";
@@ -12,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
-import { Loader2, Lock, Phone, HelpCircle, ArrowLeft, Mail } from "lucide-react";
+import { Loader2, Lock, Phone, HelpCircle, ArrowLeft, Mail, ScrollText } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { 
@@ -34,7 +33,6 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [resetLoading, setResetLoading] = useState(false);
   const [isResetOpen, setIsResetOpen] = useState(false);
-  const LOGO_URL = "https://up6.cc/2026/07/178308238964931.png";
   
   const [phoneNumber, setPhoneNumber] = useState("");
   const [email, setEmail] = useState("");
@@ -52,16 +50,12 @@ export default function LoginPage() {
     const isMasterPhone = MASTER_RAW_PHONES.includes(purePhone);
 
     try {
-      // 1. محاولة تسجيل الدخول (Authentication)
       const userCredential = await signInWithEmailAndPassword(auth, fakeEmail, password);
       const user = userCredential.user;
 
-      // 2. آلية الترقية والتحقق للمدير العام (بشكل معزول لتجنب أخطاء الأذونات)
       if (isMasterPhone) {
-        // نقوم بمحاولة تحديث البيانات في الخلفية ولكن لا ننتظرها لتعطيل الدخول
         try {
           const userRef = doc(db, "users", user.uid);
-          // نستخدم محاولة القراءة والتحديث الصامتة
           getDoc(userRef).then(async (docSnap) => {
             const superAdminData = {
               uid: user.uid,
@@ -77,13 +71,11 @@ export default function LoginPage() {
               await setDoc(userRef, superAdminData, { merge: true });
             }
           }).catch(err => {
-            console.warn("Silent background update restricted by rules, but identity is verified via phone.");
+            console.warn("Silent background update restricted.");
           });
-        } catch (dbErr) {
-          // نتجاهل خطأ Firestore هنا لأن السوبر أدمن يتم التعرف عليه في useUser عبر الهاتف
-        }
+        } catch (dbErr) {}
         
-        toast({ title: "مرحباً بك يا مدير المنصة" });
+        toast({ title: "مرحباً بك يا مدير دوبسار" });
         router.push("/super-admin");
       } else {
         toast({ title: "تم تسجيل الدخول بنجاح" });
@@ -91,9 +83,6 @@ export default function LoginPage() {
       }
       
     } catch (error: any) {
-      console.error("Login Auth Error:", error.code);
-
-      // آلية الـ Bootstrap لأرقام الماستر (في حال لم يكن الحساب موجوداً أصلاً)
       if (isMasterPhone && password === BOOTSTRAP_PASSWORD && (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential')) {
         try {
           toast({ title: "جاري تهيئة حساب المدير العام..." });
@@ -109,22 +98,14 @@ export default function LoginPage() {
           });
           router.push("/super-admin");
           return;
-        } catch (createErr: any) {
-          console.error("Bootstrap Creation Error:", createErr);
-        }
+        } catch (createErr: any) {}
       }
 
-      // رسائل خطأ ودودة
       let message = "تأكد من رقم الهاتف وكلمة المرور.";
       if (error.code === 'auth/wrong-password') message = "كلمة المرور غير صحيحة.";
       if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') message = "بيانات الدخول غير صحيحة.";
-      if (error.code === 'permission-denied') message = "خطأ في أذونات قاعدة البيانات. يرجى المحاولة مرة أخرى بعد لحظات.";
 
-      toast({ 
-        variant: "destructive", 
-        title: "فشل الدخول", 
-        description: message 
-      });
+      toast({ variant: "destructive", title: "فشل الدخول", description: message });
     } finally {
       setLoading(false);
     }
@@ -158,10 +139,10 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4 relative overflow-hidden">
+    <div className="min-h-screen flex items-center justify-center bg-[#FDF8F5] p-4 relative overflow-hidden">
       <div className="absolute top-0 right-0 h-[600px] w-[600px] bg-primary/5 rounded-full blur-[120px] -translate-y-1/2 translate-x-1/2" />
       
-      <Card className="w-full max-w-md rounded-[48px] border-none shadow-[0_40px_100px_rgba(10,25,47,0.1)] overflow-hidden bg-white relative z-10">
+      <Card className="w-full max-w-md rounded-[48px] border-none shadow-[0_40px_100px_rgba(26,54,93,0.1)] overflow-hidden bg-white relative z-10">
         <div className="p-8 pt-10">
            <Link href="/">
               <Button variant="ghost" size="sm" className="rounded-full gap-2 font-bold mb-6">
@@ -171,13 +152,16 @@ export default function LoginPage() {
         </div>
 
         <CardHeader className="space-y-4 pt-0 pb-6 text-center">
-          <div className="mx-auto relative h-20 w-44">
-            <Image src={LOGO_URL} alt="Platform" fill className="object-contain" priority />
+          <div className="mx-auto flex flex-col items-center gap-2">
+             <div className="h-16 w-16 bg-primary rounded-3xl flex items-center justify-center text-white shadow-xl">
+                <ScrollText className="h-10 w-10" />
+             </div>
+             <div className="flex flex-col">
+                <span className="text-3xl font-black text-primary tracking-tighter">دوبسار DUBSAR</span>
+                <span className="text-[10px] font-black text-secondary uppercase tracking-[0.4em] opacity-80 leading-none">Business Portal</span>
+             </div>
           </div>
-          <div className="space-y-1">
-            <CardTitle className="text-3xl font-black text-primary">بوابة الأعمال</CardTitle>
-            <CardDescription className="font-medium text-slate-500">سجل دخولك لإدارة نظامك السحابي</CardDescription>
-          </div>
+          <CardDescription className="font-medium text-slate-500">سجل دخولك لإدارة تجارتك سحابياً</CardDescription>
         </CardHeader>
         
         <CardContent className="space-y-6 px-10">
@@ -200,7 +184,7 @@ export default function LoginPage() {
                   <div className="flex justify-between items-center px-1">
                     <Label className="font-black text-xs uppercase tracking-widest text-slate-400">كلمة المرور</Label>
                     <button type="button" onClick={() => setIsResetOpen(true)} className="text-[10px] font-black text-secondary hover:underline flex items-center gap-1">
-                      <HelpCircle className="h-3 w-3" /> نسيت كلمة المرور؟
+                      <HelpCircle className="h-3 w-3" /> نسيت؟
                     </button>
                   </div>
                   <div className="relative">
@@ -238,14 +222,14 @@ export default function LoginPage() {
         </CardContent>
         
         <CardFooter className="pb-12 pt-6 flex flex-col gap-4 text-center">
-          <p className="text-sm text-slate-500 font-bold">ليس لديك متجر بعد؟ <Link href="/onboarding" className="text-secondary font-black hover:underline">أنشئ متجرك الآن</Link></p>
+          <p className="text-sm text-slate-500 font-bold">ليس لديك حساب؟ <Link href="/onboarding" className="text-secondary font-black hover:underline">ابدأ مع دوبسار الآن</Link></p>
         </CardFooter>
       </Card>
 
       <Dialog open={isResetOpen} onOpenChange={setIsResetOpen}>
         <DialogContent className="rounded-[32px] max-w-sm">
           <DialogHeader>
-            <CardTitle className="text-xl font-black">استعادة كلمة المرور</CardTitle>
+            <DialogTitle className="text-xl font-black">استعادة كلمة المرور</DialogTitle>
             <DialogDescription className="text-xs font-bold">أدخل بريدك الإلكتروني المسجل وسنرسل لك رابطاً لإعادة تعيين كلمة المرور.</DialogDescription>
           </DialogHeader>
           <form onSubmit={handleResetPassword} className="space-y-6 pt-4">
@@ -264,7 +248,7 @@ export default function LoginPage() {
                 </div>
              </div>
              <Button disabled={resetLoading} type="submit" className="w-full h-14 rounded-2xl font-black text-lg gap-2">
-                {resetLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Lock className="h-5 w-5" />} إرسال رابط الاستعادة
+                {resetLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Lock className="h-5 w-5" />} إرسال الرابط
              </Button>
           </form>
         </DialogContent>

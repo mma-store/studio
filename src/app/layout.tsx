@@ -4,25 +4,23 @@ import { Toaster } from "@/components/ui/toaster";
 import { FirebaseClientProvider } from "@/firebase";
 import { CartProvider } from "@/context/cart-context";
 
-const LOGO_URL = "https://up6.cc/2026/07/178308238964931.png";
-
 export const metadata: Metadata = {
-  title: 'مجمع محمد علاء - MMA',
-  description: 'المنصة الرسمية لبيع وصيانة كافة أنواع الدراجات النارية في العراق',
+  title: 'دوبسار - DUBSAR | منصة التجارة السحابية المتكاملة',
+  description: 'دوبسار: أول من دوّن التجارة، واليوم أول من يقودها سحابياً. نظام متكامل لإدارة المخازن، المبيعات، والورش التقنية.',
   manifest: '/manifest.json',
   icons: {
-    icon: LOGO_URL,
-    apple: LOGO_URL,
+    icon: '/favicon.ico',
+    apple: '/icon.png',
   },
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
-    title: 'MMA Store',
+    title: 'DUBSAR',
   },
 };
 
 export const viewport: Viewport = {
-  themeColor: '#FF6B00',
+  themeColor: '#1A365D',
   width: 'device-width',
   initialScale: 1,
   maximumScale: 1,
@@ -40,7 +38,6 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=Almarai:wght@300;400;700;800&display=swap" rel="stylesheet" />
-        <link rel="icon" href={LOGO_URL} />
       </head>
       <body className="font-almarai antialiased selection:bg-primary/20 overflow-x-hidden bg-background">
         <FirebaseClientProvider>

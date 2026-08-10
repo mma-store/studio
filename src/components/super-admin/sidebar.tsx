@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -21,7 +20,8 @@ import {
   Activity,
   Puzzle,
   Terminal,
-  Key
+  Key,
+  ScrollText
 } from "lucide-react";
 
 import {
@@ -43,8 +43,6 @@ import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/firebase";
 import { signOut } from "firebase/auth";
 import { toast } from "@/hooks/use-toast";
-
-const LOGO_URL = "https://up6.cc/2026/07/178308238964931.png";
 
 const SUPER_ADMIN_MENU = [
   {
@@ -91,10 +89,15 @@ export function SuperAdminSidebar() {
     <Sidebar collapsible="icon" className="border-l bg-slate-950 text-white" side="right">
       <SidebarHeader className="h-28 flex flex-col items-center justify-center border-b border-white/5 px-6 bg-black/20">
         <Link href="/super-admin" className="flex flex-col items-center gap-2">
-          <div className="relative h-12 w-36 shrink-0">
-            <Image src={LOGO_URL} alt="Platform" fill className="object-contain brightness-0 invert" />
+          <div className="flex items-center gap-2">
+             <div className="h-10 w-10 bg-primary rounded-xl flex items-center justify-center text-white shadow-lg">
+                <ScrollText className="h-6 w-6" />
+             </div>
+             <div className="flex flex-col group-data-[collapsible=icon]:hidden">
+                <span className="text-xl font-black tracking-tighter text-white">دوبسار <span className="text-secondary font-black">SUPER</span></span>
+                <span className="text-[8px] font-black text-primary uppercase tracking-[0.4em] opacity-60 leading-none">MASTER PORTAL</span>
+             </div>
           </div>
-          <span className="text-[9px] font-black text-primary uppercase tracking-[0.4em] opacity-60 group-data-[collapsible=icon]:hidden">Master Portal</span>
         </Link>
       </SidebarHeader>
 
@@ -135,8 +138,8 @@ export function SuperAdminSidebar() {
 
       <SidebarFooter className="border-t border-white/5 p-8 space-y-4 bg-black/10">
         <div className="px-5 py-4 bg-white/5 rounded-2xl border border-white/5 group-data-[collapsible=icon]:hidden text-right">
-           <p className="text-[9px] font-black text-white/20 uppercase tracking-widest mb-1">Platform Identity</p>
-           <p className="text-[11px] font-black text-white/80 leading-relaxed">بواسطة <span className="text-primary">حسين صلاح</span></p>
+           <p className="text-[9px] font-black text-white/20 uppercase tracking-widest mb-1">Platform Admin</p>
+           <p className="text-[11px] font-black text-white/80 leading-relaxed">مركز تحكم دوبسار</p>
         </div>
         <SidebarMenu>
           <SidebarMenuItem>
