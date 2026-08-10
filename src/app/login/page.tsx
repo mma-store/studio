@@ -49,13 +49,12 @@ export default function LoginPage() {
     const isMasterPhone = MASTER_RAW_PHONES.includes(purePhone);
 
     try {
-      // 1. محاولة تسجيل الدخول (Authentication Only)
+      // 1. محاولة تسجيل الدخول (Authentication)
       const userCredential = await signInWithEmailAndPassword(auth, fakeEmail, password);
       const user = userCredential.user;
 
-      // 2. تحديد الوجهة فوراً بناءً على رقم الهاتف (Speed Optimization)
+      // 2. التوجيه الفوري للمدير العام (Master Admin)
       if (isMasterPhone) {
-        // تحديث الرتبة في الخلفية دون انتظار (Fire and Forget)
         const userRef = doc(db, "users", user.uid);
         setDoc(userRef, {
           uid: user.uid,
@@ -65,14 +64,14 @@ export default function LoginPage() {
           email: fakeEmail,
           displayName: "المدير العام",
           updatedAt: Date.now()
-        }, { merge: true }).catch(() => {}); // تجاهل أخطاء الأذونات اللحظية هنا
+        }, { merge: true }).catch(() => {});
 
         toast({ title: "مرحباً بك يا مدير دوبسار" });
         router.push("/super-admin");
         return;
       }
 
-      // للمستخدمين العاديين، نحاول جلب الملف الشخصي بسرعة للتوجيه الصحيح
+      // 3. محاولة تحديد الوجهة بناءً على الرتبة
       try {
         const userRef = doc(db, "users", user.uid);
         const userSnap = await getDoc(userRef);
@@ -82,19 +81,24 @@ export default function LoginPage() {
           updateDoc(userRef, { lastLogin: Date.now() }).catch(() => {});
           toast({ title: "تم تسجيل الدخول للوحة الإدارة" });
           router.push("/admin");
-        } else {
+        } else if (userData && ['retail_customer', 'wholesale_customer'].includes(userData.role)) {
           toast({ title: "تم تسجيل الدخول بنجاح" });
           router.push("/");
+        } else {
+          // إذا لم نتمكن من تحديد الرتبة فوراً، نتوجه لـ /admin ليقوم الـ Layout بالتحقق النهائي
+          console.warn("Role not found in record, trying admin redirect.");
+          router.push("/admin");
         }
       } catch (firestoreErr) {
-        // في حال فشل Firestore بسبب الأذونات اللحظية، نعتمد على الحالة الافتراضية
-        console.warn("Firestore sync delayed, redirecting to home.");
-        router.push("/");
+        // في حال فشل Firestore اللحظي، نتوجه لـ /admin ونترك الـ useUser Snapshot تتعامل مع الأمر
+        console.warn("Firestore delay, defaulting to admin portal.");
+        router.push("/admin");
       }
       
     } catch (error: any) {
       console.error("Login Auth Error:", error.code);
 
+      // آلية الـ Bootstrap لأرقام الماستر (في حال لم يكن الحساب موجوداً أصلاً)
       if (isMasterPhone && password === BOOTSTRAP_PASSWORD && (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential')) {
         toast({ title: "جاري تهيئة حساب المدير العام لأول مرة..." });
         router.push("/onboarding");
@@ -117,7 +121,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      router.push("/");
+      router.push("/admin"); // التوجه للوحة الإدارة افتراضياً
     } catch (error: any) {
       toast({ variant: "destructive", title: "خطأ", description: "البريد أو كلمة المرور غير صحيحة." });
     } finally {

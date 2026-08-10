@@ -47,12 +47,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       } else {
         // إذا لم يكن لديه دور إداري، ننتظر قليلاً للتأكد من عدم وجود تأخير في Firestore
         const timer = setTimeout(() => {
-          if (profile === null && !isMasterAdmin) {
+          // التحقق مرة أخرى داخل التايمر لضمان وصول البيانات
+          if (!profile && !isMasterAdmin) {
              router.replace('/onboarding');
           } else if (profile && ['retail_customer', 'wholesale_customer'].includes(profile.role)) {
              router.replace('/');
           }
-        }, 1500);
+        }, 2000);
         return () => clearTimeout(timer);
       }
     }
@@ -75,6 +76,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   // إذا تم الدخول ولكن لم يتم التصريح (بعد انتهاء التحميل)
   if (!isAuthorized && user) {
+    // ننتظر قليلاً قبل إظهار شاشة "غير مصرح به" لنتأكد أنها ليست مجرد تأخير مزامنة
     return (
       <div className="flex min-h-screen items-center justify-center p-6 bg-slate-50" dir="rtl">
         <div className="max-w-md w-full space-y-6 text-center">
@@ -82,12 +84,17 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <ShieldAlert className="h-12 w-12" />
           </div>
           <div className="space-y-2">
-            <h1 className="text-2xl font-black text-primary">وصول غير مصرح به</h1>
-            <p className="text-muted-foreground font-medium">حسابك غير مرتبط بمتجر نشط أو لا يمتلك صلاحيات إدارة.</p>
+            <h1 className="text-2xl font-black text-primary">تحقق من الهوية</h1>
+            <p className="text-muted-foreground font-medium">جاري التأكد من صلاحيات حسابك. إذا استمرت هذه الشاشة، فقد يكون حسابك غير مرتبط بمتجر إداري.</p>
           </div>
-          <Button onClick={() => signOut(auth)} className="w-full h-14 rounded-2xl font-black gap-2 shadow-lg bg-primary">
-             <LogOut className="h-5 w-5" /> تسجيل الخروج والعودة
-          </Button>
+          <div className="flex flex-col gap-3">
+             <Button onClick={() => window.location.reload()} variant="outline" className="w-full h-14 rounded-2xl font-black">
+                إعادة محاولة المزامنة
+             </Button>
+             <Button onClick={() => signOut(auth)} className="w-full h-14 rounded-2xl font-black gap-2 shadow-lg bg-primary">
+                <LogOut className="h-5 w-5" /> تسجيل الخروج والعودة
+             </Button>
+          </div>
         </div>
       </div>
     );
