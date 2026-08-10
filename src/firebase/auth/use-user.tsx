@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -7,8 +6,8 @@ import { doc, onSnapshot } from 'firebase/firestore';
 import { useAuth, useFirestore } from '../provider';
 import { UserProfile } from '@/lib/types/roles';
 
-// القائمة الموحدة والنهائية لأرقام المدير العام الماستر
-const MASTER_SUPER_ADMINS = ['7858833838', '7703687932'];
+// القائمة الموحدة والنهائية لأرقام المدير العام الماستر (بدون أصفار أو بادئات)
+const MASTER_RAW_PHONES = ['7858833838', '7703687932'];
 
 export function useUser() {
   const auth = useAuth();
@@ -31,8 +30,8 @@ export function useUser() {
           }
           setLoading(false);
         }, (err) => {
-          console.warn("Profile fetch restricted by Firestore rules, fallback active:", err.code);
-          setProfile(null);
+          console.warn("Profile fetch restricted:", err.code);
+          // في حال فشل Firestore، لا نزال نحتفظ ببيانات Auth الأساسية
           setLoading(false);
         });
         
@@ -47,16 +46,18 @@ export function useUser() {
     return () => unsubscribeAuth();
   }, [auth, db]);
 
-  // منطق التحقق من السوبر أدمن - يعتمد على الرتبة أو رقم الهاتف الماستر أو البريد الإلكتروني الماستر
-  const purePhone = profile?.phoneNumber?.replace(/\s/g, '').replace(/^(\+964|0)/, '') || '';
+  // منطق التحقق الصارم من هوية المدير العام (Super Admin)
+  // يعتمد على 3 طبقات: الرتبة في Firestore، رقم الهاتف، أو بادئة البريد الإلكتروني
   const emailPrefix = user?.email?.split('@')[0] || '';
+  const purePhoneFromProfile = profile?.phoneNumber?.replace(/\s/g, '').replace(/^(\+964|0)/, '') || '';
   
   const isSuperAdmin = 
     profile?.role === 'super_admin' || 
-    MASTER_SUPER_ADMINS.includes(purePhone) || 
-    MASTER_SUPER_ADMINS.includes(emailPrefix);
+    MASTER_RAW_PHONES.includes(emailPrefix) || 
+    MASTER_RAW_PHONES.includes(purePhoneFromProfile);
 
-  const resolvedTenantId = loading ? null : (isSuperAdmin ? (profile?.tenantId || 'PLATFORM_OWNER') : (profile?.tenantId || null));
+  // السوبر أدمن ينتمي دائماً لـ PLATFORM_OWNER ليتجاوز قيود المستأجرين (Tenants)
+  const resolvedTenantId = loading ? null : (isSuperAdmin ? 'PLATFORM_OWNER' : (profile?.tenantId || null));
 
   return { 
     user, 

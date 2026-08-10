@@ -1,4 +1,3 @@
-
 'use client';
 
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
@@ -26,7 +25,7 @@ export default function SuperAdminLayout({ children }: { children: React.ReactNo
       } else if (isSuperAdmin) {
         setIsAuthorized(true);
       } else {
-        // إذا كان مستخدماً عادياً يحاول الدخول، يتم توجيهه للرئيسية أو لوحة التاجر
+        // إذا كان مستخدماً عادياً يحاول الدخول لمنطقة السوبر، يتم توجيهه للوحة التاجر
         router.replace('/admin');
       }
     }
@@ -53,7 +52,7 @@ export default function SuperAdminLayout({ children }: { children: React.ReactNo
           </div>
           <div className="space-y-2">
             <h1 className="text-2xl font-black text-slate-900">منطقة محظورة</h1>
-            <p className="text-muted-foreground font-medium">هذه المنطقة مخصصة حصراً لمدير المنصة العام. تم تسجيل محاولة الدخول.</p>
+            <p className="text-muted-foreground font-medium">هذه المنطقة مخصصة حصراً لمدير المنصة العام.</p>
           </div>
           <div className="grid gap-3 pt-4">
              <Button onClick={() => router.replace('/admin')} className="w-full h-14 rounded-2xl font-black text-lg shadow-xl shadow-primary/20">

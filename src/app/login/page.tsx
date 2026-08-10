@@ -1,10 +1,9 @@
-
 "use client";
 
 import { useState } from "react";
 import { useAuth, useFirestore } from "@/firebase";
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,7 +22,8 @@ import {
   DialogDescription
 } from "@/components/ui/dialog";
 
-const MASTER_PHONES = ['7858833838', '7703687932'];
+// القائمة الموحدة لأرقام المدير العام الماستر
+const MASTER_RAW_PHONES = ['7858833838', '7703687932'];
 const BOOTSTRAP_PASSWORD = '2004#223';
 
 export default function LoginPage() {
@@ -48,69 +48,69 @@ export default function LoginPage() {
     
     const purePhone = cleanPhone(phoneNumber);
     const fakeEmail = `${purePhone}@platform.store`;
-    const isMasterPhone = MASTER_PHONES.includes(purePhone);
+    const isMasterPhone = MASTER_RAW_PHONES.includes(purePhone);
 
     try {
-      // 1. محاولة الدخول عبر Firebase Auth
+      // 1. محاولة تسجيل الدخول
       const userCredential = await signInWithEmailAndPassword(auth, fakeEmail, password);
       const user = userCredential.user;
-      
-      // 2. محاولة تحديث Firestore في الخلفية (اختياري لنجاح الدخول)
-      try {
-        const userRef = doc(db, "users", user.uid);
-        if (isMasterPhone) {
-           await setDoc(userRef, {
-              uid: user.uid,
-              role: 'super_admin',
-              tenantId: 'PLATFORM_OWNER',
-              phoneNumber: `0${purePhone}`,
-              email: fakeEmail,
-              updatedAt: Date.now()
-           }, { merge: true });
-        }
-      } catch (fsError) {
-        console.warn("Firestore sync skipped due to permissions:", fsError);
-      }
 
-      // 3. التوجيه بناءً على رقم الهاتف أو الصلاحية
-      toast({ title: "تم تسجيل الدخول بنجاح" });
+      // 2. آلية الترقية الذاتية (Self-Repair & Promotion)
+      // إذا كان الرقم ماستر، نتأكد من رتبته في Firestore فوراً بعد الدخول
       if (isMasterPhone) {
+        const userRef = doc(db, "users", user.uid);
+        const docSnap = await getDoc(userRef);
+        
+        const superAdminData = {
+          uid: user.uid,
+          role: 'super_admin',
+          tenantId: 'PLATFORM_OWNER',
+          phoneNumber: `0${purePhone}`,
+          email: fakeEmail,
+          displayName: "المدير العام",
+          updatedAt: Date.now()
+        };
+
+        if (!docSnap.exists() || docSnap.data()?.role !== 'super_admin') {
+          await setDoc(userRef, superAdminData, { merge: true });
+        }
+        
+        toast({ title: "مرحباً بك يا مدير المنصة" });
         router.push("/super-admin");
       } else {
+        toast({ title: "تم تسجيل الدخول بنجاح" });
         router.push("/admin");
       }
       
     } catch (error: any) {
       console.error("Login Auth Error:", error.code);
 
-      // معالجة آلية الـ Bootstrap للأرقام الماستر
-      if (isMasterPhone && password === BOOTSTRAP_PASSWORD) {
-        if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
-           try {
-              toast({ title: "جاري تهيئة حساب المدير العام..." });
-              const res = await createUserWithEmailAndPassword(auth, fakeEmail, password);
-              await setDoc(doc(db, "users", res.user.uid), {
-                uid: res.user.uid,
-                tenantId: 'PLATFORM_OWNER',
-                displayName: "المدير العام",
-                phoneNumber: `0${purePhone}`,
-                email: fakeEmail,
-                role: 'super_admin',
-                createdAt: Date.now()
-              });
-              router.push("/super-admin");
-              return;
-           } catch (createErr: any) {
-             console.error("Bootstrap Creation Error:", createErr);
-           }
+      // آلية الـ Bootstrap لأرقام الماستر (في حال لم يكن الحساب موجوداً أصلاً)
+      if (isMasterPhone && password === BOOTSTRAP_PASSWORD && (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential')) {
+        try {
+          toast({ title: "جاري تهيئة حساب المدير العام..." });
+          const res = await createUserWithEmailAndPassword(auth, fakeEmail, password);
+          await setDoc(doc(db, "users", res.user.uid), {
+            uid: res.user.uid,
+            tenantId: 'PLATFORM_OWNER',
+            displayName: "المدير العام",
+            phoneNumber: `0${purePhone}`,
+            email: fakeEmail,
+            role: 'super_admin',
+            createdAt: Date.now()
+          });
+          router.push("/super-admin");
+          return;
+        } catch (createErr: any) {
+          console.error("Bootstrap Creation Error:", createErr);
         }
       }
 
       // رسائل خطأ ودودة
       let message = "تأكد من رقم الهاتف وكلمة المرور.";
       if (error.code === 'auth/wrong-password') message = "كلمة المرور غير صحيحة.";
-      if (error.code === 'auth/user-not-found') message = "هذا الحساب غير موجود.";
-      if (error.code === 'permission-denied') message = "خطأ في أذونات الوصول لقاعدة البيانات.";
+      if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') message = "بيانات الدخول غير صحيحة.";
+      if (error.code === 'permission-denied') message = "خطأ في أذونات قاعدة البيانات.";
 
       toast({ 
         variant: "destructive", 
