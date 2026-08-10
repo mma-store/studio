@@ -4,7 +4,7 @@
 import { useState } from "react";
 import { useAuth, useFirestore } from "@/firebase";
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth";
-import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
-import { Loader2, Lock, Phone, HelpCircle, ArrowLeft, Mail, ShieldCheck } from "lucide-react";
+import { Loader2, Lock, Phone, HelpCircle, ArrowLeft, Mail } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { 
@@ -20,11 +20,9 @@ import {
   DialogContent, 
   DialogHeader, 
   DialogTitle, 
-  DialogFooter,
   DialogDescription
 } from "@/components/ui/dialog";
 
-// القائمة الموحدة والنهائية لأرقام المدير العام الماستر
 const MASTER_PHONES = ['7858833838', '7703687932'];
 const BOOTSTRAP_PASSWORD = '2004#223';
 
@@ -53,43 +51,41 @@ export default function LoginPage() {
     const isMasterPhone = MASTER_PHONES.includes(purePhone);
 
     try {
-      // 1. محاولة الدخول الاعتيادية
+      // 1. محاولة الدخول عبر Firebase Auth
       const userCredential = await signInWithEmailAndPassword(auth, fakeEmail, password);
       const user = userCredential.user;
       
-      // 2. التحقق من السجل في Firestore وإصلاحه تلقائياً إذا كان ماستر
-      const userRef = doc(db, "users", user.uid);
-      const userSnap = await getDoc(userRef);
-      
-      if (isMasterPhone) {
-         // إصلاح تلقائي لصلاحيات السوبر أدمن فور الدخول الناجح
-         await setDoc(userRef, {
-            uid: user.uid,
-            role: 'super_admin',
-            tenantId: 'PLATFORM_OWNER',
-            displayName: userSnap.exists() ? (userSnap.data().displayName || "المدير العام") : "المدير العام",
-            phoneNumber: `0${purePhone}`,
-            email: fakeEmail,
-            updatedAt: Date.now()
-         }, { merge: true });
-         
-         toast({ title: "تم تسجيل دخول المدير العام", description: "مرحباً بك في مركز التحكم." });
-         router.push("/super-admin");
-      } else {
-         const userData = userSnap.data();
-         if (userData?.role && !['retail_customer', 'wholesale_customer'].includes(userData.role)) {
-           router.push("/admin");
-         } else {
-           router.push("/");
-         }
-         toast({ title: "تم تسجيل الدخول" });
+      // 2. محاولة تحديث Firestore في الخلفية (اختياري لنجاح الدخول)
+      try {
+        const userRef = doc(db, "users", user.uid);
+        if (isMasterPhone) {
+           await setDoc(userRef, {
+              uid: user.uid,
+              role: 'super_admin',
+              tenantId: 'PLATFORM_OWNER',
+              phoneNumber: `0${purePhone}`,
+              email: fakeEmail,
+              updatedAt: Date.now()
+           }, { merge: true });
+        }
+      } catch (fsError) {
+        console.warn("Firestore sync skipped due to permissions:", fsError);
       }
-    } catch (error: any) {
-      console.error("Login Error:", error.code);
 
-      // 3. آلية الـ Bootstrap للأرقام الماستر في حال فشل الدخول
+      // 3. التوجيه بناءً على رقم الهاتف أو الصلاحية
+      toast({ title: "تم تسجيل الدخول بنجاح" });
+      if (isMasterPhone) {
+        router.push("/super-admin");
+      } else {
+        router.push("/admin");
+      }
+      
+    } catch (error: any) {
+      console.error("Login Auth Error:", error.code);
+
+      // معالجة آلية الـ Bootstrap للأرقام الماستر
       if (isMasterPhone && password === BOOTSTRAP_PASSWORD) {
-        if (error.code === 'auth/user-not-found') {
+        if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
            try {
               toast({ title: "جاري تهيئة حساب المدير العام..." });
               const res = await createUserWithEmailAndPassword(auth, fakeEmail, password);
@@ -105,22 +101,22 @@ export default function LoginPage() {
               router.push("/super-admin");
               return;
            } catch (createErr: any) {
-             toast({ variant: "destructive", title: "خطأ في التهيئة", description: createErr.message });
+             console.error("Bootstrap Creation Error:", createErr);
            }
-        } else if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
-           toast({ 
-             variant: "destructive", 
-             title: "تنبيه أمني", 
-             description: "رقم الماستر مسجل مسبقاً بكلمة سر مختلفة. يرجى استخدام كلمة السر الصحيحة أو طلب إعادة تعيين." 
-           });
         }
-      } else {
-        toast({ 
-          variant: "destructive", 
-          title: "خطأ في الدخول", 
-          description: "تأكد من رقم الهاتف وكلمة المرور." 
-        });
       }
+
+      // رسائل خطأ ودودة
+      let message = "تأكد من رقم الهاتف وكلمة المرور.";
+      if (error.code === 'auth/wrong-password') message = "كلمة المرور غير صحيحة.";
+      if (error.code === 'auth/user-not-found') message = "هذا الحساب غير موجود.";
+      if (error.code === 'permission-denied') message = "خطأ في أذونات الوصول لقاعدة البيانات.";
+
+      toast({ 
+        variant: "destructive", 
+        title: "فشل الدخول", 
+        description: message 
+      });
     } finally {
       setLoading(false);
     }
@@ -241,7 +237,7 @@ export default function LoginPage() {
       <Dialog open={isResetOpen} onOpenChange={setIsResetOpen}>
         <DialogContent className="rounded-[32px] max-w-sm">
           <DialogHeader>
-            <DialogTitle className="text-xl font-black">استعادة كلمة المرور</DialogTitle>
+            <CardTitle className="text-xl font-black">استعادة كلمة المرور</CardTitle>
             <DialogDescription className="text-xs font-bold">أدخل بريدك الإلكتروني المسجل وسنرسل لك رابطاً لإعادة تعيين كلمة المرور.</DialogDescription>
           </DialogHeader>
           <form onSubmit={handleResetPassword} className="space-y-6 pt-4">

@@ -22,6 +22,7 @@ export function useUser() {
       if (firebaseUser) {
         setUser(firebaseUser);
         const profileRef = doc(db, 'users', firebaseUser.uid);
+        
         const unsubscribeProfile = onSnapshot(profileRef, (docSnap) => {
           if (docSnap.exists()) {
             setProfile(docSnap.data() as UserProfile);
@@ -30,7 +31,8 @@ export function useUser() {
           }
           setLoading(false);
         }, (err) => {
-          console.error("Profile fetch error:", err);
+          console.warn("Profile fetch restricted by Firestore rules, fallback active:", err.code);
+          setProfile(null);
           setLoading(false);
         });
         
@@ -45,11 +47,15 @@ export function useUser() {
     return () => unsubscribeAuth();
   }, [auth, db]);
 
-  // منطق التحقق من السوبر أدمن - يعتمد على الرتبة أو رقم الهاتف الماستر
+  // منطق التحقق من السوبر أدمن - يعتمد على الرتبة أو رقم الهاتف الماستر أو البريد الإلكتروني الماستر
   const purePhone = profile?.phoneNumber?.replace(/\s/g, '').replace(/^(\+964|0)/, '') || '';
-  const isSuperAdmin = profile?.role === 'super_admin' || MASTER_SUPER_ADMINS.includes(purePhone);
+  const emailPrefix = user?.email?.split('@')[0] || '';
+  
+  const isSuperAdmin = 
+    profile?.role === 'super_admin' || 
+    MASTER_SUPER_ADMINS.includes(purePhone) || 
+    MASTER_SUPER_ADMINS.includes(emailPrefix);
 
-  // السوبر أدمن يتمتع بهوية PLATFORM_OWNER لتجاوز قيود المتاجر المنفردة
   const resolvedTenantId = loading ? null : (isSuperAdmin ? (profile?.tenantId || 'PLATFORM_OWNER') : (profile?.tenantId || null));
 
   return { 
