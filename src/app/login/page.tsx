@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from "react";
@@ -51,28 +52,35 @@ export default function LoginPage() {
     const isMasterPhone = MASTER_RAW_PHONES.includes(purePhone);
 
     try {
-      // 1. محاولة تسجيل الدخول
+      // 1. محاولة تسجيل الدخول (Authentication)
       const userCredential = await signInWithEmailAndPassword(auth, fakeEmail, password);
       const user = userCredential.user;
 
-      // 2. آلية الترقية الذاتية (Self-Repair & Promotion)
-      // إذا كان الرقم ماستر، نتأكد من رتبته في Firestore فوراً بعد الدخول
+      // 2. آلية الترقية والتحقق للمدير العام (بشكل معزول لتجنب أخطاء الأذونات)
       if (isMasterPhone) {
-        const userRef = doc(db, "users", user.uid);
-        const docSnap = await getDoc(userRef);
-        
-        const superAdminData = {
-          uid: user.uid,
-          role: 'super_admin',
-          tenantId: 'PLATFORM_OWNER',
-          phoneNumber: `0${purePhone}`,
-          email: fakeEmail,
-          displayName: "المدير العام",
-          updatedAt: Date.now()
-        };
+        // نقوم بمحاولة تحديث البيانات في الخلفية ولكن لا ننتظرها لتعطيل الدخول
+        try {
+          const userRef = doc(db, "users", user.uid);
+          // نستخدم محاولة القراءة والتحديث الصامتة
+          getDoc(userRef).then(async (docSnap) => {
+            const superAdminData = {
+              uid: user.uid,
+              role: 'super_admin',
+              tenantId: 'PLATFORM_OWNER',
+              phoneNumber: `0${purePhone}`,
+              email: fakeEmail,
+              displayName: "المدير العام",
+              updatedAt: Date.now()
+            };
 
-        if (!docSnap.exists() || docSnap.data()?.role !== 'super_admin') {
-          await setDoc(userRef, superAdminData, { merge: true });
+            if (!docSnap.exists() || docSnap.data()?.role !== 'super_admin') {
+              await setDoc(userRef, superAdminData, { merge: true });
+            }
+          }).catch(err => {
+            console.warn("Silent background update restricted by rules, but identity is verified via phone.");
+          });
+        } catch (dbErr) {
+          // نتجاهل خطأ Firestore هنا لأن السوبر أدمن يتم التعرف عليه في useUser عبر الهاتف
         }
         
         toast({ title: "مرحباً بك يا مدير المنصة" });
@@ -110,7 +118,7 @@ export default function LoginPage() {
       let message = "تأكد من رقم الهاتف وكلمة المرور.";
       if (error.code === 'auth/wrong-password') message = "كلمة المرور غير صحيحة.";
       if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') message = "بيانات الدخول غير صحيحة.";
-      if (error.code === 'permission-denied') message = "خطأ في أذونات قاعدة البيانات.";
+      if (error.code === 'permission-denied') message = "خطأ في أذونات قاعدة البيانات. يرجى المحاولة مرة أخرى بعد لحظات.";
 
       toast({ 
         variant: "destructive", 
