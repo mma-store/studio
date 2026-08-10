@@ -44,6 +44,9 @@ export default function OnboardingPage() {
       .replace(/\s+/g, "-");
   };
 
+  // دالة موحدة لتنظيف الرقم لضمان التطابق التام
+  const cleanPhone = (p: string) => p.replace(/\s+/g, '').replace(/[-+]/g, '').replace(/^(\+964|00964|0)/, '');
+
   const handleOnboarding = async (e: React.FormEvent) => {
     e.preventDefault();
     if (step === 1) {
@@ -55,6 +58,8 @@ export default function OnboardingPage() {
 
     try {
       const slug = generateSlug(formData.businessName);
+      const purePhone = cleanPhone(formData.phoneNumber);
+      const email = `${purePhone}@platform.store`;
       
       // 1. التحقق من توافر الرابط (Slug)
       const slugQuery = query(collection(db, "tenants"), where("slug", "==", slug));
@@ -79,12 +84,10 @@ export default function OnboardingPage() {
           trialPlanId = plansSnap.docs[0].id;
         }
       } catch (err) {
-        console.warn("Using default trial settings (plans collection might be empty or restricted).");
+        console.warn("Using default trial settings.");
       }
 
       // 3. إنشاء حساب Firebase Auth
-      const purePhone = formData.phoneNumber.replace(/\s/g, '').replace(/^(\+964|0)/, '');
-      const email = `${purePhone}@platform.store`;
       const userCredential = await createUserWithEmailAndPassword(auth, email, formData.password);
       const user = userCredential.user;
 
@@ -99,7 +102,7 @@ export default function OnboardingPage() {
         businessName: formData.businessName,
         slug,
         ownerName: formData.ownerName,
-        phone: formData.phoneNumber,
+        phone: `0${purePhone}`,
         address: formData.address,
         businessType: formData.businessType,
         status: "trial",
@@ -119,7 +122,7 @@ export default function OnboardingPage() {
         uid: user.uid,
         tenantId,
         displayName: formData.ownerName,
-        phoneNumber: formData.phoneNumber,
+        phoneNumber: `0${purePhone}`,
         email,
         role: "owner",
         createdAt: now
@@ -142,8 +145,10 @@ export default function OnboardingPage() {
       });
       
     } catch (error: any) {
-      let message = error.message;
-      if (error.code === 'auth/email-already-in-use') message = "رقم الهاتف هذا مسجل لمتجر آخر بالفعل.";
+      console.error("Onboarding Error:", error.code);
+      let message = "فشل تأسيس المتجر. يرجى التأكد من الاتصال بالإنترنت.";
+      if (error.code === 'auth/email-already-in-use') message = "رقم الهاتف هذا مسجل لمتجر آخر بالفعل. جرب تسجيل الدخول بدلاً من ذلك.";
+      if (error.code === 'auth/weak-password') message = "كلمة المرور ضعيفة جداً. يرجى استخدام 6 رموز على الأقل.";
       
       toast({ variant: "destructive", title: "فشل التأسيس", description: message });
     } finally {

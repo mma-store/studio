@@ -1,3 +1,4 @@
+
 'use client';
 
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
@@ -32,22 +33,27 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         return;
       }
 
-      const purePhone = profile?.phoneNumber?.replace(/\s/g, '').replace(/^(\+964|0)/, '');
+      // تنظيف رقم الهاتف للتحقق الموحد
+      const purePhone = profile?.phoneNumber?.replace(/\s+/g, '').replace(/[-+]/g, '').replace(/^(\+964|00964|0)/, '');
       const isMasterAdmin = purePhone && MASTER_PHONES.includes(purePhone);
       
       // الأدوار التي يسمح لها بدخول لوحة الإدارة
       const allowedRoles = ['owner', 'admin', 'sales_employee', 'workshop_technician', 'warehouse_employee'];
       const isMerchantStaff = profile && allowedRoles.includes(profile.role);
       
+      // إذا كان سوبر أدمن أو موظف في متجر نشط
       if (isSuperAdmin || isMasterAdmin || (isMerchantStaff && tenantId)) {
         setIsAuthorized(true);
       } else {
-        // إذا لم يكن لديه دور إداري بعد ثانية من الدخول، نوجهه للمكان المناسب
-        if (profile === null && !isMasterAdmin) {
-           router.replace('/onboarding');
-        } else if (profile && ['retail_customer', 'wholesale_customer'].includes(profile.role)) {
-           router.replace('/');
-        }
+        // إذا لم يكن لديه دور إداري، ننتظر قليلاً للتأكد من عدم وجود تأخير في Firestore
+        const timer = setTimeout(() => {
+          if (profile === null && !isMasterAdmin) {
+             router.replace('/onboarding');
+          } else if (profile && ['retail_customer', 'wholesale_customer'].includes(profile.role)) {
+             router.replace('/');
+          }
+        }, 1500);
+        return () => clearTimeout(timer);
       }
     }
   }, [user, profile, loading, router, tenantId, isSuperAdmin]);
@@ -59,13 +65,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
          <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-primary text-white shadow-2xl animate-bounce">
             <ScrollText className="h-10 w-10" />
          </div>
-         <div className="w-full max-w-4xl space-y-6">
+         <div className="w-full max-w-4xl space-y-6 text-center">
             <Skeleton className="h-[400px] w-full rounded-[40px] opacity-20" />
-            <div className="grid grid-cols-3 gap-4">
-              <Skeleton className="h-32 rounded-3xl opacity-20" />
-              <Skeleton className="h-32 rounded-3xl opacity-20" />
-              <Skeleton className="h-32 rounded-3xl opacity-20" />
-            </div>
+            <p className="text-primary font-black animate-pulse">جاري المصادقة السحابية...</p>
          </div>
       </div>
     );
@@ -80,10 +82,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <ShieldAlert className="h-12 w-12" />
           </div>
           <div className="space-y-2">
-            <h1 className="text-2xl font-black">وصول غير مصرح به</h1>
+            <h1 className="text-2xl font-black text-primary">وصول غير مصرح به</h1>
             <p className="text-muted-foreground font-medium">حسابك غير مرتبط بمتجر نشط أو لا يمتلك صلاحيات إدارة.</p>
           </div>
-          <Button onClick={() => signOut(auth)} className="w-full h-14 rounded-2xl font-black gap-2 shadow-lg">
+          <Button onClick={() => signOut(auth)} className="w-full h-14 rounded-2xl font-black gap-2 shadow-lg bg-primary">
              <LogOut className="h-5 w-5" /> تسجيل الخروج والعودة
           </Button>
         </div>

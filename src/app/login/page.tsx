@@ -1,9 +1,10 @@
+
 "use client";
 
 import { useState } from "react";
 import { useAuth, useFirestore } from "@/firebase";
 import { signInWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,7 +38,8 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [resetEmail, setResetEmail] = useState("");
 
-  const cleanPhone = (p: string) => p.replace(/\s/g, '').replace(/^(\+964|0)/, '');
+  // دالة موحدة لتنظيف الرقم لضمان التطابق التام
+  const cleanPhone = (p: string) => p.replace(/\s+/g, '').replace(/[-+]/g, '').replace(/^(\+964|00964|0)/, '');
 
   const handlePhonePasswordLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,12 +50,15 @@ export default function LoginPage() {
     const isMasterPhone = MASTER_RAW_PHONES.includes(purePhone);
 
     try {
+      // 1. محاولة تسجيل الدخول
       const userCredential = await signInWithEmailAndPassword(auth, fakeEmail, password);
       const user = userCredential.user;
 
-      // تحديث بيانات المدير العام فوراً عند الدخول
+      // 2. تحديث بيانات الملف الشخصي في الخلفية (Idempotent Fix)
+      const userRef = doc(db, "users", user.uid);
+      const userSnap = await getDoc(userRef);
+      
       if (isMasterPhone) {
-        const userRef = doc(db, "users", user.uid);
         await setDoc(userRef, {
           uid: user.uid,
           role: 'super_admin',
@@ -62,38 +67,41 @@ export default function LoginPage() {
           email: fakeEmail,
           displayName: "المدير العام",
           updatedAt: Date.now()
-        }, { merge: true }).catch(() => {});
+        }, { merge: true }).catch(err => console.warn("Background profile sync delayed:", err.code));
         
         toast({ title: "مرحباً بك يا مدير دوبسار" });
         router.push("/super-admin");
       } else {
-        // التحقق من دور المستخدم لضمان التوجيه الصحيح
-        const userSnap = await getDoc(doc(db, "users", user.uid));
         const userData = userSnap.data();
-        
         if (userData && ['owner', 'admin', 'sales_employee', 'workshop_technician', 'warehouse_employee'].includes(userData.role)) {
+          // تحديث توقيت الدخول
+          updateDoc(userRef, { lastLogin: Date.now() }).catch(() => {});
           toast({ title: "تم تسجيل الدخول للوحة الإدارة" });
           router.push("/admin");
-        } else {
+        } else if (userData) {
           toast({ title: "تم تسجيل الدخول بنجاح" });
           router.push("/");
+        } else {
+          // في حال كان المستخدم مسجلاً في Auth ولكن ليس له ملف في Firestore
+          toast({ title: "يرجى استكمال بيانات متجرك" });
+          router.push("/onboarding");
         }
       }
       
     } catch (error: any) {
-      // آلية الـ Bootstrap لأرقام الماستر (في حال لم يكن الحساب موجوداً أصلاً)
+      console.error("Login Auth Error:", error.code);
+
+      // 3. آلية الـ Bootstrap للأرقام الماستر (في حال لم يكن الحساب موجوداً أصلاً)
       if (isMasterPhone && password === BOOTSTRAP_PASSWORD && (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential')) {
-        try {
-          toast({ title: "جاري تهيئة حساب المدير العام..." });
-          // سيتم التعامل مع التأسيس في صفحة التأسيس إذا لزم الأمر، أو يمكنك تفعيلها هنا
-          router.push("/onboarding");
-          return;
-        } catch (createErr: any) {}
+        toast({ title: "جاري تهيئة حساب المدير العام لأول مرة..." });
+        router.push("/onboarding");
+        return;
       }
 
       let message = "تأكد من رقم الهاتف وكلمة المرور.";
-      if (error.code === 'auth/wrong-password') message = "كلمة المرور غير صحيحة.";
-      if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') message = "بيانات الدخول غير صحيحة.";
+      if (error.code === 'auth/wrong-password') message = "كلمة المرور غير صحيحة. هل قمت بتغييرها مسبقاً؟";
+      if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') message = "بيانات الدخول غير صحيحة. يرجى التأكد من كتابة الرقم بشكل صحيح (مثلاً: 07XXXXXXXXX)";
+      if (error.code === 'auth/too-many-requests') message = "محاولات كثيرة خاطئة. تم قفل الحساب مؤقتاً لحمايتك.";
 
       toast({ variant: "destructive", title: "فشل الدخول", description: message });
     } finally {
