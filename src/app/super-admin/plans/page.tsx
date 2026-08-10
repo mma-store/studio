@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo } from "react";
@@ -29,7 +28,8 @@ import {
   DialogHeader, 
   DialogTitle, 
   DialogTrigger,
-  DialogFooter
+  DialogFooter,
+  DialogDescription
 } from "@/components/ui/dialog";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
