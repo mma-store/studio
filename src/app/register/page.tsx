@@ -1,29 +1,24 @@
-
 "use client";
 
 import { useState } from "react";
 import { useAuth, useFirestore } from "@/firebase";
 import { createUserWithEmailAndPassword } from "firebase/auth";
-import { doc, setDoc, getDocs, collection, query, where, deleteDoc } from "firebase/firestore";
+import { doc, setDoc } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { toast } from "@/hooks/use-toast";
-import { User, Phone, Lock, Loader2, Store, ArrowRight } from "lucide-react";
+import { User, Phone, Lock, Loader2, Store, ArrowRight, ScrollText } from "lucide-react";
 import Link from "next/link";
-import Image from "next/image";
-
-// القائمة الموحدة لأرقام المدير العام الماستر
-const MASTER_PHONES = ['7858833838', '7703687932'];
+import { normalizePhoneNumber, getInternalEmail } from "@/lib/auth-utils";
 
 export default function RegisterPage() {
   const auth = useAuth();
   const db = useFirestore();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
-  const LOGO_URL = "https://up6.cc/2026/07/178308238964931.png";
 
   const [formData, setFormData] = useState({
     displayName: "",
@@ -31,72 +26,32 @@ export default function RegisterPage() {
     password: "",
   });
 
-  const cleanPhone = (p: string) => p.replace(/\s/g, '').replace(/^(\+964|0)/, '');
-
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
-      const purePhone = cleanPhone(formData.phoneNumber);
-      const fakeEmail = `${purePhone}@platform.store`;
+      const purePhone = normalizePhoneNumber(formData.phoneNumber);
+      const email = getInternalEmail(purePhone);
 
-      // البحث عن رقم الهاتف في سجلات الموظفين المضافة مسبقاً
-      const usersRef = collection(db, "users");
-      const phoneQuery = query(usersRef, where("phoneNumber", "in", [purePhone, `0${purePhone}`]));
-      const querySnapshot = await getDocs(phoneQuery);
-      
-      let assignedRole = 'retail_customer';
-      let existingData: any = null;
-      let existingDocId: string | null = null;
-      let tenantId = 'MMA001';
-
-      if (!querySnapshot.empty) {
-        existingDocId = querySnapshot.docs[0].id;
-        existingData = querySnapshot.docs[0].data();
-        assignedRole = existingData.role;
-        tenantId = existingData.tenantId || 'MMA001';
-        // لا نحذف الوثيقة، بل سنقوم بتحديثها لاحقاً باستخدام setDoc مع merge
-      }
-
-      // التحقق من أرقام المدير العام الماستر
-      if (MASTER_PHONES.includes(purePhone)) {
-        assignedRole = 'super_admin';
-        tenantId = 'PLATFORM_OWNER';
-      }
-
-      const userCredential = await createUserWithEmailAndPassword(auth, fakeEmail, formData.password);
+      const userCredential = await createUserWithEmailAndPassword(auth, email, formData.password);
       const user = userCredential.user;
 
-      const finalUserData = {
+      await setDoc(doc(db, "users", user.uid), {
         uid: user.uid,
-        tenantId,
-        displayName: formData.displayName || existingData?.displayName || (assignedRole === 'super_admin' ? "المدير العام" : "مستخدم"),
+        tenantId: 'GUEST',
+        displayName: formData.displayName,
         phoneNumber: `0${purePhone}`,
-        email: fakeEmail,
-        role: assignedRole,
-        currentBalance: existingData?.currentBalance || 0,
-        totalPaid: existingData?.totalPaid || 0,
-        createdAt: Date.now(),
-        lastLogin: Date.now()
-      };
-
-      await setDoc(doc(db, "users", user.uid), finalUserData);
-
-      toast({ 
-        title: "تم إنشاء الحساب", 
-        description: assignedRole === 'super_admin' ? "مرحباً بك يا مدير المنصة." : "مرحباً بك في المنصة." 
+        email,
+        role: 'retail_customer',
+        createdAt: Date.now()
       });
 
-      if (assignedRole === 'super_admin') {
-        router.push("/super-admin");
-      } else if (['owner', 'admin'].includes(assignedRole)) {
-        router.push("/admin");
-      } else {
-        router.push("/");
-      }
+      toast({ title: "تم إنشاء الحساب بنجاح" });
+      router.push("/");
       
     } catch (error: any) {
+      console.error("Register Error:", error);
       toast({ 
         variant: "destructive", 
         title: "خطأ في التسجيل", 
@@ -111,13 +66,13 @@ export default function RegisterPage() {
     <div className="min-h-screen flex items-center justify-center bg-[#FDF8F5] p-4 relative overflow-hidden">
       <Card className="w-full max-w-md rounded-[40px] border-none shadow-2xl overflow-hidden bg-white">
         <CardHeader className="space-y-4 pt-12 pb-6 text-center">
-          <div className="mx-auto relative h-28 w-64">
-            <Image src={LOGO_URL} alt="Platform" fill className="object-contain" priority />
+          <div className="mx-auto flex flex-col items-center gap-2">
+             <div className="h-16 w-16 bg-primary rounded-3xl flex items-center justify-center text-white shadow-xl">
+                <ScrollText className="h-10 w-10" />
+             </div>
+             <CardTitle className="text-3xl font-black text-primary tracking-tighter">إنشاء حساب جديد</CardTitle>
           </div>
-          <div className="space-y-1">
-            <CardTitle className="text-3xl font-black text-foreground">إنشاء حساب جديد</CardTitle>
-            <CardDescription className="font-medium text-muted-foreground">انضم إلى مجتمع الأعمال العراقي</CardDescription>
-          </div>
+          <CardDescription className="font-medium text-muted-foreground">انضم إلى مجتمع دوبسار العراقي</CardDescription>
         </CardHeader>
         
         <CardContent className="px-8 space-y-6">
@@ -130,15 +85,9 @@ export default function RegisterPage() {
                     <p className="text-[10px] opacity-80">أريد إنشاء متجر وإدارة مبيعاتي</p>
                   </div>
                </div>
-               <ArrowRight className="h-5 w-5" />
+               <ArrowRight className="h-5 w-5 rotate-180" />
             </div>
           </Link>
-
-          <div className="relative flex items-center py-2">
-            <div className="flex-grow border-t border-muted-foreground/20"></div>
-            <span className="flex-shrink mx-4 text-muted-foreground text-xs font-bold uppercase tracking-widest">أو كزبون</span>
-            <div className="flex-grow border-t border-muted-foreground/20"></div>
-          </div>
 
           <form onSubmit={handleRegister} className="space-y-4">
             <div className="space-y-2">
@@ -162,7 +111,7 @@ export default function RegisterPage() {
                 <Input type="password" placeholder="••••••••" className="h-14 rounded-2xl pr-12 bg-muted/20 border-none" value={formData.password} onChange={(e) => setFormData({...formData, password: e.target.value})} required />
               </div>
             </div>
-            <Button type="submit" className="w-full h-14 rounded-2xl font-black text-lg gap-2 shadow-lg mt-4" disabled={loading}>
+            <Button type="submit" className="w-full h-14 rounded-2xl font-black text-lg gap-2 shadow-lg mt-4 bg-primary" disabled={loading}>
               {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : "إنشاء الحساب"}
             </Button>
           </form>

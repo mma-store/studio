@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from "react";
@@ -13,9 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { toast } from "@/hooks/use-toast";
 import { Loader2, ArrowRight, ArrowLeft, ScrollText } from "lucide-react";
 import Link from "next/link";
-import { cn } from "@/lib/utils";
-import { errorEmitter } from "@/firebase/error-emitter";
-import { FirestorePermissionError } from "@/firebase/errors";
+import { normalizePhoneNumber, getInternalEmail } from "@/lib/auth-utils";
 
 export default function OnboardingPage() {
   const auth = useAuth();
@@ -44,9 +41,6 @@ export default function OnboardingPage() {
       .replace(/\s+/g, "-");
   };
 
-  // دالة موحدة لتنظيف الرقم لضمان التطابق التام
-  const cleanPhone = (p: string) => p.replace(/\s+/g, '').replace(/[-+]/g, '').replace(/^(\+964|00964|0)/, '');
-
   const handleOnboarding = async (e: React.FormEvent) => {
     e.preventDefault();
     if (step === 1) {
@@ -58,99 +52,79 @@ export default function OnboardingPage() {
 
     try {
       const slug = generateSlug(formData.businessName);
-      const purePhone = cleanPhone(formData.phoneNumber);
-      const email = `${purePhone}@platform.store`;
+      const purePhone = normalizePhoneNumber(formData.phoneNumber);
+      const email = getInternalEmail(purePhone);
       
-      // 1. التحقق من توافر الرابط (Slug)
+      // 1. التحقق من توافر الرابط
       const slugQuery = query(collection(db, "tenants"), where("slug", "==", slug));
-      const slugSnap = await getDocs(slugQuery).catch(() => null);
+      const slugSnap = await getDocs(slugQuery);
       
-      if (slugSnap && !slugSnap.empty) {
-        toast({ variant: "destructive", title: "اسم المتجر مستخدم", description: "يرجى اختيار اسم متجر آخر أو إضافة أرقام لتمييزه." });
+      if (!slugSnap.empty) {
+        toast({ variant: "destructive", title: "اسم المتجر مستخدم", description: "يرجى اختيار اسم متجر آخر." });
         setLoading(false);
         return;
       }
 
-      // 2. محاولة الحصول على الخطة التجريبية الافتراضية
-      let trialDays = 14;
-      let trialPlanId = "trial_standard";
+      // 2. إدارة حساب المستخدم (إنشاء أو استخدام الحالي)
+      let targetUser = auth.currentUser;
       
-      try {
-        const plansQuery = query(collection(db, "plans"), where("active", "==", true), orderBy("displayOrder", "asc"), limit(1));
-        const plansSnap = await getDocs(plansQuery);
-        if (!plansSnap.empty) {
-          const trialPlan = plansSnap.docs[0].data();
-          trialDays = trialPlan.trialDays || 14;
-          trialPlanId = plansSnap.docs[0].id;
+      if (!targetUser) {
+        try {
+          const userCredential = await createUserWithEmailAndPassword(auth, email, formData.password);
+          targetUser = userCredential.user;
+        } catch (authError: any) {
+          if (authError.code === 'auth/email-already-in-use') {
+            toast({ variant: "destructive", title: "الحساب موجود مسبقاً", description: "رقم الهاتف هذا مسجل لدينا، يرجى تسجيل الدخول أولاً ثم إكمال التأسيس." });
+            setLoading(false);
+            return;
+          }
+          throw authError;
         }
-      } catch (err) {
-        console.warn("Using default trial settings.");
       }
 
-      // 3. إنشاء حساب Firebase Auth
-      const userCredential = await createUserWithEmailAndPassword(auth, email, formData.password);
-      const user = userCredential.user;
-
-      // 4. كتابة البيانات باستخدام Batch لضمان التكامل
+      // 3. كتابة البيانات (Batch)
       const batch = writeBatch(db);
       const tenantId = `T-${Date.now().toString().slice(-6)}`;
       const now = Date.now();
       
       const tenantRef = doc(db, "tenants", tenantId);
-      const tenantData = {
+      batch.set(tenantRef, {
         tenantId,
         businessName: formData.businessName,
         slug,
         ownerName: formData.ownerName,
+        ownerUid: targetUser.uid,
         phone: `0${purePhone}`,
         address: formData.address,
         businessType: formData.businessType,
         status: "trial",
-        subscriptionPlanId: trialPlanId,
         subscriptionPlan: "trial",
         trialStartDate: now,
-        trialEndDate: now + trialDays * 24 * 60 * 60 * 1000,
+        trialEndDate: now + (14 * 24 * 60 * 60 * 1000),
         createdAt: now,
-        settings: {
-          defaultPrintSize: "80mm",
-          notificationsEnabled: true
-        }
-      };
+        settings: { defaultPrintSize: "80mm", notificationsEnabled: true }
+      });
 
-      const userRef = doc(db, "users", user.uid);
-      const userData = {
-        uid: user.uid,
+      const userRef = doc(db, "users", targetUser.uid);
+      batch.set(userRef, {
+        uid: targetUser.uid,
         tenantId,
         displayName: formData.ownerName,
         phoneNumber: `0${purePhone}`,
         email,
         role: "owner",
-        createdAt: now
-      };
-
-      batch.set(tenantRef, tenantData);
-      batch.set(userRef, userData);
-
-      await batch.commit().then(() => {
-        toast({ title: "مبروك! تم تأسيس متجرك", description: "جاري تجهيز لوحة التحكم الخاصة بك." });
-        router.push("/admin");
-      }).catch(async (serverError) => {
-        const permissionError = new FirestorePermissionError({
-          path: `tenants/${tenantId}`,
-          operation: 'create',
-          requestResourceData: tenantData
-        });
-        errorEmitter.emit('permission-error', permissionError);
-        throw serverError;
+        accountType: "merchant",
+        createdAt: now,
+        status: "active"
       });
+
+      await batch.commit();
+      toast({ title: "مبروك! تم تأسيس متجرك", description: "جاري توجيهك إلى لوحة التحكم." });
+      router.push("/admin");
       
     } catch (error: any) {
-      console.error("Onboarding Error:", error.code);
-      let message = "فشل تأسيس المتجر. يرجى التأكد من الاتصال بالإنترنت.";
-      if (error.code === 'auth/email-already-in-use') message = "رقم الهاتف هذا مسجل لمتجر آخر بالفعل. جرب تسجيل الدخول بدلاً من ذلك.";
-      if (error.code === 'auth/weak-password') message = "كلمة المرور ضعيفة جداً. يرجى استخدام 6 رموز على الأقل.";
-      
-      toast({ variant: "destructive", title: "فشل التأسيس", description: message });
+      console.error("Onboarding Error:", error);
+      toast({ variant: "destructive", title: "فشل التأسيس", description: error.message });
     } finally {
       setLoading(false);
     }
@@ -176,11 +150,11 @@ export default function OnboardingPage() {
             {step === 1 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-in slide-in-from-right-4 duration-500">
                 <div className="space-y-2">
-                  <Label className="font-black text-xs mr-2 opacity-60 uppercase tracking-widest">اسم المتجر / النشاط</Label>
+                  <Label className="font-black text-xs mr-2 opacity-60 uppercase tracking-widest">اسم المتجر</Label>
                   <Input name="businessName" value={formData.businessName} onChange={handleChange} required placeholder="مثال: مجمع بابل" className="h-14 rounded-2xl bg-slate-50 border-none font-black px-6" />
                 </div>
                 <div className="space-y-2">
-                   <Label className="font-black text-xs mr-2 opacity-60 uppercase tracking-widest">اسم المدير المسؤول</Label>
+                   <Label className="font-black text-xs mr-2 opacity-60 uppercase tracking-widest">المدير المسؤول</Label>
                    <Input name="ownerName" value={formData.ownerName} onChange={handleChange} required placeholder="الاسم الكامل" className="h-14 rounded-2xl bg-slate-50 border-none font-black px-6" />
                 </div>
                 <div className="space-y-2">
@@ -203,7 +177,7 @@ export default function OnboardingPage() {
                    <Input name="phoneNumber" value={formData.phoneNumber} onChange={handleChange} required placeholder="07XXXXXXXXX" className="h-14 rounded-2xl bg-slate-50 border-none text-left font-black px-6" dir="ltr" />
                 </div>
                 <div className="space-y-2">
-                  <Label className="font-black text-xs mr-2 opacity-60 uppercase tracking-widest">كلمة السر (6 أرقام على الأقل)</Label>
+                  <Label className="font-black text-xs mr-2 opacity-60 uppercase tracking-widest">كلمة السر</Label>
                   <Input type="password" name="password" value={formData.password} onChange={handleChange} required placeholder="••••••••" className="h-14 rounded-2xl bg-slate-50 border-none text-left px-6" dir="ltr" />
                 </div>
               </div>
@@ -217,7 +191,7 @@ export default function OnboardingPage() {
                 className="flex-1 h-16 rounded-[24px] font-black text-xl gap-3 shadow-2xl bg-primary"
               >
                 {loading ? <Loader2 className="h-6 w-6 animate-spin" /> : (
-                  <>{step === 1 ? "المتابعة للخطوة الأخيرة" : "تأسيس المتجر الآن"}<ArrowRight className={cn("h-6 w-6", step === 2 && "hidden")} /></>
+                  <>{step === 1 ? "المتابعة للخطوة الأخيرة" : "تأسيس المتجر الآن"}<ArrowRight className={step === 2 ? "hidden" : "h-6 w-6 rotate-180"} /></>
                 )}
               </Button>
             </div>
