@@ -3,7 +3,9 @@
 import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
 import { 
   getFirestore, 
-  Firestore
+  Firestore,
+  initializeFirestore,
+  memoryLocalCache
 } from 'firebase/firestore';
 import { getAuth, Auth } from 'firebase/auth';
 import { firebaseConfig } from './config';
@@ -15,14 +17,23 @@ let auth: Auth;
 export function initializeFirebase() {
   if (!getApps().length) {
     app = initializeApp(firebaseConfig);
-    // العودة إلى استخدام getFirestore القياسي لضمان أقصى درجات الاستقرار.
-    // الأخطاء من نوع (Assertion Failed) غالباً ما تنتج عن تعارض في إعدادات localCache
-    // داخل المتصفحات في بيئات التطوير السحابية.
-    firestore = getFirestore(app);
+    // استخدام initializeFirestore بدلاً من getFirestore للتحكم في الكاش
+    // الذاكرة المؤقتة (Memory Cache) تمنع أخطاء Assertion Failed المرتبطة بـ IndexedDB في البيئات السحابية
+    firestore = initializeFirestore(app, {
+      localCache: memoryLocalCache(),
+    });
     auth = getAuth(app);
   } else {
     app = getApps()[0];
-    firestore = getFirestore(app);
+    try {
+      // محاولة الحصول على النسخة الحالية
+      firestore = getFirestore(app);
+    } catch (e) {
+      // في حال وجود تعارض في الإعدادات، يتم إعادة التهيئة بالكاش في الذاكرة
+      firestore = initializeFirestore(app, {
+        localCache: memoryLocalCache(),
+      });
+    }
     auth = getAuth(app);
   }
   return { app, firestore, auth };

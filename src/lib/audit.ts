@@ -1,9 +1,9 @@
-
-import { collection, addDoc } from "firebase/firestore";
-import { db } from "./firebase/config";
+import { collection, addDoc, getFirestore } from "firebase/firestore";
+import { initializeFirebase } from "@/firebase";
 
 /**
  * Utility to log administrative actions to the system audit log.
+ * Updated to use centralized firebase initialization.
  */
 export async function logAction(data: {
   userId: string;
@@ -11,9 +11,11 @@ export async function logAction(data: {
   action: string;
   target: string;
   details: string;
+  tenantId?: string;
 }) {
   try {
-    await addDoc(collection(db, 'auditLogs'), {
+    const { firestore } = initializeFirebase();
+    await addDoc(collection(firestore, 'auditLogs'), {
       ...data,
       timestamp: Date.now(),
     });
