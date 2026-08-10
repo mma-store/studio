@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from "react";
@@ -30,28 +31,52 @@ export default function LoginPage() {
     const email = getInternalEmail(purePhone);
 
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      let userCredential;
+      try {
+        // المحاولة الأولى: التنسيق القياسي الحديث (بدون صفر رائد)
+        userCredential = await signInWithEmailAndPassword(auth, email, password);
+      } catch (firstError: any) {
+        // المحاولة الثانية: إذا فشل بسبب عدم وجود الحساب، نجرب التنسيق القديم (مع صفر رائد)
+        if (firstError.code === 'auth/invalid-credential' || firstError.code === 'auth/user-not-found') {
+          const legacyEmail = getInternalEmail(`0${purePhone}`);
+          try {
+            userCredential = await signInWithEmailAndPassword(auth, legacyEmail, password);
+          } catch (secondError: any) {
+            // إذا فشلت المحاولتين، نرمي الخطأ الأصلي لإظهار رسالة فشل الدخول
+            throw firstError;
+          }
+        } else {
+          throw firstError;
+        }
+      }
+      
       const user = userCredential.user;
 
-      // محاولة استباقية لمعرفة الوجهة
+      // محاولة استباقية لمعرفة الوجهة وتحديث بيانات المستخدم
       const userRef = doc(db, "users", user.uid);
-      const userSnap = await getDoc(userRef);
-      
-      if (userSnap.exists()) {
-        const userData = userSnap.data();
-        await updateDoc(userRef, { lastLogin: Date.now() }).catch(() => {});
-        
-        if (userData.role === 'super_admin') {
-          router.push("/super-admin");
-        } else if (['owner', 'admin', 'sales_employee', 'workshop_technician', 'warehouse_employee'].includes(userData.role)) {
-          router.push("/admin");
+      getDoc(userRef).then(async (userSnap) => {
+        if (userSnap.exists()) {
+          const userData = userSnap.data();
+          await updateDoc(userRef, { 
+            lastLogin: Date.now(),
+            // ضمان توحيد رقم الهاتف في السجل
+            phoneNumber: userData.phoneNumber?.startsWith('0') ? userData.phoneNumber : `0${purePhone}`
+          }).catch(() => {});
+          
+          const isMaster = purePhone === '7858833838' || purePhone === '7703687932';
+          
+          if (userData.role === 'super_admin' || isMaster) {
+            router.push("/super-admin");
+          } else if (['owner', 'admin', 'sales_employee', 'workshop_technician', 'warehouse_employee'].includes(userData.role)) {
+            router.push("/admin");
+          } else {
+            router.push("/");
+          }
         } else {
-          router.push("/");
+          // إذا نجح Auth وفشل Firestore، نرسله لـ /admin ليقوم الـ Layout بالمعالجة
+          router.push("/admin");
         }
-      } else {
-        // إذا نجح Auth وفشل Firestore، نرسله لـ /admin ليقوم الـ Layout بالمعالجة
-        router.push("/admin");
-      }
+      });
       
       toast({ title: "تم تسجيل الدخول بنجاح" });
     } catch (error: any) {
@@ -114,7 +139,7 @@ export default function LoginPage() {
         </CardContent>
         
         <CardFooter className="pb-12 pt-6 flex flex-col gap-4 text-center">
-          <p className="text-sm text-slate-500 font-bold">ليس لديك حساب؟ <Link href="/onboarding" className="text-secondary font-black hover:underline">ابدأ مع دوبسار الآن</Link></p>
+          <p className="text-sm text-slate-500 font-bold">ليس لديك حساب؟ <Link href="/register" className="text-secondary font-black hover:underline">ابدأ مع دوبسار الآن</Link></p>
         </CardFooter>
       </Card>
     </div>
