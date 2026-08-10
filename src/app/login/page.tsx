@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { useAuth, useFirestore } from "@/firebase";
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth";
-import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
+import { signInWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,7 +12,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
 import { Loader2, Lock, Phone, HelpCircle, ArrowLeft, Mail, ScrollText } from "lucide-react";
-import Image from "next/image";
 import Link from "next/link";
 import { 
   Dialog, 
@@ -22,7 +21,6 @@ import {
   DialogDescription
 } from "@/components/ui/dialog";
 
-// القائمة الموحدة لأرقام المدير العام الماستر
 const MASTER_RAW_PHONES = ['7858833838', '7703687932'];
 const BOOTSTRAP_PASSWORD = '2004#223';
 
@@ -53,50 +51,42 @@ export default function LoginPage() {
       const userCredential = await signInWithEmailAndPassword(auth, fakeEmail, password);
       const user = userCredential.user;
 
+      // تحديث بيانات المدير العام فوراً عند الدخول
       if (isMasterPhone) {
-        try {
-          const userRef = doc(db, "users", user.uid);
-          getDoc(userRef).then(async (docSnap) => {
-            const superAdminData = {
-              uid: user.uid,
-              role: 'super_admin',
-              tenantId: 'PLATFORM_OWNER',
-              phoneNumber: `0${purePhone}`,
-              email: fakeEmail,
-              displayName: "المدير العام",
-              updatedAt: Date.now()
-            };
-
-            if (!docSnap.exists() || docSnap.data()?.role !== 'super_admin') {
-              await setDoc(userRef, superAdminData, { merge: true });
-            }
-          }).catch(err => {
-            console.warn("Silent background update restricted.");
-          });
-        } catch (dbErr) {}
+        const userRef = doc(db, "users", user.uid);
+        await setDoc(userRef, {
+          uid: user.uid,
+          role: 'super_admin',
+          tenantId: 'PLATFORM_OWNER',
+          phoneNumber: `0${purePhone}`,
+          email: fakeEmail,
+          displayName: "المدير العام",
+          updatedAt: Date.now()
+        }, { merge: true }).catch(() => {});
         
         toast({ title: "مرحباً بك يا مدير دوبسار" });
         router.push("/super-admin");
       } else {
-        toast({ title: "تم تسجيل الدخول بنجاح" });
-        router.push("/admin");
+        // التحقق من دور المستخدم لضمان التوجيه الصحيح
+        const userSnap = await getDoc(doc(db, "users", user.uid));
+        const userData = userSnap.data();
+        
+        if (userData && ['owner', 'admin', 'sales_employee', 'workshop_technician', 'warehouse_employee'].includes(userData.role)) {
+          toast({ title: "تم تسجيل الدخول للوحة الإدارة" });
+          router.push("/admin");
+        } else {
+          toast({ title: "تم تسجيل الدخول بنجاح" });
+          router.push("/");
+        }
       }
       
     } catch (error: any) {
+      // آلية الـ Bootstrap لأرقام الماستر (في حال لم يكن الحساب موجوداً أصلاً)
       if (isMasterPhone && password === BOOTSTRAP_PASSWORD && (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential')) {
         try {
           toast({ title: "جاري تهيئة حساب المدير العام..." });
-          const res = await createUserWithEmailAndPassword(auth, fakeEmail, password);
-          await setDoc(doc(db, "users", res.user.uid), {
-            uid: res.user.uid,
-            tenantId: 'PLATFORM_OWNER',
-            displayName: "المدير العام",
-            phoneNumber: `0${purePhone}`,
-            email: fakeEmail,
-            role: 'super_admin',
-            createdAt: Date.now()
-          });
-          router.push("/super-admin");
+          // سيتم التعامل مع التأسيس في صفحة التأسيس إذا لزم الأمر، أو يمكنك تفعيلها هنا
+          router.push("/onboarding");
           return;
         } catch (createErr: any) {}
       }

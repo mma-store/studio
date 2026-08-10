@@ -1,4 +1,3 @@
-
 'use client';
 
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
@@ -26,33 +25,35 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const subscription = useSubscription(tenantId);
 
   useEffect(() => {
+    // الانتظار حتى يكتمل التحميل بالكامل قبل اتخاذ قرار التوجيه
     if (!loading) {
       if (!user) {
         router.replace('/login');
+        return;
+      }
+
+      const purePhone = profile?.phoneNumber?.replace(/\s/g, '').replace(/^(\+964|0)/, '');
+      const isMasterAdmin = purePhone && MASTER_PHONES.includes(purePhone);
+      
+      // الأدوار التي يسمح لها بدخول لوحة الإدارة
+      const allowedRoles = ['owner', 'admin', 'sales_employee', 'workshop_technician', 'warehouse_employee'];
+      const isMerchantStaff = profile && allowedRoles.includes(profile.role);
+      
+      if (isSuperAdmin || isMasterAdmin || (isMerchantStaff && tenantId)) {
+        setIsAuthorized(true);
       } else {
-        const purePhone = profile?.phoneNumber?.replace(/\s/g, '').replace(/^(\+964|0)/, '');
-        const isMasterAdmin = purePhone && MASTER_PHONES.includes(purePhone);
-        
-        // السماح بالدخول إذا كان العضو يمتلك رتبة إدارية في متجر أو هو المدير العام
-        const isMerchant = profile && ['owner', 'admin', 'sales_employee', 'workshop_technician', 'warehouse_employee'].includes(profile.role);
-        
-        if (isSuperAdmin || isMasterAdmin || (isMerchant && tenantId)) {
-          setIsAuthorized(true);
-        } else {
-          // إذا كان المستخدم زبوناً عادياً أو بلا ملف شخصي يحاول دخول لوحة الإدارة
-          if (profile && ['retail_customer', 'wholesale_customer'].includes(profile.role)) {
-            router.replace('/');
-          } else if (profile === null && !isMasterAdmin) {
-            // حالة خاصة: مستخدم جديد دخل ولم يكمل التأسيس
-            router.replace('/onboarding');
-          }
+        // إذا لم يكن لديه دور إداري بعد ثانية من الدخول، نوجهه للمكان المناسب
+        if (profile === null && !isMasterAdmin) {
+           router.replace('/onboarding');
+        } else if (profile && ['retail_customer', 'wholesale_customer'].includes(profile.role)) {
+           router.replace('/');
         }
       }
     }
   }, [user, profile, loading, router, tenantId, isSuperAdmin]);
 
   // شاشة التحميل الأولية
-  if (loading || (tenantId && subscription.loading)) {
+  if (loading || (tenantId && subscription.loading && !isSuperAdmin)) {
     return (
       <div className="flex min-h-screen w-full flex-col items-center justify-center bg-[#FDF8F5] p-8 gap-8">
          <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-primary text-white shadow-2xl animate-bounce">
@@ -80,7 +81,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </div>
           <div className="space-y-2">
             <h1 className="text-2xl font-black">وصول غير مصرح به</h1>
-            <p className="text-muted-foreground font-medium">حسابك غير مرتبـط بمتجر نشط حالياً أو لا يمتلك صلاحيات إدارة.</p>
+            <p className="text-muted-foreground font-medium">حسابك غير مرتبط بمتجر نشط أو لا يمتلك صلاحيات إدارة.</p>
           </div>
           <Button onClick={() => signOut(auth)} className="w-full h-14 rounded-2xl font-black gap-2 shadow-lg">
              <LogOut className="h-5 w-5" /> تسجيل الخروج والعودة

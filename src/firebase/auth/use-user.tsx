@@ -15,11 +15,14 @@ export function useUser() {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [profileLoading, setProfileLoading] = useState(false);
 
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
+      setUser(firebaseUser);
+      
       if (firebaseUser) {
-        setUser(firebaseUser);
+        setProfileLoading(true);
         const profileRef = doc(db, 'users', firebaseUser.uid);
         
         const unsubscribeProfile = onSnapshot(profileRef, (docSnap) => {
@@ -28,10 +31,11 @@ export function useUser() {
           } else {
             setProfile(null);
           }
+          setProfileLoading(false);
           setLoading(false);
         }, (err) => {
           console.warn("Profile fetch restricted:", err.code);
-          // في حال فشل Firestore، لا نزال نحتفظ ببيانات Auth الأساسية
+          setProfileLoading(false);
           setLoading(false);
         });
         
@@ -39,6 +43,7 @@ export function useUser() {
       } else {
         setUser(null);
         setProfile(null);
+        setProfileLoading(false);
         setLoading(false);
       }
     });
@@ -47,7 +52,6 @@ export function useUser() {
   }, [auth, db]);
 
   // منطق التحقق الصارم من هوية المدير العام (Super Admin)
-  // يعتمد على 3 طبقات: الرتبة في Firestore، رقم الهاتف، أو بادئة البريد الإلكتروني
   const emailPrefix = user?.email?.split('@')[0] || '';
   const purePhoneFromProfile = profile?.phoneNumber?.replace(/\s/g, '').replace(/^(\+964|0)/, '') || '';
   
@@ -62,7 +66,7 @@ export function useUser() {
   return { 
     user, 
     profile, 
-    loading, 
+    loading: loading || profileLoading, // تأكد من انتظار تحميل الملف الشخصي أيضاً
     isSuperAdmin,
     tenantId: resolvedTenantId
   };
