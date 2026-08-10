@@ -28,55 +28,64 @@ export default function LoginPage() {
     setLoading(true);
     
     const purePhone = normalizePhoneNumber(phoneNumber);
-    const email = getInternalEmail(purePhone);
+    
+    // قائمة بكافة احتمالات البريد الإلكتروني الداخلي لضمان التوافق مع كافة نسخ النظام
+    const emailAttempts = [
+      getInternalEmail(purePhone),           // 7xxxxxxxx@dubsar.platform (القياسي الحالي)
+      getInternalEmail(`0${purePhone}`),     // 07xxxxxxxx@dubsar.platform (القياسي البديل)
+      `${purePhone}@mma.store`,              // 7xxxxxxxx@mma.store (القديم)
+      `0${purePhone}@mma.store`              // 07xxxxxxxx@mma.store (القديم جداً)
+    ];
 
     try {
-      let userCredential;
-      try {
-        // المحاولة الأولى: التنسيق القياسي الحديث (بدون صفر رائد)
-        userCredential = await signInWithEmailAndPassword(auth, email, password);
-      } catch (firstError: any) {
-        // المحاولة الثانية: إذا فشل بسبب عدم وجود الحساب، نجرب التنسيق القديم (مع صفر رائد)
-        if (firstError.code === 'auth/invalid-credential' || firstError.code === 'auth/user-not-found') {
-          const legacyEmail = getInternalEmail(`0${purePhone}`);
-          try {
-            userCredential = await signInWithEmailAndPassword(auth, legacyEmail, password);
-          } catch (secondError: any) {
-            // إذا فشلت المحاولتين، نرمي الخطأ الأصلي لإظهار رسالة فشل الدخول
-            throw firstError;
+      let userCredential = null;
+      let lastError = null;
+
+      // محاولة تسجيل الدخول بكافة التنسيقات الممكنة
+      for (const attemptEmail of emailAttempts) {
+        try {
+          userCredential = await signInWithEmailAndPassword(auth, attemptEmail, password);
+          if (userCredential) break; // نجاح الدخول
+        } catch (err: any) {
+          lastError = err;
+          // نمر للمحاولة التالية فقط إذا كان الخطأ متعلقاً ببيانات الاعتماد
+          if (err.code !== 'auth/invalid-credential' && err.code !== 'auth/user-not-found') {
+            break; 
           }
-        } else {
-          throw firstError;
         }
+      }
+
+      if (!userCredential) {
+        throw lastError || new Error("Auth failed");
       }
       
       const user = userCredential.user;
 
       // محاولة استباقية لمعرفة الوجهة وتحديث بيانات المستخدم
       const userRef = doc(db, "users", user.uid);
-      getDoc(userRef).then(async (userSnap) => {
-        if (userSnap.exists()) {
-          const userData = userSnap.data();
-          await updateDoc(userRef, { 
-            lastLogin: Date.now(),
-            // ضمان توحيد رقم الهاتف في السجل
-            phoneNumber: userData.phoneNumber?.startsWith('0') ? userData.phoneNumber : `0${purePhone}`
-          }).catch(() => {});
-          
-          const isMaster = purePhone === '7858833838' || purePhone === '7703687932';
-          
-          if (userData.role === 'super_admin' || isMaster) {
-            router.push("/super-admin");
-          } else if (['owner', 'admin', 'sales_employee', 'workshop_technician', 'warehouse_employee'].includes(userData.role)) {
-            router.push("/admin");
-          } else {
-            router.push("/");
-          }
-        } else {
-          // إذا نجح Auth وفشل Firestore، نرسله لـ /admin ليقوم الـ Layout بالمعالجة
+      const userSnap = await getDoc(userRef);
+      
+      if (userSnap.exists()) {
+        const userData = userSnap.data();
+        // تحديث سجل الدخول في الخلفية
+        updateDoc(userRef, { 
+          lastLogin: Date.now(),
+          phoneNumber: userData.phoneNumber?.startsWith('0') ? userData.phoneNumber : `0${purePhone}`
+        }).catch(() => {});
+        
+        const isMaster = purePhone === '7858833838' || purePhone === '7703687932';
+        
+        if (userData.role === 'super_admin' || isMaster) {
+          router.push("/super-admin");
+        } else if (['owner', 'admin', 'sales_employee', 'workshop_technician', 'warehouse_employee'].includes(userData.role)) {
           router.push("/admin");
+        } else {
+          router.push("/");
         }
-      });
+      } else {
+        // إذا نجح Auth وفشل Firestore، نرسله لـ /admin ليقوم الـ Layout بالمعالجة
+        router.push("/admin");
+      }
       
       toast({ title: "تم تسجيل الدخول بنجاح" });
     } catch (error: any) {
