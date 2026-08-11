@@ -31,7 +31,6 @@ export default function OnboardingPage() {
     businessType: "retail",
   });
 
-  // إذا كان المستخدم يمتلك بروفايل بالفعل، نوجهه للوحة التحكم فوراً
   useEffect(() => {
     if (!userLoading && profile && profile.tenantId) {
       router.replace('/admin');
@@ -84,27 +83,35 @@ export default function OnboardingPage() {
 
       if (!targetUser) throw new Error("فشل تحديد الهوية");
 
-      // 2. التحقق من الرابط (Slug) - معالجة خطأ الأذونات بذكاء
+      // 2. التحقق من الرابط (Slug) - معالجة صامتة للأذونات
       const slugRef = doc(db, "slugs", slug);
       let isSlugAvailable = true;
 
       try {
         const slugSnap = await getDoc(slugRef);
-        if (slugSnap.exists() && slugSnap.data().ownerUid !== targetUser.uid) {
-          isSlugAvailable = false;
+        if (slugSnap.exists()) {
+          // إذا كان الرابط موجوداً ولكن لمالك آخر، فهو محجوز
+          if (slugSnap.data().ownerUid !== targetUser.uid) {
+            isSlugAvailable = false;
+          }
         }
       } catch (err: any) {
-        // إذا كان الخطأ "permission-denied" فهذا يعني أن الرابط محجوز لشخص آخر (أو محاولة سابقة)
-        // في نظام SaaS، الرفض هو تأكيد غير مباشر بأن الوثيقة موجودة وليست لك.
+        // في نظام SaaS، رفض الأذونات عند القراءة يعني غالباً أن الوثيقة موجودة ولكن ليست لك.
+        // نعتبر هذا الرابط محجوزاً دون إظهار خطأ تقني في الواجهة.
         if (err.code === 'permission-denied') {
           isSlugAvailable = false;
         } else {
+          // الأخطاء التقنية الأخرى (مثل الشبكة) يتم تمريرها
           throw err;
         }
       }
 
       if (!isSlugAvailable) {
-        toast({ variant: "destructive", title: "الرابط محجوز", description: "اسم هذا المتجر مستخدم بالفعل، يرجى اختيار اسم آخر." });
+        toast({ 
+          variant: "destructive", 
+          title: "الاسم محجوز", 
+          description: "اسم هذا المتجر مستخدم بالفعل من قبل تاجر آخر، يرجى اختيار اسم مختلف." 
+        });
         setLoading(false);
         return;
       }
@@ -153,7 +160,7 @@ export default function OnboardingPage() {
       router.push("/admin");
       
     } catch (error: any) {
-      toast({ variant: "destructive", title: "خطأ في التأسيس", description: error.message });
+      toast({ variant: "destructive", title: "خطأ في التأسيس", description: error.message || "حدث خطأ غير متوقع." });
     } finally {
       setLoading(false);
     }

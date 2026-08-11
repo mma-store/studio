@@ -6,8 +6,6 @@ import { doc, onSnapshot } from 'firebase/firestore';
 import { useAuth, useFirestore } from '../provider';
 import { UserProfile } from '@/lib/types/roles';
 import { normalizePhoneNumber } from '@/lib/auth-utils';
-import { errorEmitter } from '../error-emitter';
-import { FirestorePermissionError } from '../errors';
 
 const MASTER_RAW_PHONES = ['7858833838', '7703687932'];
 
@@ -25,6 +23,7 @@ export function useUser() {
       if (firebaseUser) {
         const profileRef = doc(db, 'users', firebaseUser.uid);
         
+        // استخدام onSnapshot لضمان تحديث الرتبة والـ tenantId فوراً عند حدوث أي تغيير سحابي
         const unsubscribeProfile = onSnapshot(profileRef, (docSnap) => {
           if (docSnap.exists()) {
             setProfile(docSnap.data() as UserProfile);
@@ -33,7 +32,7 @@ export function useUser() {
           }
           setLoading(false);
         }, (err) => {
-          // الصمت عن الخطأ هنا لتجنب حلقة الانهيار في الواجهة
+          console.warn("Profile fetch failed:", err.message);
           setProfile(null);
           setLoading(false);
         });
@@ -57,7 +56,7 @@ export function useUser() {
     MASTER_RAW_PHONES.includes(emailPrefix) || 
     MASTER_RAW_PHONES.includes(purePhone);
 
-  // الأولوية لـ tenantId المتجر الحقيقي إذا وجد، وإلا نستخدم معرف المنصة للسوبر أدمن
+  // الأولوية لـ tenantId المتجر الحقيقي إذا وجد في البروفايل، لضمان دخول التاجر لمتجره الخاص
   const resolvedTenantId = profile?.tenantId || (isSuperAdmin ? 'PLATFORM_OWNER' : null);
 
   return { 

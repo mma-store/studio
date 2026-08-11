@@ -6,50 +6,45 @@ import { AdminHeader } from "@/components/admin/header";
 import { useUser } from "@/firebase";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { signOut } from "firebase/auth";
-import { useAuth } from "@/firebase";
-import { ShieldAlert, LogOut, ScrollText, Loader2 } from "lucide-react";
-import { useSubscription } from "@/hooks/use-subscription";
+import { ScrollText, Loader2 } from "lucide-react";
 import { ReliabilityProvider } from "@/components/reliability/reliability-provider";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const { user, profile, loading, tenantId, isSuperAdmin } = useUser();
-  const auth = useAuth();
   const router = useRouter();
   const [isAuthorized, setIsAuthorized] = useState(false);
 
   useEffect(() => {
+    // ننتظر حتى اكتمال حالة التحميل تماماً من useUser
     if (!loading) {
       if (!user) {
         router.replace('/login');
         return;
       }
 
-      // التحقق من الصلاحيات الإدارية بناءً على الملف الشخصي
+      // الصلاحيات الإدارية المسموح بها في لوحة التحكم
       const allowedRoles = ['owner', 'admin', 'sales_employee', 'workshop_technician', 'warehouse_employee'];
-      const hasAdminRole = profile && allowedRoles.includes(profile.role);
       
-      // السماح بالدخول إذا كان سوبر أدمن أو يملك رتبة إدارية ومعرف متجر
-      if (isSuperAdmin || (hasAdminRole && tenantId)) {
+      // التاجر يجب أن يمتلك ملفاً شخصياً ودوراً إدارياً ومعرف متجر
+      const hasAdminProfile = profile && allowedRoles.includes(profile.role) && profile.tenantId;
+      
+      if (isSuperAdmin || hasAdminProfile) {
         setIsAuthorized(true);
       } else {
-        // تأخير بسيط للمزامنة قبل الطرد
-        const timer = setTimeout(() => {
-          if (!profile) {
-            router.replace('/onboarding');
-          } else {
-            router.replace('/');
-          }
-        }, 2000);
-        return () => clearTimeout(timer);
+        // إذا كان المستخدم موثقاً ولكن بدون بروفايل أو tenantId، فهو بحاجة للتأسيس
+        if (!profile || !profile.tenantId) {
+          router.replace('/onboarding');
+        } else {
+          // إذا كان زبوناً عادياً، نطرده للواجهة الرئيسية
+          router.replace('/');
+        }
       }
     }
   }, [user, profile, loading, router, tenantId, isSuperAdmin]);
 
-  // حالة التحميل الفاخرة
-  if (loading || (user && !profile && !isAuthorized)) {
+  // شاشة انتظار جمالية ومؤمنة
+  if (loading || (user && !isAuthorized)) {
     return (
       <div className="flex min-h-screen w-full flex-col items-center justify-center bg-[#FDF8F5] p-8 gap-8">
          <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-primary text-white shadow-2xl animate-bounce">
@@ -66,7 +61,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     );
   }
 
-  // منع العرض إذا لم يكن مصرحاً له
+  // منع عرض المحتوى إذا لم يتم التأكد من الصلاحيات بعد
   if (!isAuthorized) return null;
 
   return (
