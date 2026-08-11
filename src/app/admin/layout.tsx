@@ -6,19 +6,17 @@ import { AdminHeader } from "@/components/admin/header";
 import { useUser } from "@/firebase";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Button } from "@/components/ui/button";
 import { ScrollText, Loader2 } from "lucide-react";
 import { ReliabilityProvider } from "@/components/reliability/reliability-provider";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  const { user, profile, loading, tenantId, isSuperAdmin } = useUser();
+  const { user, profile, loading, isAuthenticated } = useUser();
   const router = useRouter();
   const [isAuthorized, setIsAuthorized] = useState(false);
 
   useEffect(() => {
-    // ننتظر حتى اكتمال حالة التحميل تماماً من useUser
     if (!loading) {
-      if (!user) {
+      if (!isAuthenticated) {
         router.replace('/login');
         return;
       }
@@ -29,22 +27,21 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       // التاجر يجب أن يمتلك ملفاً شخصياً ودوراً إدارياً ومعرف متجر
       const hasAdminProfile = profile && allowedRoles.includes(profile.role) && profile.tenantId;
       
-      if (isSuperAdmin || hasAdminProfile) {
+      if (hasAdminProfile) {
         setIsAuthorized(true);
       } else {
-        // إذا كان المستخدم موثقاً ولكن بدون بروفايل أو tenantId، فهو بحاجة للتأسيس
+        // إذا كان مستخدماً موثقاً ولكن بدون بروفايل كامل، نوجهه للتأسيس أو الواجهة
         if (!profile || !profile.tenantId) {
           router.replace('/onboarding');
         } else {
-          // إذا كان زبوناً عادياً، نطرده للواجهة الرئيسية
           router.replace('/');
         }
       }
     }
-  }, [user, profile, loading, router, tenantId, isSuperAdmin]);
+  }, [isAuthenticated, profile, loading, router]);
 
   // شاشة انتظار جمالية ومؤمنة
-  if (loading || (user && !isAuthorized)) {
+  if (loading || (isAuthenticated && !isAuthorized)) {
     return (
       <div className="flex min-h-screen w-full flex-col items-center justify-center bg-[#FDF8F5] p-8 gap-8">
          <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-primary text-white shadow-2xl animate-bounce">
@@ -61,7 +58,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     );
   }
 
-  // منع عرض المحتوى إذا لم يتم التأكد من الصلاحيات بعد
   if (!isAuthorized) return null;
 
   return (

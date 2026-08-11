@@ -18,7 +18,7 @@ export default function OnboardingPage() {
   const auth = useAuth();
   const db = useFirestore();
   const router = useRouter();
-  const { user: currentUser, profile, loading: userLoading } = useUser();
+  const { profile, loading: userLoading } = useUser();
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState(1);
 
@@ -32,7 +32,8 @@ export default function OnboardingPage() {
   });
 
   useEffect(() => {
-    if (!userLoading && profile && profile.tenantId) {
+    // إذا كان المستخدم يمتلك بالفعل متجراً، نوجهه للوحة التحكم فوراً
+    if (!userLoading && profile && profile.tenantId && profile.role === 'owner') {
       router.replace('/admin');
     }
   }, [profile, userLoading, router]);
@@ -64,7 +65,7 @@ export default function OnboardingPage() {
       const slug = generateSlug(formData.businessName);
       const now = Date.now();
 
-      // 1. إدارة الهوية (Auth)
+      // 1. إدارة الهوية (Firebase Auth)
       let targetUser = auth.currentUser;
       
       if (!targetUser) {
@@ -81,45 +82,27 @@ export default function OnboardingPage() {
         }
       }
 
-      if (!targetUser) throw new Error("فشل تحديد الهوية");
+      if (!targetUser) throw new Error("فشل توثيق الهوية");
 
-      // 2. التحقق من الرابط (Slug) - معالجة صامتة للأذونات
+      // 2. التحقق من توفر الرابط (Slug)
       const slugRef = doc(db, "slugs", slug);
-      let isSlugAvailable = true;
-
-      try {
-        const slugSnap = await getDoc(slugRef);
-        if (slugSnap.exists()) {
-          // إذا كان الرابط موجوداً ولكن لمالك آخر، فهو محجوز
-          if (slugSnap.data().ownerUid !== targetUser.uid) {
-            isSlugAvailable = false;
-          }
-        }
-      } catch (err: any) {
-        // في نظام SaaS، رفض الأذونات عند القراءة يعني غالباً أن الوثيقة موجودة ولكن ليست لك.
-        // نعتبر هذا الرابط محجوزاً دون إظهار خطأ تقني في الواجهة.
-        if (err.code === 'permission-denied') {
-          isSlugAvailable = false;
-        } else {
-          // الأخطاء التقنية الأخرى (مثل الشبكة) يتم تمريرها
-          throw err;
-        }
-      }
-
-      if (!isSlugAvailable) {
+      const slugSnap = await getDoc(slugRef);
+      
+      if (slugSnap.exists() && slugSnap.data().ownerUid !== targetUser.uid) {
         toast({ 
           variant: "destructive", 
           title: "الاسم محجوز", 
-          description: "اسم هذا المتجر مستخدم بالفعل من قبل تاجر آخر، يرجى اختيار اسم مختلف." 
+          description: "اسم المتجر هذا مستخدم بالفعل، يرجى اختيار اسم آخر." 
         });
         setLoading(false);
         return;
       }
 
-      // 3. التأسيس الذري (Atomic Onboarding)
+      // 3. إنشاء المتجر والبروفايل (Atomic Batch)
       const batch = writeBatch(db);
       const tenantId = `T-${Date.now().toString().slice(-6)}`;
       
+      // وثيقة المتجر
       batch.set(doc(db, "tenants", tenantId), {
         tenantId,
         businessName: formData.businessName.trim(),
@@ -129,12 +112,14 @@ export default function OnboardingPage() {
         phone: `0${purePhone}`,
         address: formData.address.trim(),
         businessType: formData.businessType,
-        status: "trial",
+        status: "active",
         subscriptionPlan: "trial",
+        trialEndDate: now + (14 * 24 * 60 * 60 * 1000), // 14 يوم تجريبي
         createdAt: now,
         settings: { defaultPrintSize: "80mm", notificationsEnabled: true }
       });
 
+      // وثيقة حجز الرابط
       batch.set(doc(db, "slugs", slug), {
         tenantId,
         businessName: formData.businessName.trim(),
@@ -142,6 +127,7 @@ export default function OnboardingPage() {
         createdAt: now
       });
 
+      // وثيقة المستخدم (الملف الشخصي)
       batch.set(doc(db, "users", targetUser.uid), {
         uid: targetUser.uid,
         tenantId,
@@ -156,11 +142,16 @@ export default function OnboardingPage() {
 
       await batch.commit();
 
-      toast({ title: "تم التأسيس بنجاح", description: "أهلاً بك في منصة دوبسار." });
+      toast({ title: "أهلاً بك!", description: "تم تأسيس متجرك السحابي بنجاح." });
       router.push("/admin");
       
     } catch (error: any) {
-      toast({ variant: "destructive", title: "خطأ في التأسيس", description: error.message || "حدث خطأ غير متوقع." });
+      console.error("Onboarding Error:", error);
+      toast({ 
+        variant: "destructive", 
+        title: "خطأ في التأسيس", 
+        description: error.message || "حدث خطأ غير متوقع، يرجى المحاولة لاحقاً." 
+      });
     } finally {
       setLoading(false);
     }

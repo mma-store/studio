@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from "react";
@@ -29,60 +28,39 @@ export default function LoginPage() {
     
     setLoading(true);
     
-    const trimmedPhone = phoneNumber.trim();
+    // 1. تنظيف البيانات المدخلة بشكل صارم
+    const purePhone = normalizePhoneNumber(phoneNumber.trim());
     const trimmedPassword = password.trim();
-    const purePhone = normalizePhoneNumber(trimmedPhone);
     
     if (!purePhone || purePhone.length < 9) {
       toast({ 
         variant: "destructive", 
-        title: "تنسيق غير صحيح", 
-        description: "يرجى إدخال رقم هاتف عراقي صالح (مثلاً: 0780xxxxxxx)." 
+        title: "خطأ في الرقم", 
+        description: "يرجى إدخال رقم هاتف صالح." 
       });
       setLoading(false);
       return;
     }
 
-    // مصفوفة الاحتمالات لضمان التوافق مع كافة الحسابات القديمة والجديدة
-    const emailAttempts = [
-      getInternalEmail(purePhone),           // الحديث (@dubsar.platform)
-      `${purePhone}@mma.store`,              // القديم
-      `0${purePhone}@dubsar.platform`,       // صيغة الصفر الزائد
-      `0${purePhone}@mma.store`              // الصيغة الأولية
-    ];
+    // 2. توليد الهوية الرقمية الموحدة
+    const email = getInternalEmail(purePhone);
 
     try {
-      let userCredential = null;
-      let lastError = null;
-
-      for (const attemptEmail of emailAttempts) {
-        try {
-          userCredential = await signInWithEmailAndPassword(auth, attemptEmail, trimmedPassword);
-          if (userCredential) break; 
-        } catch (err: any) {
-          lastError = err;
-          // إذا كان الخطأ تقنياً وليس متعلقاً ببيانات الاعتماد، نتوقف
-          if (err.code === 'auth/network-request-failed' || err.code === 'auth/internal-error') {
-            break;
-          }
-        }
-      }
-
-      if (!userCredential) {
-        throw lastError || new Error("Auth failed");
-      }
-      
+      // 3. محاولة تسجيل الدخول
+      const userCredential = await signInWithEmailAndPassword(auth, email, trimmedPassword);
       const user = userCredential.user;
-      toast({ title: "تم الدخول", description: "جاري تحميل لوحة التحكم..." });
 
-      // محاولة تحديث بيانات الجلسة في الخلفية
+      // 4. جلب الملف الشخصي والتحقق من الرتبة
       const userRef = doc(db, "users", user.uid);
       const userSnap = await getDoc(userRef);
       
       if (userSnap.exists()) {
         const userData = userSnap.data();
-        updateDoc(userRef, { lastLogin: Date.now() }).catch(() => {});
+        await updateDoc(userRef, { lastLogin: Date.now() }).catch(() => {});
 
+        toast({ title: "تم الدخول بنجاح" });
+
+        // توجيه بناءً على الرتبة
         if (userData.role === 'super_admin') {
           router.push("/super-admin");
         } else if (['owner', 'admin', 'sales_employee', 'workshop_technician', 'warehouse_employee'].includes(userData.role)) {
@@ -91,16 +69,25 @@ export default function LoginPage() {
           router.push("/");
         }
       } else {
-        // إذا لم يكن لديه بروفايل، فهو مستخدم جديد لم يكمل التأسيس
+        // إذا كان موجوداً في Auth ولكن ليس لديه ملف (حالة نادرة)، نوجهه للتأسيس
         router.push("/onboarding");
       }
       
     } catch (error: any) {
-      let message = "رقم الهاتف أو كلمة المرور غير صحيحة.";
-      if (error.code === 'auth/too-many-requests') {
-        message = "تم قفل الحساب مؤقتاً لكثرة المحاولات.";
+      // تسجيل الخطأ داخلياً للمطور في بيئة التطوير
+      if (process.env.NODE_ENV === 'development') {
+        console.error("Login Failure Code:", error.code);
       }
-      toast({ variant: "destructive", title: "فشل الدخول", description: message });
+
+      let errorMessage = "رقم الهاتف أو كلمة المرور غير صحيحة.";
+      
+      if (error.code === 'auth/too-many-requests') {
+        errorMessage = "تم قفل الحساب مؤقتاً بسبب محاولات خاطئة متكررة.";
+      } else if (error.code === 'auth/network-request-failed') {
+        errorMessage = "فشل الاتصال، تحقق من جودة الإنترنت.";
+      }
+      
+      toast({ variant: "destructive", title: "فشل الدخول", description: errorMessage });
     } finally {
       setLoading(false);
     }

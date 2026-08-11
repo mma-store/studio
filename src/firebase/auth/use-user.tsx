@@ -23,7 +23,7 @@ export function useUser() {
       if (firebaseUser) {
         const profileRef = doc(db, 'users', firebaseUser.uid);
         
-        // استخدام onSnapshot لضمان تحديث الرتبة والـ tenantId فوراً عند حدوث أي تغيير سحابي
+        // استخدام onSnapshot لضمان تحديث الرتبة والـ tenantId فوراً
         const unsubscribeProfile = onSnapshot(profileRef, (docSnap) => {
           if (docSnap.exists()) {
             setProfile(docSnap.data() as UserProfile);
@@ -47,16 +47,12 @@ export function useUser() {
     return () => unsubscribeAuth();
   }, [auth, db]);
 
-  // التحقق من الهوية الماستر
-  const emailPrefix = user?.email?.split('@')[0] || '';
-  const purePhone = profile?.phoneNumber ? normalizePhoneNumber(profile.phoneNumber) : '';
-  
-  const isSuperAdmin = 
-    profile?.role === 'super_admin' || 
-    MASTER_RAW_PHONES.includes(emailPrefix) || 
-    MASTER_RAW_PHONES.includes(purePhone);
+  // 1. تحديد ما إذا كان المستخدم سوبر أدمن
+  const isSuperAdmin = profile?.role === 'super_admin' || 
+    (user?.email && MASTER_RAW_PHONES.some(p => user.email!.includes(p)));
 
-  // الأولوية لـ tenantId المتجر الحقيقي إذا وجد في البروفايل، لضمان دخول التاجر لمتجره الخاص
+  // 2. حل معرف المتجر (Tenant ID)
+  // الأولوية دائماً لمعرف المتجر الموجود في البروفايل لضمان الوصول للبيانات الصحيحة
   const resolvedTenantId = profile?.tenantId || (isSuperAdmin ? 'PLATFORM_OWNER' : null);
 
   return { 
