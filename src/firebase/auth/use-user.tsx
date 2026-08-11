@@ -6,6 +6,8 @@ import { doc, onSnapshot } from 'firebase/firestore';
 import { useAuth, useFirestore } from '../provider';
 import { UserProfile } from '@/lib/types/roles';
 import { normalizePhoneNumber } from '@/lib/auth-utils';
+import { errorEmitter } from '../error-emitter';
+import { FirestorePermissionError } from '../errors';
 
 const MASTER_RAW_PHONES = ['7858833838', '7703687932'];
 
@@ -30,8 +32,13 @@ export function useUser() {
             setProfile(null);
           }
           setLoading(false);
-        }, (err) => {
-          console.error("Profile sync error:", err);
+        }, async (err) => {
+          if (err.code === 'permission-denied') {
+            errorEmitter.emit('permission-error', new FirestorePermissionError({
+              path: profileRef.path,
+              operation: 'get'
+            }));
+          }
           setProfile(null);
           setLoading(false);
         });

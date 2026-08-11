@@ -3,6 +3,7 @@ import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 import { FirebaseClientProvider } from "@/firebase";
 import { CartProvider } from "@/context/cart-context";
+import { FirebaseErrorListener } from "@/components/firebase/firebase-error-listener";
 
 export const metadata: Metadata = {
   title: 'دوبسار - DUBSAR | منصة التجارة السحابية المتكاملة',
@@ -42,6 +43,7 @@ export default function RootLayout({
       <body className="font-almarai antialiased selection:bg-primary/20 overflow-x-hidden bg-background">
         <FirebaseClientProvider>
           <CartProvider>
+            <FirebaseErrorListener />
             {children}
             <Toaster />
           </CartProvider>

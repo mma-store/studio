@@ -1,10 +1,9 @@
-
 'use client';
 
 import { useState } from "react";
 import { useAuth, useFirestore } from "@/firebase";
 import { createUserWithEmailAndPassword } from "firebase/auth";
-import { collection, doc, query, where, getDocs, writeBatch, orderBy, limit } from "firebase/firestore";
+import { collection, doc, query, where, getDocs, writeBatch } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,6 +13,8 @@ import { toast } from "@/hooks/use-toast";
 import { Loader2, ArrowRight, ArrowLeft, ScrollText } from "lucide-react";
 import Link from "next/link";
 import { normalizePhoneNumber, getInternalEmail } from "@/lib/auth-utils";
+import { errorEmitter } from "@/firebase/error-emitter";
+import { FirestorePermissionError } from "@/firebase/errors";
 
 export default function OnboardingPage() {
   const auth = useAuth();
@@ -60,7 +61,18 @@ export default function OnboardingPage() {
       
       // 1. التحقق من توافر الرابط
       const slugQuery = query(collection(db, "tenants"), where("slug", "==", slug));
-      const slugSnap = await getDocs(slugQuery);
+      let slugSnap;
+      try {
+        slugSnap = await getDocs(slugQuery);
+      } catch (err: any) {
+        if (err.code === 'permission-denied') {
+          errorEmitter.emit('permission-error', new FirestorePermissionError({
+            path: 'tenants',
+            operation: 'list'
+          }));
+        }
+        throw err;
+      }
       
       if (!slugSnap.empty) {
         toast({ variant: "destructive", title: "اسم المتجر مستخدم", description: "يرجى اختيار اسم متجر آخر." });
@@ -68,7 +80,7 @@ export default function OnboardingPage() {
         return;
       }
 
-      // 2. إدارة حساب المستخدم (إنشاء أو استخدام الحالي)
+      // 2. إدارة حساب المستخدم
       let targetUser = auth.currentUser;
       
       if (!targetUser) {
@@ -91,7 +103,7 @@ export default function OnboardingPage() {
       const now = Date.now();
       
       const tenantRef = doc(db, "tenants", tenantId);
-      batch.set(tenantRef, {
+      const tenantData = {
         tenantId,
         businessName: formData.businessName.trim(),
         slug,
@@ -106,10 +118,11 @@ export default function OnboardingPage() {
         trialEndDate: now + (14 * 24 * 60 * 60 * 1000),
         createdAt: now,
         settings: { defaultPrintSize: "80mm", notificationsEnabled: true }
-      });
+      };
+      batch.set(tenantRef, tenantData);
 
       const userRef = doc(db, "users", targetUser.uid);
-      batch.set(userRef, {
+      const userData = {
         uid: targetUser.uid,
         tenantId,
         displayName: formData.ownerName.trim(),
@@ -119,9 +132,22 @@ export default function OnboardingPage() {
         accountType: "merchant",
         createdAt: now,
         status: "active"
-      });
+      };
+      batch.set(userRef, userData);
 
-      await batch.commit();
+      try {
+        await batch.commit();
+      } catch (err: any) {
+        if (err.code === 'permission-denied') {
+          errorEmitter.emit('permission-error', new FirestorePermissionError({
+            path: `tenants/${tenantId} or users/${targetUser.uid}`,
+            operation: 'create',
+            requestResourceData: { tenantData, userData }
+          }));
+        }
+        throw err;
+      }
+
       toast({ title: "مبروك! تم تأسيس متجرك", description: "جاري توجيهك إلى لوحة التحكم." });
       router.push("/admin");
       
