@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from "react";
@@ -10,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { toast } from "@/hooks/use-toast";
-import { Loader2, Lock, Phone, ArrowLeft, ScrollText, AlertCircle } from "lucide-react";
+import { Loader2, Lock, Phone, ArrowLeft, ScrollText, AlertCircle } from "lucide-center";
 import Link from "next/link";
 import { normalizePhoneNumber, getInternalEmail } from "@/lib/auth-utils";
 
@@ -44,24 +45,23 @@ export default function LoginPage() {
 
     // مصفوفة الاحتمالات لضمان التوافق مع كافة الحسابات القديمة والجديدة
     const emailAttempts = [
-      getInternalEmail(purePhone),           // التنسيق القياسي الحديث (@dubsar.platform)
-      `${purePhone}@mma.store`,              // التنسيق القديم الأول
-      `0${purePhone}@dubsar.platform`,       // تنسيق الصفر الزائد الممكن
-      `0${purePhone}@mma.store`              // تنسيق قديم جداً
+      getInternalEmail(purePhone),           // الحديث (@dubsar.platform)
+      `${purePhone}@mma.store`,              // القديم
+      `0${purePhone}@dubsar.platform`,       // صيغة الصفر الزائد
+      `0${purePhone}@mma.store`              // الصيغة الأولية
     ];
 
     try {
       let userCredential = null;
       let lastError = null;
 
-      // تجربة الدخول بكافة التنسيقات بصمت
       for (const attemptEmail of emailAttempts) {
         try {
           userCredential = await signInWithEmailAndPassword(auth, attemptEmail, trimmedPassword);
           if (userCredential) break; 
         } catch (err: any) {
           lastError = err;
-          // إذا كان الخطأ مشكلة في الشبكة أو السيرفر، نتوقف فوراً ونبلغ المستخدم
+          // إذا كان الخطأ تقنياً وليس متعلقاً ببيانات الاعتماد، نتوقف
           if (err.code === 'auth/network-request-failed' || err.code === 'auth/internal-error') {
             break;
           }
@@ -73,47 +73,34 @@ export default function LoginPage() {
       }
       
       const user = userCredential.user;
-      toast({ title: "تم التحقق بنجاح", description: "جاري فتح لوحة التحكم..." });
+      toast({ title: "تم الدخول", description: "جاري تحميل لوحة التحكم..." });
 
-      // محاولة تحديث آخر ظهور وتوجيه المستخدم
-      try {
-        const userRef = doc(db, "users", user.uid);
-        const userSnap = await getDoc(userRef);
-        
-        if (userSnap.exists()) {
-          const userData = userSnap.data();
-          await updateDoc(userRef, { lastLogin: Date.now() });
+      // محاولة تحديث بيانات الجلسة في الخلفية
+      const userRef = doc(db, "users", user.uid);
+      const userSnap = await getDoc(userRef);
+      
+      if (userSnap.exists()) {
+        const userData = userSnap.data();
+        updateDoc(userRef, { lastLogin: Date.now() }).catch(() => {});
 
-          if (userData.role === 'super_admin') {
-            router.push("/super-admin");
-          } else if (['owner', 'admin', 'sales_employee', 'workshop_technician', 'warehouse_employee'].includes(userData.role)) {
-            router.push("/admin");
-          } else {
-            router.push("/");
-          }
-        } else {
-          // إذا لم يوجد ملف شخصي، نوجهه للتأسيس كإجراء احتياطي
+        if (userData.role === 'super_admin') {
+          router.push("/super-admin");
+        } else if (['owner', 'admin', 'sales_employee', 'workshop_technician', 'warehouse_employee'].includes(userData.role)) {
           router.push("/admin");
+        } else {
+          router.push("/");
         }
-      } catch (dbError) {
-        // إذا فشل Firestore لحظياً، نوجهه للـ admin على أي حال لأن الـ Auth نجح
-        router.push("/admin");
+      } else {
+        // إذا لم يكن لديه بروفايل، فهو مستخدم جديد لم يكمل التأسيس
+        router.push("/onboarding");
       }
       
     } catch (error: any) {
       let message = "رقم الهاتف أو كلمة المرور غير صحيحة.";
-      
       if (error.code === 'auth/too-many-requests') {
-        message = "تم قفل الحساب مؤقتاً بسبب محاولات كثيرة خاطئة. يرجى الانتظار قليلاً.";
-      } else if (error.code === 'auth/network-request-failed') {
-        message = "يرجى التحقق من اتصالك بالإنترنت والمحاولة مرة أخرى.";
+        message = "تم قفل الحساب مؤقتاً لكثرة المحاولات.";
       }
-      
-      toast({ 
-        variant: "destructive", 
-        title: "تعذر الدخول", 
-        description: message 
-      });
+      toast({ variant: "destructive", title: "فشل الدخول", description: message });
     } finally {
       setLoading(false);
     }
@@ -121,8 +108,6 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#FDF8F5] p-4 relative overflow-hidden">
-      <div className="absolute top-0 right-0 h-[600px] w-[600px] bg-primary/5 rounded-full blur-[120px] -translate-y-1/2 translate-x-1/2" />
-      
       <Card className="w-full max-w-md rounded-[48px] border-none shadow-2xl overflow-hidden bg-white relative z-10">
         <div className="p-8 pt-10">
            <Link href="/">
@@ -139,13 +124,13 @@ export default function LoginPage() {
              </div>
              <span className="text-3xl font-black text-primary tracking-tighter">دوبسار DUBSAR</span>
           </div>
-          <CardDescription className="font-medium text-slate-500 italic">"من ألواح بابل.. إلى سحابة اليوم"</CardDescription>
+          <CardDescription className="font-medium text-slate-500 italic">بوابتك للتجارة السحابية الذكية</CardDescription>
         </CardHeader>
         
         <CardContent className="px-10">
           <form onSubmit={handleLogin} className="space-y-5">
             <div className="space-y-2">
-              <Label className="font-black text-xs mr-2 uppercase tracking-widest text-slate-400">رقم الهاتف</Label>
+              <Label className="font-black text-xs mr-2 uppercase tracking-widest text-slate-400 text-right block">رقم الهاتف</Label>
               <div className="relative">
                 <Phone className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-300" />
                 <Input 
@@ -160,7 +145,7 @@ export default function LoginPage() {
               </div>
             </div>
             <div className="space-y-2">
-              <Label className="font-black text-xs mr-2 uppercase tracking-widest text-slate-400">كلمة المرور</Label>
+              <Label className="font-black text-xs mr-2 uppercase tracking-widest text-slate-400 text-right block">كلمة المرور</Label>
               <div className="relative">
                 <Lock className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-300" />
                 <Input 
@@ -175,7 +160,7 @@ export default function LoginPage() {
             </div>
             <Button 
               type="submit" 
-              className="w-full h-16 rounded-[24px] font-black text-lg gap-2 shadow-2xl mt-4 bg-primary transition-all active:scale-95" 
+              className="w-full h-16 rounded-[24px] font-black text-lg gap-2 shadow-2xl mt-4 bg-primary" 
               disabled={loading}
             >
               {loading ? <Loader2 className="h-6 w-6 animate-spin" /> : "دخول إلى النظام"}
@@ -184,11 +169,7 @@ export default function LoginPage() {
         </CardContent>
         
         <CardFooter className="pb-12 pt-6 flex flex-col gap-4 text-center">
-          <div className="flex items-center gap-2 justify-center text-amber-600 bg-amber-50 py-2 px-4 rounded-xl border border-amber-100 mb-2">
-             <AlertCircle className="h-4 w-4" />
-             <p className="text-[10px] font-bold">تأكد من كتابة الرقم بشكل صحيح باللغة الإنجليزية</p>
-          </div>
-          <p className="text-sm text-slate-500 font-bold">ليس لديك حساب؟ <Link href="/register" className="text-secondary font-black hover:underline">ابدأ مع دوبسار الآن</Link></p>
+          <p className="text-sm text-slate-500 font-bold">ليس لديك حساب؟ <Link href="/register" className="text-secondary font-black hover:underline">انضم إلينا الآن</Link></p>
         </CardFooter>
       </Card>
     </div>
