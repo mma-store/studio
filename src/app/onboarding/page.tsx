@@ -59,12 +59,13 @@ export default function OnboardingPage() {
       const email = getInternalEmail(purePhone);
       const trimmedPassword = formData.password.trim();
       
-      // 1. التحقق من توافر الرابط عبر السجل العالمي (slugs) لتجنب أخطاء الأذونات
+      // 1. التحقق من توافر الرابط عبر السجل العالمي (slugs) باستخدام عملية GET المسموحة
       const slugRef = doc(db, "slugs", slug);
       let slugSnap;
       try {
         slugSnap = await getDoc(slugRef);
       } catch (err: any) {
+        // في حال فشل القراءة بسبب الأذونات، نرسل تقريراً سياقياً
         if (err.code === 'permission-denied') {
           errorEmitter.emit('permission-error', new FirestorePermissionError({
             path: `slugs/${slug}`,
@@ -80,7 +81,7 @@ export default function OnboardingPage() {
         return;
       }
 
-      // 2. إدارة حساب المستخدم
+      // 2. إدارة حساب المستخدم (Auth)
       let targetUser = auth.currentUser;
       
       if (!targetUser) {
@@ -97,11 +98,12 @@ export default function OnboardingPage() {
         }
       }
 
-      // 3. كتابة البيانات (Batch)
+      // 3. كتابة البيانات بشكل ذري (Batch) لضمان التكامل
       const batch = writeBatch(db);
       const tenantId = `T-${Date.now().toString().slice(-6)}`;
       const now = Date.now();
       
+      // سجل المتجر
       const tenantRef = doc(db, "tenants", tenantId);
       const tenantData = {
         tenantId,
@@ -129,6 +131,7 @@ export default function OnboardingPage() {
         createdAt: now
       });
 
+      // ملف المستخدم الشخصي
       const userRef = doc(db, "users", targetUser.uid);
       const userData = {
         uid: targetUser.uid,
@@ -148,7 +151,7 @@ export default function OnboardingPage() {
       } catch (err: any) {
         if (err.code === 'permission-denied') {
           errorEmitter.emit('permission-error', new FirestorePermissionError({
-            path: `tenants/${tenantId} or users/${targetUser.uid}`,
+            path: `tenants/${tenantId} (batch write)`,
             operation: 'create',
             requestResourceData: { tenantData, userData }
           }));
@@ -161,7 +164,7 @@ export default function OnboardingPage() {
       
     } catch (error: any) {
       console.error("Onboarding Error:", error);
-      toast({ variant: "destructive", title: "فشل التأسيس", description: error.message });
+      toast({ variant: "destructive", title: "فشل التأسيس", description: error.message || "حدث خطأ غير متوقع" });
     } finally {
       setLoading(false);
     }
