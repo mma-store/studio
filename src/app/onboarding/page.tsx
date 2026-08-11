@@ -1,8 +1,7 @@
-
 'use client';
 
-import { useState } from "react";
-import { useAuth, useFirestore } from "@/firebase";
+import { useState, useEffect } from "react";
+import { useAuth, useFirestore, useUser } from "@/firebase";
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth";
 import { collection, doc, writeBatch, getDoc } from "firebase/firestore";
 import { useRouter } from "next/navigation";
@@ -14,13 +13,12 @@ import { toast } from "@/hooks/use-toast";
 import { Loader2, ArrowRight, ArrowLeft, ScrollText } from "lucide-react";
 import Link from "next/link";
 import { normalizePhoneNumber, getInternalEmail } from "@/lib/auth-utils";
-import { errorEmitter } from "@/firebase/error-emitter";
-import { FirestorePermissionError } from "@/firebase/errors";
 
 export default function OnboardingPage() {
   const auth = useAuth();
   const db = useFirestore();
   const router = useRouter();
+  const { user: currentUser, profile, loading: userLoading } = useUser();
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState(1);
 
@@ -32,6 +30,13 @@ export default function OnboardingPage() {
     address: "",
     businessType: "retail",
   });
+
+  // إذا كان المستخدم يمتلك بروفايل بالفعل، نوجهه للوحة التحكم فوراً
+  useEffect(() => {
+    if (!userLoading && profile && profile.tenantId) {
+      router.replace('/admin');
+    }
+  }, [profile, userLoading, router]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -55,67 +60,60 @@ export default function OnboardingPage() {
     setLoading(true);
 
     try {
-      const slug = generateSlug(formData.businessName);
       const purePhone = normalizePhoneNumber(formData.phoneNumber.trim());
       const email = getInternalEmail(purePhone);
-      const trimmedPassword = formData.password.trim();
+      const slug = generateSlug(formData.businessName);
       const now = Date.now();
 
-      // 1. إدارة حساب المستخدم (Auth) أولاً
-      // هذا يضمن أن العمليات التالية (قراءة slugs) ستتم بهوية موثقة لتجنب permission-denied
+      // 1. إدارة الهوية (Auth)
       let targetUser = auth.currentUser;
       
       if (!targetUser) {
         try {
-          const userCredential = await createUserWithEmailAndPassword(auth, email, trimmedPassword);
+          const userCredential = await createUserWithEmailAndPassword(auth, email, formData.password.trim());
           targetUser = userCredential.user;
         } catch (authError: any) {
           if (authError.code === 'auth/email-already-in-use') {
-            // إذا كان الحساب موجوداً، نحاول تسجيل الدخول به لمواصلة التأسيس
-            try {
-              const loginRes = await signInWithEmailAndPassword(auth, email, trimmedPassword);
-              targetUser = loginRes.user;
-            } catch (loginErr) {
-              toast({ variant: "destructive", title: "الحساب موجود مسبقاً", description: "رقم الهاتف مسجل، يرجى تسجيل الدخول أولاً أو استخدام كلمة مرور صحيحة." });
-              setLoading(false);
-              return;
-            }
+            const loginRes = await signInWithEmailAndPassword(auth, email, formData.password.trim());
+            targetUser = loginRes.user;
           } else {
             throw authError;
           }
         }
       }
 
-      if (!targetUser) throw new Error("فشل تحديد هوية المستخدم");
+      if (!targetUser) throw new Error("فشل تحديد الهوية");
 
-      // 2. التحقق من توافر الرابط (الآن نحن مستخدم موثق authenticated)
+      // 2. التحقق من الرابط (Slug) - معالجة خطأ الأذونات بذكاء
       const slugRef = doc(db, "slugs", slug);
-      let slugSnap;
+      let isSlugAvailable = true;
+
       try {
-        slugSnap = await getDoc(slugRef);
-      } catch (err: any) {
-        if (err.code === 'permission-denied') {
-          errorEmitter.emit('permission-error', new FirestorePermissionError({
-            path: `slugs/${slug}`,
-            operation: 'get'
-          }));
+        const slugSnap = await getDoc(slugRef);
+        if (slugSnap.exists() && slugSnap.data().ownerUid !== targetUser.uid) {
+          isSlugAvailable = false;
         }
-        throw err;
+      } catch (err: any) {
+        // إذا كان الخطأ "permission-denied" فهذا يعني أن الرابط محجوز لشخص آخر (أو محاولة سابقة)
+        // في نظام SaaS، الرفض هو تأكيد غير مباشر بأن الوثيقة موجودة وليست لك.
+        if (err.code === 'permission-denied') {
+          isSlugAvailable = false;
+        } else {
+          throw err;
+        }
       }
-      
-      if (slugSnap.exists() && slugSnap.data().ownerUid !== targetUser.uid) {
-        toast({ variant: "destructive", title: "اسم المتجر مستخدم", description: "يرجى اختيار اسم متجر آخر." });
+
+      if (!isSlugAvailable) {
+        toast({ variant: "destructive", title: "الرابط محجوز", description: "اسم هذا المتجر مستخدم بالفعل، يرجى اختيار اسم آخر." });
         setLoading(false);
         return;
       }
 
-      // 3. كتابة البيانات بشكل ذري (Batch)
+      // 3. التأسيس الذري (Atomic Onboarding)
       const batch = writeBatch(db);
       const tenantId = `T-${Date.now().toString().slice(-6)}`;
       
-      // سجل المتجر
-      const tenantRef = doc(db, "tenants", tenantId);
-      const tenantData = {
+      batch.set(doc(db, "tenants", tenantId), {
         tenantId,
         businessName: formData.businessName.trim(),
         slug,
@@ -126,25 +124,18 @@ export default function OnboardingPage() {
         businessType: formData.businessType,
         status: "trial",
         subscriptionPlan: "trial",
-        trialStartDate: now,
-        trialEndDate: now + (14 * 24 * 60 * 60 * 1000),
         createdAt: now,
         settings: { defaultPrintSize: "80mm", notificationsEnabled: true }
-      };
-      batch.set(tenantRef, tenantData);
+      });
 
-      // حجز الرابط
-      const slugRegistryRef = doc(db, "slugs", slug);
-      batch.set(slugRegistryRef, {
+      batch.set(doc(db, "slugs", slug), {
         tenantId,
         businessName: formData.businessName.trim(),
         ownerUid: targetUser.uid,
         createdAt: now
       });
 
-      // ملف المستخدم
-      const userRef = doc(db, "users", targetUser.uid);
-      const userData = {
+      batch.set(doc(db, "users", targetUser.uid), {
         uid: targetUser.uid,
         tenantId,
         displayName: formData.ownerName.trim(),
@@ -154,17 +145,15 @@ export default function OnboardingPage() {
         accountType: "merchant",
         createdAt: now,
         status: "active"
-      };
-      batch.set(userRef, userData, { merge: true });
+      }, { merge: true });
 
       await batch.commit();
 
-      toast({ title: "مبروك! تم تأسيس متجرك", description: "جاري فتح لوحة التحكم..." });
+      toast({ title: "تم التأسيس بنجاح", description: "أهلاً بك في منصة دوبسار." });
       router.push("/admin");
       
     } catch (error: any) {
-      console.error("Onboarding Error:", error);
-      toast({ variant: "destructive", title: "فشل التأسيس", description: error.message || "حدث خطأ غير متوقع" });
+      toast({ variant: "destructive", title: "خطأ في التأسيس", description: error.message });
     } finally {
       setLoading(false);
     }

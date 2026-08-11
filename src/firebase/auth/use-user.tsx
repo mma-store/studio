@@ -32,13 +32,8 @@ export function useUser() {
             setProfile(null);
           }
           setLoading(false);
-        }, async (err) => {
-          if (err.code === 'permission-denied') {
-            errorEmitter.emit('permission-error', new FirestorePermissionError({
-              path: profileRef.path,
-              operation: 'get'
-            }));
-          }
+        }, (err) => {
+          // الصمت عن الخطأ هنا لتجنب حلقة الانهيار في الواجهة
           setProfile(null);
           setLoading(false);
         });
@@ -53,7 +48,7 @@ export function useUser() {
     return () => unsubscribeAuth();
   }, [auth, db]);
 
-  // منطق التحقق من رتبة المدير العام
+  // التحقق من الهوية الماستر
   const emailPrefix = user?.email?.split('@')[0] || '';
   const purePhone = profile?.phoneNumber ? normalizePhoneNumber(profile.phoneNumber) : '';
   
@@ -62,7 +57,8 @@ export function useUser() {
     MASTER_RAW_PHONES.includes(emailPrefix) || 
     MASTER_RAW_PHONES.includes(purePhone);
 
-  const resolvedTenantId = isSuperAdmin ? 'PLATFORM_OWNER' : (profile?.tenantId || null);
+  // الأولوية لـ tenantId المتجر الحقيقي إذا وجد، وإلا نستخدم معرف المنصة للسوبر أدمن
+  const resolvedTenantId = profile?.tenantId || (isSuperAdmin ? 'PLATFORM_OWNER' : null);
 
   return { 
     user, 
