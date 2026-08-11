@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useFirestore } from '@/firebase';
-import { collection, query, where, limit, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot } from 'firebase/firestore';
 
 export interface TenantData {
   tenantId: string;
@@ -26,18 +26,35 @@ export function useTenantData(slug: string) {
     if (!slug) return;
 
     setLoading(true);
-    const tenantsRef = collection(db, 'tenants');
-    const q = query(tenantsRef, where('slug', '==', slug), limit(1));
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      if (!snapshot.empty) {
-        const data = snapshot.docs[0].data() as TenantData;
-        if (data.status !== 'active') {
-          setError('هذا المتجر غير نشط حالياً.');
+    // التحقق من الرابط عبر سجل الروابط (Slug Registry) للوصول المباشر والآمن
+    const slugRef = doc(db, 'slugs', slug);
+
+    const unsubscribeSlug = onSnapshot(slugRef, async (slugSnap) => {
+      if (slugSnap.exists()) {
+        const { tenantId } = slugSnap.data();
+        
+        // جلب بيانات المتجر بناءً على المعرف الحقيقي
+        const tenantRef = doc(db, 'tenants', tenantId);
+        
+        try {
+          const tenantSnap = await getDoc(tenantRef);
+          if (tenantSnap.exists()) {
+            const data = tenantSnap.data() as TenantData;
+            if (data.status !== 'active' && data.status !== 'trial') {
+              setError('هذا المتجر غير نشط حالياً.');
+              setTenant(null);
+            } else {
+              setTenant({ ...data, tenantId: tenantSnap.id });
+              setError(null);
+            }
+          } else {
+            setError('المعذرة، المتجر المطلوب غير موجود.');
+            setTenant(null);
+          }
+        } catch (err) {
+          setError('فشل الوصول لبيانات المتجر.');
           setTenant(null);
-        } else {
-          setTenant({ ...data, tenantId: snapshot.docs[0].id });
-          setError(null);
         }
       } else {
         setError('المعذرة، المتجر المطلوب غير موجود.');
@@ -49,7 +66,7 @@ export function useTenantData(slug: string) {
       setLoading(false);
     });
 
-    return () => unsubscribe();
+    return () => unsubscribeSlug();
   }, [db, slug]);
 
   return { tenant, loading, error };

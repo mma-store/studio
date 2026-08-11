@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useAuth, useFirestore } from "@/firebase";
 import { createUserWithEmailAndPassword } from "firebase/auth";
-import { collection, doc, query, where, getDocs, writeBatch } from "firebase/firestore";
+import { collection, doc, writeBatch, getDoc } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -59,22 +59,22 @@ export default function OnboardingPage() {
       const email = getInternalEmail(purePhone);
       const trimmedPassword = formData.password.trim();
       
-      // 1. التحقق من توافر الرابط
-      const slugQuery = query(collection(db, "tenants"), where("slug", "==", slug));
+      // 1. التحقق من توافر الرابط عبر السجل العالمي (slugs) لتجنب أخطاء الأذونات
+      const slugRef = doc(db, "slugs", slug);
       let slugSnap;
       try {
-        slugSnap = await getDocs(slugQuery);
+        slugSnap = await getDoc(slugRef);
       } catch (err: any) {
         if (err.code === 'permission-denied') {
           errorEmitter.emit('permission-error', new FirestorePermissionError({
-            path: 'tenants',
-            operation: 'list'
+            path: `slugs/${slug}`,
+            operation: 'get'
           }));
         }
         throw err;
       }
       
-      if (!slugSnap.empty) {
+      if (slugSnap.exists()) {
         toast({ variant: "destructive", title: "اسم المتجر مستخدم", description: "يرجى اختيار اسم متجر آخر." });
         setLoading(false);
         return;
@@ -120,6 +120,14 @@ export default function OnboardingPage() {
         settings: { defaultPrintSize: "80mm", notificationsEnabled: true }
       };
       batch.set(tenantRef, tenantData);
+
+      // حجز الرابط في السجل العالمي
+      const slugRegistryRef = doc(db, "slugs", slug);
+      batch.set(slugRegistryRef, {
+        tenantId,
+        businessName: formData.businessName.trim(),
+        createdAt: now
+      });
 
       const userRef = doc(db, "users", targetUser.uid);
       const userData = {
