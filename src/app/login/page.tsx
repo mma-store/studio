@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { toast } from "@/hooks/use-toast";
-import { Loader2, Lock, Phone, ArrowLeft, ScrollText } from "lucide-react";
+import { Loader2, Lock, Phone, ArrowLeft, ScrollText, AlertCircle } from "lucide-react";
 import Link from "next/link";
 import { normalizePhoneNumber, getInternalEmail } from "@/lib/auth-utils";
 
@@ -24,6 +24,8 @@ export default function LoginPage() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
+    
     setLoading(true);
     
     const trimmedPhone = phoneNumber.trim();
@@ -33,18 +35,18 @@ export default function LoginPage() {
     if (!purePhone || purePhone.length < 9) {
       toast({ 
         variant: "destructive", 
-        title: "رقم هاتف غير صالح", 
-        description: "يرجى إدخال رقم هاتف عراقي صحيح." 
+        title: "تنسيق غير صحيح", 
+        description: "يرجى إدخال رقم هاتف عراقي صالح (مثلاً: 0780xxxxxxx)." 
       });
       setLoading(false);
       return;
     }
 
-    // محاولة الدخول بكافة التنسيقات الممكنة لضمان أقصى درجات التوافق
+    // مصفوفة الاحتمالات لضمان التوافق مع كافة الحسابات القديمة والجديدة
     const emailAttempts = [
-      getInternalEmail(purePhone),           // التنسيق القياسي الحديث
-      `${purePhone}@mma.store`,              // التنسيق القديم
-      `0${purePhone}@dubsar.platform`,       // تنسيق الصفر الزائد
+      getInternalEmail(purePhone),           // التنسيق القياسي الحديث (@dubsar.platform)
+      `${purePhone}@mma.store`,              // التنسيق القديم الأول
+      `0${purePhone}@dubsar.platform`,       // تنسيق الصفر الزائد الممكن
       `0${purePhone}@mma.store`              // تنسيق قديم جداً
     ];
 
@@ -52,14 +54,14 @@ export default function LoginPage() {
       let userCredential = null;
       let lastError = null;
 
+      // تجربة الدخول بكافة التنسيقات بصمت
       for (const attemptEmail of emailAttempts) {
         try {
-          // محاولة صامتة
           userCredential = await signInWithEmailAndPassword(auth, attemptEmail, trimmedPassword);
           if (userCredential) break; 
         } catch (err: any) {
           lastError = err;
-          // إذا كان الخطأ ليس متعلقاً ببيانات الاعتماد (مثل مشكلة إنترنت)، نتوقف فوراً
+          // إذا كان الخطأ مشكلة في الشبكة أو السيرفر، نتوقف فوراً ونبلغ المستخدم
           if (err.code === 'auth/network-request-failed' || err.code === 'auth/internal-error') {
             break;
           }
@@ -71,13 +73,16 @@ export default function LoginPage() {
       }
       
       const user = userCredential.user;
+      toast({ title: "تم التحقق بنجاح", description: "جاري فتح لوحة التحكم..." });
 
-      // تحديث بيانات الجلسة في Firestore في الخلفية
-      const userRef = doc(db, "users", user.uid);
-      getDoc(userRef).then((userSnap) => {
+      // محاولة تحديث آخر ظهور وتوجيه المستخدم
+      try {
+        const userRef = doc(db, "users", user.uid);
+        const userSnap = await getDoc(userRef);
+        
         if (userSnap.exists()) {
           const userData = userSnap.data();
-          updateDoc(userRef, { lastLogin: Date.now() }).catch(() => {});
+          await updateDoc(userRef, { lastLogin: Date.now() });
 
           if (userData.role === 'super_admin') {
             router.push("/super-admin");
@@ -87,26 +92,26 @@ export default function LoginPage() {
             router.push("/");
           }
         } else {
+          // إذا لم يوجد ملف شخصي، نوجهه للتأسيس كإجراء احتياطي
           router.push("/admin");
         }
-      }).catch(() => {
+      } catch (dbError) {
+        // إذا فشل Firestore لحظياً، نوجهه للـ admin على أي حال لأن الـ Auth نجح
         router.push("/admin");
-      });
+      }
       
-      toast({ title: "تم تسجيل الدخول بنجاح" });
     } catch (error: any) {
-      console.error("Login Error Details:", error.code, error.message);
-      let message = "تأكد من رقم الهاتف وكلمة المرور.";
+      let message = "رقم الهاتف أو كلمة المرور غير صحيحة.";
       
       if (error.code === 'auth/too-many-requests') {
-        message = "محاولات كثيرة خاطئة. تم قفل الحساب مؤقتاً.";
+        message = "تم قفل الحساب مؤقتاً بسبب محاولات كثيرة خاطئة. يرجى الانتظار قليلاً.";
       } else if (error.code === 'auth/network-request-failed') {
-        message = "يرجى التحقق من اتصال الإنترنت.";
+        message = "يرجى التحقق من اتصالك بالإنترنت والمحاولة مرة أخرى.";
       }
       
       toast({ 
         variant: "destructive", 
-        title: "فشل الدخول", 
+        title: "تعذر الدخول", 
         description: message 
       });
     } finally {
@@ -134,7 +139,7 @@ export default function LoginPage() {
              </div>
              <span className="text-3xl font-black text-primary tracking-tighter">دوبسار DUBSAR</span>
           </div>
-          <CardDescription className="font-medium text-slate-500">سجل دخولك لإدارة تجارتك سحابياً</CardDescription>
+          <CardDescription className="font-medium text-slate-500 italic">"من ألواح بابل.. إلى سحابة اليوم"</CardDescription>
         </CardHeader>
         
         <CardContent className="px-10">
@@ -143,23 +148,46 @@ export default function LoginPage() {
               <Label className="font-black text-xs mr-2 uppercase tracking-widest text-slate-400">رقم الهاتف</Label>
               <div className="relative">
                 <Phone className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-300" />
-                <Input type="tel" placeholder="07XXXXXXXXX" className="h-14 rounded-2xl pr-12 bg-slate-50 border-none text-left font-black" dir="ltr" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} required />
+                <Input 
+                  type="tel" 
+                  placeholder="07XXXXXXXXX" 
+                  className="h-14 rounded-2xl pr-12 bg-slate-50 border-none text-left font-black" 
+                  dir="ltr" 
+                  value={phoneNumber} 
+                  onChange={(e) => setPhoneNumber(e.target.value)} 
+                  required 
+                />
               </div>
             </div>
             <div className="space-y-2">
               <Label className="font-black text-xs mr-2 uppercase tracking-widest text-slate-400">كلمة المرور</Label>
               <div className="relative">
                 <Lock className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-300" />
-                <Input type="password" placeholder="••••••••" className="h-14 rounded-2xl pr-12 bg-slate-50 border-none" value={password} onChange={(e) => setPassword(e.target.value)} required />
+                <Input 
+                  type="password" 
+                  placeholder="••••••••" 
+                  className="h-14 rounded-2xl pr-12 bg-slate-50 border-none" 
+                  value={password} 
+                  onChange={(e) => setPassword(e.target.value)} 
+                  required 
+                />
               </div>
             </div>
-            <Button type="submit" className="w-full h-16 rounded-[24px] font-black text-lg gap-2 shadow-2xl mt-4 bg-primary" disabled={loading}>
+            <Button 
+              type="submit" 
+              className="w-full h-16 rounded-[24px] font-black text-lg gap-2 shadow-2xl mt-4 bg-primary transition-all active:scale-95" 
+              disabled={loading}
+            >
               {loading ? <Loader2 className="h-6 w-6 animate-spin" /> : "دخول إلى النظام"}
             </Button>
           </form>
         </CardContent>
         
         <CardFooter className="pb-12 pt-6 flex flex-col gap-4 text-center">
+          <div className="flex items-center gap-2 justify-center text-amber-600 bg-amber-50 py-2 px-4 rounded-xl border border-amber-100 mb-2">
+             <AlertCircle className="h-4 w-4" />
+             <p className="text-[10px] font-bold">تأكد من كتابة الرقم بشكل صحيح باللغة الإنجليزية</p>
+          </div>
           <p className="text-sm text-slate-500 font-bold">ليس لديك حساب؟ <Link href="/register" className="text-secondary font-black hover:underline">ابدأ مع دوبسار الآن</Link></p>
         </CardFooter>
       </Card>

@@ -4,32 +4,35 @@ import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
 import { 
   getFirestore, 
   Firestore,
-  enableNetwork,
+  terminate,
+  clearIndexedDbPersistence
 } from 'firebase/firestore';
 import { getAuth, Auth } from 'firebase/auth';
 import { firebaseConfig } from './config';
 
-// استخدام متغير عالمي لمنع إعادة التهيئة المتكررة في بيئة Next.js
-let cachedApp: FirebaseApp;
-let cachedFirestore: Firestore;
-let cachedAuth: Auth;
+/**
+ * Singleton Firebase Instance Manager
+ * يضمن عدم تكرار الاتصال وقفل قاعدة البيانات
+ */
+let cachedApp: FirebaseApp | undefined;
+let cachedFirestore: Firestore | undefined;
+let cachedAuth: Auth | undefined;
 
 export function initializeFirebase() {
   if (typeof window !== 'undefined') {
-    if (!getApps().length) {
-      cachedApp = initializeApp(firebaseConfig);
-      cachedFirestore = getFirestore(cachedApp);
-      cachedAuth = getAuth(cachedApp);
-    } else {
-      cachedApp = getApps()[0];
+    if (!cachedApp) {
+      // التحقق من وجود مثيلات سابقة لتجنب التضارب
+      const existingApps = getApps();
+      cachedApp = existingApps.length ? existingApps[0] : initializeApp(firebaseConfig);
       cachedFirestore = getFirestore(cachedApp);
       cachedAuth = getAuth(cachedApp);
     }
     
-    // التأكد من تفعيل الشبكة
-    enableNetwork(cachedFirestore).catch(() => {});
-    
-    return { app: cachedApp, firestore: cachedFirestore, auth: cachedAuth };
+    return { 
+      app: cachedApp, 
+      firestore: cachedFirestore!, 
+      auth: cachedAuth! 
+    };
   }
   
   // للطرف السيرفر (SSR)
