@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from "react";
@@ -29,8 +30,9 @@ export default function LoginPage() {
     setLoading(true);
     
     // 1. تنظيف البيانات المدخلة بشكل صارم
-    const purePhone = normalizePhoneNumber(phoneNumber.trim());
+    const rawPhoneInput = phoneNumber.trim();
     const trimmedPassword = password.trim();
+    const purePhone = normalizePhoneNumber(rawPhoneInput);
     
     if (!purePhone || purePhone.length < 9) {
       toast({ 
@@ -42,15 +44,46 @@ export default function LoginPage() {
       return;
     }
 
-    // 2. توليد الهوية الرقمية الموحدة
-    const email = getInternalEmail(purePhone);
+    // 2. قائمة بكافة احتمالات البريد الإلكتروني الداخلي (الحالية والقديمة)
+    // هذا يضمن دخول المستخدمين الذين سجلوا في إصدارات سابقة من النظام
+    const emailAttempts = [
+      getInternalEmail(purePhone),      // التنسيق الحالي: 7xxxxxxxx@dubsar.platform
+      `${purePhone}@mma.store`,         // التنسيق القديم 1
+      `${purePhone}@platform.store`,    // التنسيق القديم 2
+      `0${purePhone}@dubsar.platform`,  // احتمال وجود الصفر في قاعدة البيانات
+      `0${purePhone}@mma.store`,        // احتمال وجود الصفر (قديم)
+      `${rawPhoneInput}@dubsar.platform` // الرقم الخام كما أدخله المستخدم
+    ];
+
+    let userCredential = null;
+    let lastFirebaseError = null;
 
     try {
-      // 3. محاولة تسجيل الدخول
-      const userCredential = await signInWithEmailAndPassword(auth, email, trimmedPassword);
-      const user = userCredential.user;
+      // 3. محاولة الدخول بكافة التنسيقات الممكنة بصمت وسرعة
+      for (const attemptEmail of emailAttempts) {
+        try {
+          if (process.env.NODE_ENV === 'development') {
+            console.log(`Attempting login with identity: ${attemptEmail}`);
+          }
+          userCredential = await signInWithEmailAndPassword(auth, attemptEmail, trimmedPassword);
+          if (userCredential) break; // نجاح الدخول
+        } catch (err: any) {
+          lastFirebaseError = err;
+          // إذا كان الخطأ تقنياً (مثل انقطاع الإنترنت أو الطلبات الكثيرة)، نتوقف فوراً
+          if (err.code === 'auth/network-request-failed' || err.code === 'auth/too-many-requests') {
+            throw err;
+          }
+          // خلاف ذلك (مثل invalid-credential)، ننتقل للمحاولة التالية
+          continue;
+        }
+      }
+
+      if (!userCredential) {
+        throw lastFirebaseError || new Error("auth/invalid-credential");
+      }
 
       // 4. جلب الملف الشخصي والتحقق من الرتبة
+      const user = userCredential.user;
       const userRef = doc(db, "users", user.uid);
       const userSnap = await getDoc(userRef);
       
@@ -58,7 +91,7 @@ export default function LoginPage() {
         const userData = userSnap.data();
         await updateDoc(userRef, { lastLogin: Date.now() }).catch(() => {});
 
-        toast({ title: "تم الدخول بنجاح" });
+        toast({ title: "تم تسجيل الدخول بنجاح" });
 
         // توجيه بناءً على الرتبة
         if (userData.role === 'super_admin') {
@@ -69,14 +102,13 @@ export default function LoginPage() {
           router.push("/");
         }
       } else {
-        // إذا كان موجوداً في Auth ولكن ليس لديه ملف (حالة نادرة)، نوجهه للتأسيس
+        // إذا كان موجوداً في Auth ولكن ليس لديه ملف، نوجهه للتأسيس
         router.push("/onboarding");
       }
       
     } catch (error: any) {
-      // تسجيل الخطأ داخلياً للمطور في بيئة التطوير
       if (process.env.NODE_ENV === 'development') {
-        console.error("Login Failure Code:", error.code);
+        console.error("Final Login Failure:", error.code);
       }
 
       let errorMessage = "رقم الهاتف أو كلمة المرور غير صحيحة.";

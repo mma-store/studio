@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect } from 'react';
@@ -11,6 +12,8 @@ import { errorEmitter } from '@/firebase/error-emitter';
 export function FirebaseErrorListener() {
   useEffect(() => {
     const handlePermissionError = (error: any) => {
+      const path = error.context?.path || '';
+      
       // في بيئة التطوير، نقوم برمي الخطأ ليظهر بشكل مرئي للمطور
       // مع كافة التفاصيل السياقية (المسار، العملية، البيانات)
       if (process.env.NODE_ENV === 'development') {
@@ -20,7 +23,13 @@ export function FirebaseErrorListener() {
         console.error('Data:', error.context?.requestResourceData);
         console.groupEnd();
         
-        // رمي الخطأ ليظهر في واجهة Next.js
+        // لا نريد تعطيل التطبيق بالكامل إذا فشل تحميل "الباقات" (plans)
+        // فهي معلومات ترويجية وليست حرجة لعمل النظام الأساسي
+        if (path.includes('plans')) {
+          return;
+        }
+        
+        // رمي الخطأ ليظهر في واجهة Next.js للحالات الحرجة الأخرى
         throw error;
       }
     };
