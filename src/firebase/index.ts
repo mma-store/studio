@@ -4,39 +4,41 @@ import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
 import { 
   getFirestore, 
   Firestore,
-  initializeFirestore,
-  memoryLocalCache
+  enableNetwork,
 } from 'firebase/firestore';
 import { getAuth, Auth } from 'firebase/auth';
 import { firebaseConfig } from './config';
 
-let app: FirebaseApp;
-let firestore: Firestore;
-let auth: Auth;
+// استخدام متغير عالمي لمنع إعادة التهيئة المتكررة في بيئة Next.js
+let cachedApp: FirebaseApp;
+let cachedFirestore: Firestore;
+let cachedAuth: Auth;
 
 export function initializeFirebase() {
-  if (!getApps().length) {
-    app = initializeApp(firebaseConfig);
-    // استخدام initializeFirestore بدلاً من getFirestore للتحكم في الكاش
-    // الذاكرة المؤقتة (Memory Cache) تمنع أخطاء Assertion Failed المرتبطة بـ IndexedDB في البيئات السحابية
-    firestore = initializeFirestore(app, {
-      localCache: memoryLocalCache(),
-    });
-    auth = getAuth(app);
-  } else {
-    app = getApps()[0];
-    try {
-      // محاولة الحصول على النسخة الحالية
-      firestore = getFirestore(app);
-    } catch (e) {
-      // في حال وجود تعارض في الإعدادات، يتم إعادة التهيئة بالكاش في الذاكرة
-      firestore = initializeFirestore(app, {
-        localCache: memoryLocalCache(),
-      });
+  if (typeof window !== 'undefined') {
+    if (!getApps().length) {
+      cachedApp = initializeApp(firebaseConfig);
+      cachedFirestore = getFirestore(cachedApp);
+      cachedAuth = getAuth(cachedApp);
+    } else {
+      cachedApp = getApps()[0];
+      cachedFirestore = getFirestore(cachedApp);
+      cachedAuth = getAuth(cachedApp);
     }
-    auth = getAuth(app);
+    
+    // التأكد من تفعيل الشبكة
+    enableNetwork(cachedFirestore).catch(() => {});
+    
+    return { app: cachedApp, firestore: cachedFirestore, auth: cachedAuth };
   }
-  return { app, firestore, auth };
+  
+  // للطرف السيرفر (SSR)
+  const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
+  return { 
+    app, 
+    firestore: getFirestore(app), 
+    auth: getAuth(app) 
+  };
 }
 
 export { FirebaseProvider, useFirebase, useFirebaseApp, useFirestore, useAuth } from './provider';

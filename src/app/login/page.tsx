@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from "react";
@@ -35,38 +34,35 @@ export default function LoginPage() {
       toast({ 
         variant: "destructive", 
         title: "رقم هاتف غير صالح", 
-        description: "يرجى إدخال رقم هاتف عراقي صحيح (مثلاً: 078XXXXXXXX)." 
+        description: "يرجى إدخال رقم هاتف عراقي صحيح." 
       });
       setLoading(false);
       return;
     }
 
-    // قائمة بكافة احتمالات البريد الإلكتروني الداخلي لضمان التوافق مع الحسابات القديمة والجديدة
+    // محاولة الدخول بكافة التنسيقات الممكنة لضمان أقصى درجات التوافق
     const emailAttempts = [
-      getInternalEmail(purePhone),           // 7xxxxxxxx@dubsar.platform
-      getInternalEmail(`0${purePhone}`),     // 07xxxxxxxx@dubsar.platform
-      `${purePhone}@mma.store`,              // Legacy format
-      `0${purePhone}@mma.store`              // Very old legacy format
-    ].filter(Boolean) as string[];
+      getInternalEmail(purePhone),           // التنسيق القياسي الحديث
+      `${purePhone}@mma.store`,              // التنسيق القديم
+      `0${purePhone}@dubsar.platform`,       // تنسيق الصفر الزائد
+      `0${purePhone}@mma.store`              // تنسيق قديم جداً
+    ];
 
     try {
       let userCredential = null;
       let lastError = null;
 
-      // محاولة تسجيل الدخول بكافة التنسيقات الممكنة
       for (const attemptEmail of emailAttempts) {
         try {
+          // محاولة صامتة
           userCredential = await signInWithEmailAndPassword(auth, attemptEmail, trimmedPassword);
           if (userCredential) break; 
         } catch (err: any) {
           lastError = err;
-          // إذا كان الخطأ ليس متعلقاً ببيانات الاعتماد (مثل مشكلة إنترنت)، نتوقف فوراً ونظهره
-          const isCredentialError = 
-            err.code === 'auth/invalid-credential' || 
-            err.code === 'auth/user-not-found' || 
-            err.code === 'auth/wrong-password';
-          
-          if (!isCredentialError) break;
+          // إذا كان الخطأ ليس متعلقاً ببيانات الاعتماد (مثل مشكلة إنترنت)، نتوقف فوراً
+          if (err.code === 'auth/network-request-failed' || err.code === 'auth/internal-error') {
+            break;
+          }
         }
       }
 
@@ -76,19 +72,14 @@ export default function LoginPage() {
       
       const user = userCredential.user;
 
-      // تحديث بيانات الجلسة في Firestore
+      // تحديث بيانات الجلسة في Firestore في الخلفية
       const userRef = doc(db, "users", user.uid);
       getDoc(userRef).then((userSnap) => {
         if (userSnap.exists()) {
           const userData = userSnap.data();
-          updateDoc(userRef, { 
-            lastLogin: Date.now(),
-            phoneNumber: userData.phoneNumber?.startsWith('0') ? userData.phoneNumber : `0${purePhone}`
-          }).catch(() => {});
+          updateDoc(userRef, { lastLogin: Date.now() }).catch(() => {});
 
-          // التوجيه الذكي
-          const isMaster = purePhone === '7858833838' || purePhone === '7703687932';
-          if (userData.role === 'super_admin' || isMaster) {
+          if (userData.role === 'super_admin') {
             router.push("/super-admin");
           } else if (['owner', 'admin', 'sales_employee', 'workshop_technician', 'warehouse_employee'].includes(userData.role)) {
             router.push("/admin");
@@ -104,6 +95,7 @@ export default function LoginPage() {
       
       toast({ title: "تم تسجيل الدخول بنجاح" });
     } catch (error: any) {
+      console.error("Login Error Details:", error.code, error.message);
       let message = "تأكد من رقم الهاتف وكلمة المرور.";
       
       if (error.code === 'auth/too-many-requests') {
