@@ -6,30 +6,27 @@ import { errorEmitter } from '@/firebase/error-emitter';
 
 /**
  * @fileOverview مستمع مركزي لأخطاء أذونات Firestore.
- * يقوم برمي الخطأ السياقي ليظهر في شاشة التطوير (Next.js Error Overlay)
- * مما يساعد المطور على معرفة القاعدة التي تسببت في الرفض بدقة.
  */
 export function FirebaseErrorListener() {
   useEffect(() => {
     const handlePermissionError = (error: any) => {
       const path = error.context?.path || '';
+      const operation = error.context?.operation || '';
       
-      // في بيئة التطوير، نقوم برمي الخطأ ليظهر بشكل مرئي للمطور
-      // مع كافة التفاصيل السياقية (المسار، العملية، البيانات)
       if (process.env.NODE_ENV === 'development') {
-        console.group('🔥 Firestore Permission Denied');
-        console.error('Path:', error.context?.path);
-        console.error('Operation:', error.context?.operation);
-        console.error('Data:', error.context?.requestResourceData);
+        console.group('🔥 Firestore Permission Event');
+        console.warn('Path:', path);
+        console.warn('Operation:', operation);
         console.groupEnd();
         
-        // لا نريد تعطيل التطبيق بالكامل إذا فشل تحميل "الباقات" (plans)
-        // فهي معلومات ترويجية وليست حرجة لعمل النظام الأساسي
-        if (path.includes('plans')) {
+        // منع انهيار الواجهة في الحالات غير الحرجة
+        // 1. باقات الاشتراك (معلومات ترويجية)
+        // 2. عمليات القراءة البسيطة (Get/List) التي قد تفشل بسبب المزامنة
+        if (path.includes('plans') || operation === 'get' || operation === 'list') {
           return;
         }
         
-        // رمي الخطأ ليظهر في واجهة Next.js للحالات الحرجة الأخرى
+        // رمي الخطأ فقط للعمليات الحرجة (مثل الكتابة والحذف) لضمان انتباه المطور
         throw error;
       }
     };

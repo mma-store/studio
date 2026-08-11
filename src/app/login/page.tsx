@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { toast } from "@/hooks/use-toast";
-import { Loader2, Lock, Phone, ArrowLeft, ScrollText, AlertCircle } from "lucide-react";
+import { Loader2, Lock, Phone, ArrowLeft, ScrollText } from "lucide-react";
 import Link from "next/link";
 import { normalizePhoneNumber, getInternalEmail } from "@/lib/auth-utils";
 
@@ -29,7 +29,6 @@ export default function LoginPage() {
     
     setLoading(true);
     
-    // 1. تنظيف البيانات المدخلة بشكل صارم
     const rawPhoneInput = phoneNumber.trim();
     const trimmedPassword = password.trim();
     const purePhone = normalizePhoneNumber(rawPhoneInput);
@@ -44,71 +43,78 @@ export default function LoginPage() {
       return;
     }
 
-    // 2. قائمة بكافة احتمالات البريد الإلكتروني الداخلي (الحالية والقديمة)
-    // هذا يضمن دخول المستخدمين الذين سجلوا في إصدارات سابقة من النظام
     const emailAttempts = [
-      getInternalEmail(purePhone),      // التنسيق الحالي: 7xxxxxxxx@dubsar.platform
-      `${purePhone}@mma.store`,         // التنسيق القديم 1
-      `${purePhone}@platform.store`,    // التنسيق القديم 2
-      `0${purePhone}@dubsar.platform`,  // احتمال وجود الصفر في قاعدة البيانات
-      `0${purePhone}@mma.store`,        // احتمال وجود الصفر (قديم)
-      `${rawPhoneInput}@dubsar.platform` // الرقم الخام كما أدخله المستخدم
+      getInternalEmail(purePhone),
+      `${purePhone}@mma.store`,
+      `${purePhone}@platform.store`,
+      `0${purePhone}@dubsar.platform`
     ];
 
     let userCredential = null;
-    let lastFirebaseError = null;
+    let authError = null;
 
     try {
-      // 3. محاولة الدخول بكافة التنسيقات الممكنة بصمت وسرعة
+      // المرحلة الأولى: التوثيق (Auth)
       for (const attemptEmail of emailAttempts) {
         try {
-          if (process.env.NODE_ENV === 'development') {
-            console.log(`Attempting login with identity: ${attemptEmail}`);
-          }
           userCredential = await signInWithEmailAndPassword(auth, attemptEmail, trimmedPassword);
-          if (userCredential) break; // نجاح الدخول
+          if (userCredential) break;
         } catch (err: any) {
-          lastFirebaseError = err;
-          // إذا كان الخطأ تقنياً (مثل انقطاع الإنترنت أو الطلبات الكثيرة)، نتوقف فوراً
+          authError = err;
           if (err.code === 'auth/network-request-failed' || err.code === 'auth/too-many-requests') {
             throw err;
           }
-          // خلاف ذلك (مثل invalid-credential)، ننتقل للمحاولة التالية
           continue;
         }
       }
 
       if (!userCredential) {
-        throw lastFirebaseError || new Error("auth/invalid-credential");
+        throw authError || new Error("auth/invalid-credential");
       }
 
-      // 4. جلب الملف الشخصي والتحقق من الرتبة
-      const user = userCredential.user;
-      const userRef = doc(db, "users", user.uid);
-      const userSnap = await getDoc(userRef);
-      
-      if (userSnap.exists()) {
-        const userData = userSnap.data();
-        await updateDoc(userRef, { lastLogin: Date.now() }).catch(() => {});
+      // المرحلة الثانية: جلب الملف الشخصي (Firestore)
+      // تم وضعها في try-catch منفصل لتمييز أخطاء الأذونات عن أخطاء الدخول
+      try {
+        const user = userCredential.user;
+        const userRef = doc(db, "users", user.uid);
+        const userSnap = await getDoc(userRef);
+        
+        if (userSnap.exists()) {
+          const userData = userSnap.data();
+          // تحديث وقت الدخول (اختياري، لا يمنع الدخول في حال فشله)
+          await updateDoc(userRef, { lastLogin: Date.now() }).catch(e => console.warn("Failed to update lastLogin:", e.message));
 
-        toast({ title: "تم تسجيل الدخول بنجاح" });
+          toast({ title: "تم تسجيل الدخول بنجاح" });
 
-        // توجيه بناءً على الرتبة
-        if (userData.role === 'super_admin') {
-          router.push("/super-admin");
-        } else if (['owner', 'admin', 'sales_employee', 'workshop_technician', 'warehouse_employee'].includes(userData.role)) {
-          router.push("/admin");
+          if (userData.role === 'super_admin') {
+            router.push("/super-admin");
+          } else if (['owner', 'admin', 'sales_employee', 'workshop_technician', 'warehouse_employee'].includes(userData.role)) {
+            router.push("/admin");
+          } else {
+            router.push("/");
+          }
         } else {
-          router.push("/");
+          // المستخدم موثق ولكن لا يمتلك بروفايل
+          toast({ title: "اكتمل التوثيق", description: "يرجى إكمال إعداد متجرك." });
+          router.push("/onboarding");
         }
-      } else {
-        // إذا كان موجوداً في Auth ولكن ليس لديه ملف، نوجهه للتأسيس
-        router.push("/onboarding");
+      } catch (fsError: any) {
+        if (fsError.code === 'permission-denied') {
+          // خطأ أذونات - المستخدم موثق لكن لا يمكنه قراءة وثيقته
+          console.error("Firestore Permission Denied during login:", fsError);
+          toast({ 
+            variant: "destructive", 
+            title: "خطأ في الصلاحيات", 
+            description: "تم التعرف عليك ولكن لا يمكن الوصول لبياناتك. تواصل مع الدعم." 
+          });
+        } else {
+          throw fsError;
+        }
       }
       
     } catch (error: any) {
       if (process.env.NODE_ENV === 'development') {
-        console.error("Final Login Failure:", error.code);
+        console.error("Login flow failed:", error.code || error.message);
       }
 
       let errorMessage = "رقم الهاتف أو كلمة المرور غير صحيحة.";
