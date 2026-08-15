@@ -74,6 +74,13 @@
     "/banners/{id}": { "schema": "object", "description": "Banners" },
     "/offers/{id}": { "schema": "object", "description": "Offers" },
     "/financialTransactions/{id}": { "schema": "object", "description": "Finance" },
-    "/cashShifts/{id}": { "schema": "object", "description": "Shifts" }
+    "/cashShifts/{id}": { "schema": "object", "description": "Shifts" },
+    "/subscriptionInvoices/{id}": { "schema": "object", "description": "Billing records" },
+    "/paymentVouchers/{id}": { "schema": "object", "description": "Outgoing payments" },
+    "/receiptVouchers/{id}": { "schema": "object", "description": "Incoming payments" },
+    "/apiKeys/{id}": { "schema": "object", "description": "Developer keys" },
+    "/webhooks/{id}": { "schema": "object", "description": "Developer webhooks" },
+    "/systemLogs/{id}": { "schema": "object", "description": "Critical system alerts" },
+    "/notifications/{id}": { "schema": "object", "description": "User notifications" }
   }
 }

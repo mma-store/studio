@@ -35,21 +35,34 @@ export default function BillingPage() {
   const db = useFirestore();
   const subscription = useSubscription(tenantId);
   
-  const invoicesQuery = useMemo(() => query(
-    collection(db, 'subscriptionInvoices'),
-    where('tenantId', '==', tenantId),
-    orderBy('issueDate', 'desc')
-  ), [db, tenantId]);
+  const invoicesQuery = useMemo(() => {
+    if (!tenantId) return null;
+    return query(
+      collection(db, 'subscriptionInvoices'),
+      where('tenantId', '==', tenantId),
+      orderBy('issueDate', 'desc')
+    );
+  }, [db, tenantId]);
   
   const { data: invoices, loading: invoicesLoading } = useCollection(invoicesQuery);
-  const { data: products } = useCollection(query(collection(db, 'products'), where('tenantId', '==', tenantId)));
-  const { data: staff } = useCollection(query(collection(db, 'users'), where('tenantId', '==', tenantId), where('role', 'in', ['admin', 'owner', 'sales_employee', 'workshop_technician', 'warehouse_employee'])));
+  
+  const productsQuery = useMemo(() => {
+    if (!tenantId) return null;
+    return query(collection(db, 'products'), where('tenantId', '==', tenantId));
+  }, [db, tenantId]);
+  const { data: products } = useCollection(productsQuery);
+
+  const staffQuery = useMemo(() => {
+    if (!tenantId) return null;
+    return query(collection(db, 'users'), where('tenantId', '==', tenantId), where('role', 'in', ['admin', 'owner', 'sales_employee', 'workshop_technician', 'warehouse_employee']));
+  }, [db, tenantId]);
+  const { data: staff } = useCollection(staffQuery);
 
   // Dynamic Plans for upgrade
   const plansQuery = useMemo(() => query(collection(db, 'plans'), where('active', '==', true), orderBy('displayOrder', 'asc')), [db]);
   const { data: availablePlans } = useCollection(plansQuery);
 
-  if (subscription.loading) return <div className="p-8"><Skeleton className="h-[400px] w-full rounded-[40px]" /></div>;
+  if (subscription.loading || !tenantId) return <div className="p-8"><Skeleton className="h-[400px] w-full rounded-[40px]" /></div>;
 
   const productUsage = (products.length / (subscription.limits.maxProducts || 1)) * 100;
   const staffUsage = (staff.length / (subscription.limits.maxEmployees || 1)) * 100;
