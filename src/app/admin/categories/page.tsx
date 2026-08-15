@@ -53,6 +53,21 @@ export default function CategoriesPage() {
 
   const filtered = categories.filter((c: any) => c.name.toLowerCase().includes(search.toLowerCase()));
 
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsUploading(true);
+    try {
+      const url = await uploadToCloudinary(file);
+      setUploadedImageUrl(url);
+      toast({ title: "تم رفع الصورة بنجاح" });
+    } catch (e) {
+      toast({ variant: "destructive", title: "خطأ", description: "فشل رفع الصورة، يرجى المحاولة لاحقاً." });
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   const handleAction = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!tenantId) return;
