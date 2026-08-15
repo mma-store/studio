@@ -27,10 +27,10 @@ export default function OnboardingPage() {
     businessType: "retail",
   });
 
-  // Idempotent Check: If user already has a tenant, move them to admin
+  // Idempotent Check: منع الدخول إذا كان المستخدم يملك متجراً بالفعل
   useEffect(() => {
-    if (!identityLoading && profile?.tenantId) {
-      toast({ title: "لديك متجر بالفعل", description: "جاري نقلك للوحة التحكم..." });
+    if (!identityLoading && profile?.tenantId && profile.tenantId !== 'GUEST') {
+      console.log('DIAGNOSTIC: User already has a tenant:', profile.tenantId);
       router.replace('/admin');
     }
   }, [identityLoading, profile, router]);
@@ -44,33 +44,15 @@ export default function OnboardingPage() {
     if (!user) return;
     
     setLoading(true);
+    console.log('DIAGNOSTIC: Starting atomic onboarding for UID:', user.uid);
 
     try {
-      // 1. Double check idempotency via Query (just in case profile isn't synced yet)
-      const tenantsRef = collection(db, "tenants");
-      const q = query(tenantsRef, where("ownerUid", "==", user.uid));
-      const existingTenants = await getDocs(q);
-
-      if (!existingTenants.empty) {
-        const existingData = existingTenants.docs[0].data();
-        toast({ title: "متجرك موجود بالفعل" });
-        
-        // Repair profile if needed
-        if (!profile?.tenantId) {
-          await writeBatch(db)
-            .set(doc(db, "accountProfiles", user.uid), { ...profile, tenantId: existingData.tenantId }, { merge: true })
-            .commit();
-        }
-        
-        router.replace("/admin");
-        return;
-      }
-
       const slug = generateSlug(formData.businessName);
       const now = Date.now();
       const newTenantId = `T-${Date.now().toString().slice(-6)}`;
 
-      // 2. Slug uniqueness check
+      // 1. التحقق من توفر الرابط
+      console.log('DIAGNOSTIC: Checking slug availability:', slug);
       const slugRef = doc(db, "slugs", slug);
       const slugSnap = await getDoc(slugRef);
       if (slugSnap.exists()) {
@@ -79,9 +61,11 @@ export default function OnboardingPage() {
         return;
       }
 
-      // 3. Atomic Batch Creation
+      // 2. عملية كتابة ذرية (Atomic Batch)
+      console.log('DIAGNOSTIC: Committing batch write...');
       const batch = writeBatch(db);
       
+      // إنشاء المتجر
       batch.set(doc(db, "tenants", newTenantId), {
         tenantId: newTenantId,
         businessName: formData.businessName.trim(),
@@ -94,6 +78,7 @@ export default function OnboardingPage() {
         createdAt: now
       });
 
+      // حجز الرابط
       batch.set(slugRef, { tenantId: newTenantId, ownerUid: user.uid });
 
       const newProfile: UserProfile = {
@@ -107,15 +92,19 @@ export default function OnboardingPage() {
         createdAt: now
       };
 
+      // تحديث ملف الهوية (القديم والجديد)
       batch.set(doc(db, "accountProfiles", user.uid), newProfile);
       batch.set(doc(db, "users", user.uid), newProfile);
 
       await batch.commit();
+      console.log('DIAGNOSTIC: Batch commit SUCCESS. Data written to Firestore.');
+      
       toast({ title: "تم التأسيس بنجاح!" });
       router.replace("/admin");
       
     } catch (error: any) {
-      toast({ variant: "destructive", title: "فشل التأسيس", description: error.message });
+      console.error('DIAGNOSTIC: Batch commit FAILED:', error.code, error.message);
+      toast({ variant: "destructive", title: "فشل التأسيس", description: `خطأ Firestore: ${error.code}` });
     } finally {
       setLoading(false);
     }

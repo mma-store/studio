@@ -1,3 +1,4 @@
+
 'use client';
 
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
@@ -17,21 +18,17 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    // ننتظر حتى ينتهي التحميل تماماً قبل اتخاذ أي قرار توجيه
     if (!loading && !error) {
       if (!isAuthenticated) {
         router.replace('/login');
         return;
       }
 
-      // إذا كان المستخدم موثقاً، نتحقق من وجود الـ tenantId في البروفايل المرجعي
-      if (profile?.tenantId) {
+      // إذا كان المستخدم يملك tenantId حقيقياً (وليس GUEST)
+      if (profile?.tenantId && profile.tenantId !== 'GUEST') {
         setReady(true);
-      } else if (profile && !profile.tenantId) {
-        // مستخدم مسجل ولكن ليس لديه متجر بعد
-        router.replace('/onboarding');
-      } else if (!profile && !loading) {
-        // لم يتم العثور على بروفايل إطلاقاً
+      } else if (profile && (!profile.tenantId || profile.tenantId === 'GUEST')) {
+        // مستخدم مسجل ولكن يحتاج للتأسيس
         router.replace('/onboarding');
       }
     }
@@ -67,15 +64,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               <p className="text-primary font-black border-b border-white/10 pb-2">DIAGNOSTIC TRACE:</p>
               <div className="space-y-1">
                  <p>Auth UID: {diagnostic.authUid}</p>
-                 <p>Auth Email: {diagnostic.authEmail}</p>
-              </div>
-              <div className="space-y-1 border-t border-white/10 pt-2">
-                 <p className="text-white">Execution Steps:</p>
-                 {diagnostic.steps.map((step: string, i: number) => (
-                   <p key={i} className="flex gap-2">
-                      <span className="opacity-30">[{i+1}]</span> {step}
-                   </p>
-                 ))}
+                 <p>Profile: {profile ? 'FOUND' : 'MISSING'}</p>
+                 <p>TenantID: {profile?.tenantId || 'NONE'}</p>
               </div>
            </div>
          )}
@@ -84,7 +74,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <Button onClick={() => window.location.reload()} className="bg-red-600 hover:bg-red-700 h-14 px-10 rounded-2xl gap-2 font-black shadow-xl">
                <RefreshCw className="h-5 w-5" /> إعادة محاولة الاتصال
             </Button>
-            <Button variant="outline" onClick={() => router.push('/login')} className="h-14 px-8 rounded-2xl font-bold">تسجيل الدخول مجدداً</Button>
          </div>
       </div>
     );
