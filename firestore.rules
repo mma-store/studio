@@ -7,42 +7,49 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function getProfile() {
+    // Safe profile data access
+    function getProfileData() {
       return get(/databases/$(database)/documents/accountProfiles/$(request.auth.uid)).data;
     }
+    
+    function profileExists() {
+      return exists(/databases/$(database)/documents/accountProfiles/$(request.auth.uid));
+    }
 
+    // Internal check for roles - ONLY used where tenantId is present
     function isSuperAdmin() {
-      return isAuthenticated() && (
-        getProfile().accountType == 'super_admin' || getProfile().role == 'super_admin'
-      );
+      return isAuthenticated() && profileExists() && 
+        (getProfileData().accountType == 'super_admin' || getProfileData().role == 'super_admin');
     }
 
     function isTenantMember(tenantId) {
-      return isAuthenticated() && (getProfile().tenantId == tenantId || isSuperAdmin());
+      return isAuthenticated() && (
+        isSuperAdmin() || (profileExists() && getProfileData().tenantId == tenantId)
+      );
     }
 
     function isTenantAdmin(tenantId) {
       return isAuthenticated() && (
-        (getProfile().tenantId == tenantId && getProfile().role in ['owner', 'admin']) || 
-        isSuperAdmin()
+        isSuperAdmin() || (profileExists() && getProfileData().tenantId == tenantId && getProfileData().role in ['owner', 'admin'])
       );
     }
 
-    // --- Identity Rules (CRITICAL FIX) ---
-    // Allow users to read/write their own profile using UID
+    // --- Identity Rules (REFACTORED: No circular helpers) ---
+    // Users can ALWAYS read/write their own records using direct UID matching
     match /accountProfiles/{uid} {
-      allow read, write: if isAuthenticated() && (request.auth.uid == uid || isSuperAdmin());
+      allow read, write: if isAuthenticated() && (request.auth.uid == uid);
+      // Super admin can manage other profiles
+      allow read, write: if isAuthenticated() && request.auth.uid != uid && isSuperAdmin();
     }
 
     match /users/{uid} {
-      allow read, write: if isAuthenticated() && (request.auth.uid == uid || isSuperAdmin());
+      allow read, write: if isAuthenticated() && (request.auth.uid == uid);
+      allow read, write: if isAuthenticated() && request.auth.uid != uid && isSuperAdmin();
     }
 
     // --- Tenant Rules ---
     match /tenants/{tenantId} {
-      // Allow read if user is member of the tenant
-      allow read: if isAuthenticated() && (isTenantMember(tenantId));
-      // Allow onboarding for new users (no tenant yet)
+      allow read: if isAuthenticated() && isTenantMember(tenantId);
       allow create: if isAuthenticated();
       allow update: if isTenantAdmin(tenantId);
     }
@@ -54,38 +61,38 @@ service cloud.firestore {
 
     // --- Global Platform Data ---
     match /plans/{planId} {
-      allow read: if isAuthenticated();
+      allow read: if true; 
       allow write: if isSuperAdmin();
     }
 
     // --- Operational Data (Tenant Isolated) ---
-    // Products, Categories, Banners, Offers are public-ish but writable only by admins
+    // Products and Categories are public to read for logged-in users, but protected for write
     match /products/{id} {
       allow read: if isAuthenticated();
-      allow write: if isTenantAdmin(request.resource.data.tenantId || resource.data.tenantId);
+      allow write: if isAuthenticated() && isTenantAdmin(request.resource.data.tenantId || resource.data.tenantId);
     }
     match /categories/{id} {
       allow read: if isAuthenticated();
-      allow write: if isTenantAdmin(request.resource.data.tenantId || resource.data.tenantId);
+      allow write: if isAuthenticated() && isTenantAdmin(request.resource.data.tenantId || resource.data.tenantId);
     }
     match /banners/{id} {
       allow read: if isAuthenticated();
-      allow write: if isTenantAdmin(request.resource.data.tenantId || resource.data.tenantId);
+      allow write: if isAuthenticated() && isTenantAdmin(request.resource.data.tenantId || resource.data.tenantId);
     }
     match /offers/{id} {
       allow read: if isAuthenticated();
-      allow write: if isTenantAdmin(request.resource.data.tenantId || resource.data.tenantId);
+      allow write: if isAuthenticated() && isTenantAdmin(request.resource.data.tenantId || resource.data.tenantId);
     }
 
-    // --- Private/Operational Data (Strict Isolation) ---
+    // --- Catch-all Private Tenant Data ---
     match /{path=**} {
       allow read: if isAuthenticated() && (
-        (resource.data.tenantId != null && resource.data.tenantId == getProfile().tenantId) || 
-        isSuperAdmin()
+        isSuperAdmin() || 
+        (resource.data.tenantId != null && profileExists() && resource.data.tenantId == getProfileData().tenantId)
       );
       allow write: if isAuthenticated() && (
-        (request.resource.data.tenantId != null && request.resource.data.tenantId == getProfile().tenantId && getProfile().role in ['owner', 'admin']) ||
-        isSuperAdmin()
+        isSuperAdmin() ||
+        (request.resource.data.tenantId != null && profileExists() && request.resource.data.tenantId == getProfileData().tenantId && getProfileData().role in ['owner', 'admin'])
       );
     }
   }
