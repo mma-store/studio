@@ -2,87 +2,87 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // --- Basic Auth Helpers ---
+    // 1. القواعد المباشرة للهوية (مستقلة تماماً لمنع الحلقة المفرغة)
+    match /accountProfiles/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    match /users/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // 2. وظائف مساعدة آمنة (تستدعى فقط بعد نجاح قراءة الهوية)
     function isAuthenticated() {
       return request.auth != null;
     }
 
-    function isOwner(uid) {
-      return isAuthenticated() && request.auth.uid == uid;
-    }
-
-    // --- Identity Resolution (Safe & Non-Recursive) ---
-    // Reads profile without using helper functions that might recurse
-    function getRawProfile() {
+    function getUserData() {
       return get(/databases/$(database)/documents/accountProfiles/$(request.auth.uid)).data;
     }
 
     function isSuperAdmin() {
       return isAuthenticated() && 
-        exists(/databases/$(database)/documents/accountProfiles/$(request.auth.uid)) && 
-        (getRawProfile().accountType == 'super_admin' || getRawProfile().role == 'super_admin');
+        (getUserData().accountType == 'super_admin' || getUserData().role == 'super_admin');
     }
 
-    function getUserTenantId() {
-      return getRawProfile().tenantId;
-    }
-
-    // --- Domain Helpers ---
     function isTenantMember(tenantId) {
       return isAuthenticated() && (
         isSuperAdmin() || 
-        (exists(/databases/$(database)/documents/accountProfiles/$(request.auth.uid)) && getRawProfile().tenantId == tenantId)
+        getUserData().tenantId == tenantId
       );
     }
 
-    function isTenantAdmin(tenantId) {
-      return isAuthenticated() && (
-        isSuperAdmin() || 
-        (exists(/databases/$(database)/documents/accountProfiles/$(request.auth.uid)) && 
-         getRawProfile().tenantId == tenantId && 
-         getRawProfile().role in ['owner', 'admin'])
-      );
-    }
-
-    // --- Identity Rules ---
-    match /accountProfiles/{uid} {
-      allow read: if isOwner(uid) || isSuperAdmin();
-      allow write: if isOwner(uid) || isSuperAdmin();
-    }
-
-    match /users/{uid} {
-      allow read, write: if isOwner(uid) || isSuperAdmin();
-    }
-
-    // --- Tenant Rules ---
+    // 3. قواعد المتاجر (Tenants)
     match /tenants/{tenantId} {
       allow read: if isAuthenticated() && isTenantMember(tenantId);
-      allow create: if isAuthenticated(); // New merchants can create their first tenant
-      allow update: if isTenantAdmin(tenantId);
+      allow create: if isAuthenticated(); 
+      allow update: if isAuthenticated() && isTenantMember(tenantId) && getUserData().role in ['owner', 'admin'];
     }
 
-    match /slugs/{slug} {
-      allow read: if true;
-      allow create, update: if isAuthenticated();
+    // 4. قواعد البيانات التشغيلية (معزولة بالـ tenantId)
+    // تشمل: المنتجات، الأقسام، الطلبات، الموردين، المصاريف، إلخ.
+    
+    match /products/{id} {
+      allow read: if isAuthenticated() && isTenantMember(resource.data.tenantId);
+      allow write: if isAuthenticated() && isTenantMember(request.resource.data.tenantId) && getUserData().role in ['owner', 'admin', 'warehouse_employee'];
     }
 
-    // --- Global Data ---
+    match /categories/{id} {
+      allow read: if isAuthenticated() && isTenantMember(resource.data.tenantId);
+      allow write: if isAuthenticated() && isTenantMember(request.resource.data.tenantId) && getUserData().role in ['owner', 'admin'];
+    }
+
+    match /orders/{id} {
+      allow read: if isAuthenticated() && (isSuperAdmin() || resource.data.userId == request.auth.uid || isTenantMember(resource.data.tenantId));
+      allow write: if isAuthenticated() && (isTenantMember(request.resource.data.tenantId) || isTenantMember(resource.data.tenantId));
+    }
+
+    match /suppliers/{id} {
+      allow read, write: if isAuthenticated() && isTenantMember(resource.data.tenantId || request.resource.data.tenantId);
+    }
+
+    match /expenses/{id} {
+      allow read, write: if isAuthenticated() && isTenantMember(resource.data.tenantId || request.resource.data.tenantId);
+    }
+
+    match /auditLogs/{id} {
+      allow read: if isAuthenticated() && isTenantMember(resource.data.tenantId);
+      allow create: if isAuthenticated(); 
+    }
+
+    match /subscriptionInvoices/{id} {
+      allow read: if isAuthenticated() && isTenantMember(resource.data.tenantId);
+    }
+
+    // 5. البيانات العامة للمنصة
     match /plans/{planId} {
       allow read: if isAuthenticated();
       allow write: if isSuperAdmin();
     }
 
-    // --- Business Data (Tenant Isolated) ---
-    // Any scoped data must match the user's tenantId
-    match /{path=**} {
-      allow read: if isAuthenticated() && (
-        isSuperAdmin() || 
-        (resource.data.tenantId != null && exists(/databases/$(database)/documents/accountProfiles/$(request.auth.uid)) && resource.data.tenantId == getUserTenantId())
-      );
-      allow write: if isAuthenticated() && (
-        isSuperAdmin() ||
-        (request.resource.data.tenantId != null && exists(/databases/$(database)/documents/accountProfiles/$(request.auth.uid)) && request.resource.data.tenantId == getUserTenantId() && getRawProfile().role in ['owner', 'admin'])
-      );
+    match /slugs/{slug} {
+      allow read: if true;
+      allow write: if isAuthenticated();
     }
   }
 }

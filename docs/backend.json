@@ -15,11 +15,7 @@
         "address": { "type": "string" },
         "status": { "type": "string", "enum": ["active", "trial", "suspended", "expired"] },
         "subscriptionPlan": { "type": "string" },
-        "subscriptionPlanId": { "type": "string" },
-        "createdAt": { "type": "number" },
-        "trialEndDate": { "type": "number" },
-        "currentPeriodEnd": { "type": "number" },
-        "settings": { "type": "object" }
+        "createdAt": { "type": "number" }
       },
       "required": ["tenantId", "slug", "ownerUid"]
     },
@@ -41,29 +37,19 @@
     }
   },
   "auth": {
-    "providers": ["password", "phone"]
+    "providers": ["password"]
   },
   "firestore": {
     "/accountProfiles/{uid}": { "schema": "AccountProfile", "description": "Primary identity (UID-Keyed)" },
-    "/users/{uid}": { "schema": "AccountProfile", "description": "Legacy compatible identity (UID-Keyed)" },
+    "/users/{uid}": { "schema": "AccountProfile", "description": "Legacy compatible identity" },
     "/tenants/{tenantId}": { "schema": "Tenant", "description": "Tenant configuration" },
-    "/plans/{planId}": { "schema": "object", "description": "Global subscription plans" },
-    "/products/{id}": { "schema": "object", "description": "Multi-tenant products" },
-    "/categories/{id}": { "schema": "object", "description": "Categories" },
-    "/orders/{id}": { "schema": "object", "description": "Multi-tenant orders" },
-    "/repairOrders/{id}": { "schema": "object", "description": "Workshop tasks" },
-    "/suppliers/{id}": { "schema": "object", "description": "Suppliers" },
-    "/purchases/{id}": { "schema": "object", "description": "Inventory purchases" },
-    "/expenses/{id}": { "schema": "object", "description": "Expenses" },
-    "/auditLogs/{id}": { "schema": "object", "description": "Audit trails" },
+    "/products/{id}": { "schema": "object", "description": "Tenant products" },
+    "/categories/{id}": { "schema": "object", "description": "Tenant categories" },
+    "/orders/{id}": { "schema": "object", "description": "Tenant orders" },
+    "/plans/{id}": { "schema": "object", "description": "Global plans" },
+    "/auditLogs/{id}": { "schema": "object", "description": "System audit logs" },
     "/subscriptionInvoices/{id}": { "schema": "object", "description": "Billing records" },
-    "/apiKeys/{id}": { "schema": "object", "description": "Developer keys" },
-    "/webhooks/{id}": { "schema": "object", "description": "Developer webhooks" },
-    "/notifications/{id}": { "schema": "object", "description": "User notifications" },
-    "/systemLogs/{id}": { "schema": "object", "description": "System health logs" },
-    "/banners/{id}": { "schema": "object", "description": "Banners" },
-    "/offers/{id}": { "schema": "object", "description": "Offers" },
-    "/cashShifts/{id}": { "schema": "object", "description": "Finance shifts" },
-    "/financialTransactions/{id}": { "schema": "object", "description": "Finance transactions" }
+    "/suppliers/{id}": { "schema": "object", "description": "Store suppliers" },
+    "/expenses/{id}": { "schema": "object", "description": "Store expenses" }
   }
 }
