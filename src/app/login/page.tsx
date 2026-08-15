@@ -14,6 +14,10 @@ import { Loader2, Lock, Phone, ArrowLeft, ScrollText } from "lucide-react";
 import Link from "next/link";
 import { normalizePhoneNumber, getInternalEmail } from "@/lib/auth-utils";
 
+/**
+ * @fileOverview صفحة تسجيل الدخول الموحدة.
+ * تعتمد على التوثيق فقط، وتترك حل الهوية للـ AdminLayout.
+ */
 export default function LoginPage() {
   const auth = useAuth();
   const router = useRouter();
@@ -36,7 +40,7 @@ export default function LoginPage() {
       return;
     }
 
-    // تجربة كافة التنسيقات التاريخية للبريد الإلكتروني الداخلي
+    // تجربة كافة التنسيقات التاريخية للبريد الإلكتروني الداخلي (Resilient Login)
     const emailAttempts = [
       getInternalEmail(purePhone), 
       `${purePhone}@mma.store`,    
@@ -45,38 +49,31 @@ export default function LoginPage() {
     ];
 
     let success = false;
+    let lastError = "";
 
     try {
-      // محاولة تسجيل الدخول
       for (const attemptEmail of emailAttempts) {
         try {
           await signInWithEmailAndPassword(auth, attemptEmail, trimmedPassword);
           success = true;
           break; 
         } catch (err: any) {
+          lastError = err.code;
           if (err.code === 'auth/network-request-failed') throw err;
           continue;
         }
       }
 
       if (success) {
-        toast({ title: "تم التوثيق بنجاح", description: "جاري فتح لوحة التحكم..." });
-        // التوجه للوحة الإدارة؛ الـ Layout سيتكفل بالتحقق من وجود البروفايل
+        toast({ title: "تم التوثيق بنجاح", description: "جاري التعرف على متجرك..." });
+        // التحويل للـ Admin؛ سيقوم الـ Layout بحل الهوية المرجعية وتوجيه التاجر لمتجره
         router.push("/admin");
       } else {
-        toast({ 
-          variant: "destructive", 
-          title: "فشل الدخول", 
-          description: "رقم الهاتف أو كلمة المرور غير صحيحة." 
-        });
+        const msg = lastError === 'auth/wrong-password' ? "كلمة المرور غير صحيحة." : "رقم الهاتف غير مسجل أو البيانات خاطئة.";
+        toast({ variant: "destructive", title: "فشل الدخول", description: msg });
       }
     } catch (error: any) {
-      console.error("Auth Error:", error.code);
-      toast({ 
-        variant: "destructive", 
-        title: "خطأ في الاتصال", 
-        description: "يرجى التحقق من جودة الإنترنت والمحاولة ثانية." 
-      });
+      toast({ variant: "destructive", title: "خطأ في الاتصال", description: "يرجى التحقق من الإنترنت والمحاولة ثانية." });
     } finally {
       setLoading(false);
     }
@@ -103,7 +100,7 @@ export default function LoginPage() {
           <CardDescription className="font-medium text-slate-500 italic">بوابتك للتجارة السحابية الذكية</CardDescription>
         </CardHeader>
         
-        <CardContent className="px-10">
+        <CardContent className="px-10 pb-12">
           <form onSubmit={handleLogin} className="space-y-5">
             <div className="space-y-2">
               <Label className="font-black text-xs mr-2 uppercase tracking-widest text-slate-400 text-right block">رقم الهاتف</Label>
@@ -143,10 +140,6 @@ export default function LoginPage() {
             </Button>
           </form>
         </CardContent>
-        
-        <CardFooter className="pb-12 pt-6 flex flex-col gap-4 text-center">
-          <p className="text-sm text-slate-500 font-bold">ليس لديك حساب؟ <Link href="/register" className="text-secondary font-black hover:underline">انضم إلينا الآن</Link></p>
-        </CardFooter>
       </Card>
     </div>
   );
