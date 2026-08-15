@@ -1,15 +1,13 @@
-
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // --- وظائف مساعدة (Helper Functions) ---
+    // --- Helper Functions ---
     function isAuthenticated() {
       return request.auth != null;
     }
 
     function getProfile() {
-      // الوصول المباشر لملف الهوية الموحد بالـ UID
       return get(/databases/$(database)/documents/accountProfiles/$(request.auth.uid)).data;
     }
 
@@ -30,7 +28,8 @@ service cloud.firestore {
       );
     }
 
-    // --- قواعد الهوية (Identity Rules) ---
+    // --- Identity Rules (CRITICAL FIX) ---
+    // Allow users to read/write their own profile using UID
     match /accountProfiles/{uid} {
       allow read, write: if isAuthenticated() && (request.auth.uid == uid || isSuperAdmin());
     }
@@ -39,9 +38,12 @@ service cloud.firestore {
       allow read, write: if isAuthenticated() && (request.auth.uid == uid || isSuperAdmin());
     }
 
+    // --- Tenant Rules ---
     match /tenants/{tenantId} {
-      allow read: if isAuthenticated(); // السماح بقراءة بيانات المتجر الأساسية لأي مستخدم مسجل
-      allow create: if isAuthenticated(); // السماح للمستخدمين الجدد بإنشاء متجر
+      // Allow read if user is member of the tenant
+      allow read: if isAuthenticated() && (isTenantMember(tenantId));
+      // Allow onboarding for new users (no tenant yet)
+      allow create: if isAuthenticated();
       allow update: if isTenantAdmin(tenantId);
     }
 
@@ -50,13 +52,14 @@ service cloud.firestore {
       allow create, update: if isAuthenticated();
     }
 
+    // --- Global Platform Data ---
     match /plans/{planId} {
       allow read: if isAuthenticated();
       allow write: if isSuperAdmin();
     }
 
-    // --- قواعد البيانات العامة للمتجر (Discovery) ---
-    // يمكن للزبائن المسجلين القراءة، والمديرين فقط الكتابة
+    // --- Operational Data (Tenant Isolated) ---
+    // Products, Categories, Banners, Offers are public-ish but writable only by admins
     match /products/{id} {
       allow read: if isAuthenticated();
       allow write: if isTenantAdmin(request.resource.data.tenantId || resource.data.tenantId);
@@ -74,8 +77,7 @@ service cloud.firestore {
       allow write: if isTenantAdmin(request.resource.data.tenantId || resource.data.tenantId);
     }
 
-    // --- قواعد البيانات التشغيلية والخاصة (Private/Operational) ---
-    // تفرض عزلاً تاماً بناءً على الـ tenantId
+    // --- Private/Operational Data (Strict Isolation) ---
     match /{path=**} {
       allow read: if isAuthenticated() && (
         (resource.data.tenantId != null && resource.data.tenantId == getProfile().tenantId) || 
