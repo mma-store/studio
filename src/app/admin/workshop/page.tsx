@@ -46,12 +46,16 @@ export default function WorkshopDashboardPage() {
   const db = useFirestore();
   const { tenantId } = useUser();
   
-  const repairOrdersQuery = useMemo(() => query(
-    collection(db, 'repairOrders'), 
-    where('tenantId', '==', tenantId),
-    orderBy('createdAt', 'desc'), 
-    limit(5)
-  ), [db, tenantId]);
+  const repairOrdersQuery = useMemo(() => {
+    if (!tenantId) return null;
+    return query(
+      collection(db, 'repairOrders'), 
+      where('tenantId', '==', tenantId),
+      orderBy('createdAt', 'desc'), 
+      limit(5)
+    );
+  }, [db, tenantId]);
+  
   const { data: recentRepairs, loading } = useCollection(repairOrdersQuery);
 
   return (
@@ -76,25 +80,25 @@ export default function WorkshopDashboardPage() {
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
         <StatsCard 
           title="مهام اليوم" 
-          value="--" 
+          value={recentRepairs?.length.toString() || "0"} 
           icon={Wrench} 
           color="blue"
         />
         <StatsCard 
           title="قيد العمل" 
-          value="--" 
+          value={recentRepairs?.filter((o:any) => o.status === 'in_progress').length.toString() || "0"} 
           icon={TrendingUp} 
           color="purple"
         />
         <StatsCard 
           title="بانتظار قطع" 
-          value="--" 
+          value={recentRepairs?.filter((o:any) => o.status === 'waiting_parts').length.toString() || "0"} 
           icon={Clock} 
           color="orange"
         />
         <StatsCard 
           title="إيرادات الورشة" 
-          value="-- د.ع" 
+          value={`${recentRepairs?.reduce((acc: number, o: any) => acc + (o.totalAmount || 0), 0).toLocaleString()} د.ع`} 
           icon={BadgeDollarSign} 
           trend={{ value: "مباشر", isUp: true }}
           color="green"

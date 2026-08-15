@@ -30,18 +30,22 @@ export default function CashRegisterPage() {
   const [isClosing, setIsClosing] = useState(false);
   const [amount, setAmount] = useState(0);
 
-  const shiftsQuery = useMemo(() => query(
-    collection(db, 'cashShifts'), 
-    where('tenantId', '==', tenantId),
-    orderBy('openingTime', 'desc'), 
-    limit(10)
-  ), [db, tenantId]);
+  const shiftsQuery = useMemo(() => {
+    if (!tenantId) return null;
+    return query(
+      collection(db, 'cashShifts'), 
+      where('tenantId', '==', tenantId),
+      orderBy('openingTime', 'desc'), 
+      limit(10)
+    );
+  }, [db, tenantId]);
   
   const { data: shifts, loading } = useCollection(shiftsQuery);
 
   const activeShift = shifts.find(s => s.status === 'open');
 
   const handleOpenShift = async () => {
+    if (!tenantId) return;
     setIsOpening(true);
     try {
       await addDoc(collection(db, 'cashShifts'), {

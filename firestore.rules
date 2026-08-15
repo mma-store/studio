@@ -9,12 +9,13 @@ service cloud.firestore {
     }
 
     function getProfile() {
+      // Direct access with Auth UID should be safe within limits
       return get(/databases/$(database)/documents/accountProfiles/$(request.auth.uid)).data;
     }
 
     function isSuperAdmin() {
       return isAuthenticated() && (
-        get(/databases/$(database)/documents/accountProfiles/$(request.auth.uid)).data.accountType == 'super_admin'
+        getProfile().accountType == 'super_admin'
       );
     }
 
@@ -39,7 +40,7 @@ service cloud.firestore {
     }
 
     match /tenants/{tenantId} {
-      allow read: if isTenantMember(tenantId) || isAuthenticated(); // Allow customers to see tenant info
+      allow read: if isAuthenticated(); // Allow reading metadata for any store
       allow create: if isAuthenticated();
       allow update: if isTenantAdmin(tenantId);
     }
@@ -50,11 +51,11 @@ service cloud.firestore {
     }
 
     match /plans/{planId} {
-      allow read: if true;
+      allow read: if isAuthenticated();
       allow write: if isSuperAdmin();
     }
 
-    // --- Public Shop Data (Read access for all authenticated users) ---
+    // --- Global Read Access for Storefront Discovery ---
     match /products/{id} {
       allow read: if isAuthenticated();
       allow write: if isTenantAdmin(request.resource.data.tenantId || resource.data.tenantId);
@@ -78,12 +79,13 @@ service cloud.firestore {
 
     // --- Private Operational Data Rules ---
     match /{path=**} {
-      // General rule for private docs: check tenantId field match with user profile
+      // Force tenant matching for all other operational data (orders, etc)
       allow read: if isAuthenticated() && (
-        resource.data.tenantId == getProfile().tenantId || isSuperAdmin()
+        (resource.data.tenantId != null && resource.data.tenantId == getProfile().tenantId) || 
+        isSuperAdmin()
       );
       allow write: if isAuthenticated() && (
-        (request.resource.data.tenantId == getProfile().tenantId && getProfile().role in ['owner', 'admin']) ||
+        (request.resource.data.tenantId != null && request.resource.data.tenantId == getProfile().tenantId && getProfile().role in ['owner', 'admin']) ||
         isSuperAdmin()
       );
     }
