@@ -10,8 +10,8 @@ import { UserProfile } from '@/lib/types/roles';
 const MASTER_RAW_PHONES = ['7858833838', '7703687932'];
 
 /**
- * @fileOverview Hook موحد لإدارة حالة المستخدم والتحقق من الصلاحيات.
- * تم تحسينه لضمان استقرار جلسة التاجر والمدير العام.
+ * @fileOverview المحرك المركزي للهوية (Identity Engine).
+ * يضمن ربط Firebase Auth UID بسجلات Firestore بشكل تفاعلي.
  */
 export function useUser() {
   const auth = useAuth();
@@ -25,19 +25,28 @@ export function useUser() {
       setUser(firebaseUser);
       
       if (firebaseUser) {
+        // مراقبة حية للملف الشخصي لضمان استلام الـ tenantId فوراً
         const profileRef = doc(db, 'users', firebaseUser.uid);
-        
-        // استخدام onSnapshot لضمان تحديث الرتبة والـ tenantId فوراً وبشكل تفاعلي
         const unsubscribeProfile = onSnapshot(profileRef, (docSnap) => {
           if (docSnap.exists()) {
-            setProfile(docSnap.data() as UserProfile);
+            const data = docSnap.data() as UserProfile;
+            setProfile(data);
+            
+            // التشخيص في وضع التطوير
+            if (process.env.NODE_ENV === 'development') {
+              console.group('🛡️ Identity Diagnosis');
+              console.log('Firebase UID:', firebaseUser.uid);
+              console.log('Profile UID:', data.uid);
+              console.log('Tenant ID:', data.tenantId);
+              console.log('User Role:', data.role);
+              console.groupEnd();
+            }
           } else {
             setProfile(null);
           }
           setLoading(false);
         }, (err) => {
-          // في حال فشل الوصول للملف الشخصي (مثلاً خطأ أذونات عابر)
-          console.warn("Profile sync error:", err.message);
+          console.error("Profile sync error:", err);
           setLoading(false);
         });
         
@@ -51,12 +60,13 @@ export function useUser() {
     return () => unsubscribeAuth();
   }, [auth, db]);
 
-  // التحقق من هوية المدير العام
+  // التحقق من صلاحيات المدير العام للمنصة
   const isSuperAdmin = profile?.role === 'super_admin' || 
     (user?.email && MASTER_RAW_PHONES.some(p => user.email!.includes(p)));
 
-  // حل معرف المتجر (Tenant ID)
-  // الأولوية دائماً لمعرف المتجر الموجود في الملف الشخصي الفعلي
+  // حل معرف المتجر (Tenant Resolution)
+  // الأولوية 1: المعرف المسجل في البروفايل (للتجار والمدراء)
+  // الأولوية 2: المعرف العام (للمدير العام إذا لم يكن يدير متجراً خاصاً)
   const resolvedTenantId = profile?.tenantId || (isSuperAdmin ? 'PLATFORM_OWNER' : null);
 
   return { 

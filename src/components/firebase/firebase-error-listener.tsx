@@ -6,7 +6,7 @@ import { errorEmitter } from '@/firebase/error-emitter';
 
 /**
  * @fileOverview مستمع مركزي لأخطاء أذونات Firestore.
- * تم تحديثه ليمنع انهيار الواجهة في حالات القراءة غير الحرجة.
+ * تم تحديثه ليمنع انهيار الواجهة في حالات القراءة غير الحرجة (مثل الباقات).
  */
 export function FirebaseErrorListener() {
   useEffect(() => {
@@ -15,18 +15,19 @@ export function FirebaseErrorListener() {
       const operation = error.context?.operation || '';
       
       if (process.env.NODE_ENV === 'development') {
+        // تسجيل الخطأ في وحدة التحكم للتشخيص دون إيقاف التطبيق
         console.group('🔥 Firestore Permission Event');
         console.warn('Path:', path);
         console.warn('Operation:', operation);
         console.groupEnd();
         
-        // منع انهيار الواجهة (Error Overlay) لكافة عمليات القراءة
-        // هذا يسمح للتطبيق بالاستمرار حتى لو فشلت قراءة الباقات أو الملفات الشخصية مؤقتاً
+        // استثناء: لا تظهر شاشة الخطأ الحمراء لقائمة الباقات أو عمليات القراءة البسيطة
+        // هذا يضمن بقاء المستخدم في صفحة الدخول حتى لو فشلت قراءة الخلفية
         if (operation === 'get' || operation === 'list' || path.includes('plans')) {
           return;
         }
         
-        // رمي الخطأ فقط للعمليات الحرجة (مثل الكتابة والحذف) لضمان انتباه المطور
+        // رمي الخطأ للعمليات الحرجة فقط (كتابة، حذف) لضمان انتباه المطور
         throw error;
       }
     };
