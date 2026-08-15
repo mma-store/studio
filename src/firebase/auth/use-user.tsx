@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -19,7 +18,6 @@ export function useUser() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [identitySource, setIdentitySource] = useState<'canonical' | 'legacy' | 'none'>('none');
-  const [diagnostic, setDiagnostic] = useState<any>(null);
 
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -28,32 +26,23 @@ export function useUser() {
       if (!firebaseUser) {
         setProfile(null);
         setLoading(false);
-        setDiagnostic(null);
         return;
       }
 
       setLoading(true);
       setError(null);
 
-      const diag = {
-        authUid: firebaseUser.uid,
-        authEmail: firebaseUser.email,
-        steps: ["Auth Detected"]
-      };
-
-      // 1. Direct UID read from Account Profiles
+      // 1. Direct UID read from Account Profiles (Canonical Source)
       const profileRef = doc(db, 'accountProfiles', firebaseUser.uid);
       
       const unsubscribeProfile = onSnapshot(profileRef, 
         async (snap) => {
           if (snap.exists()) {
-            const data = snap.data() as UserProfile;
-            setProfile(data);
+            setProfile(snap.data() as UserProfile);
             setIdentitySource('canonical');
-            diag.steps.push("Canonical Profile Resolved");
             setLoading(false);
           } else {
-            diag.steps.push("Canonical Missing, checking Legacy...");
+            // 2. Fallback to legacy 'users' collection
             try {
               const legacyRef = doc(db, 'users', firebaseUser.uid);
               const legacySnap = await getDoc(legacyRef);
@@ -73,24 +62,30 @@ export function useUser() {
                 
                 setProfile(resolvedProfile);
                 setIdentitySource('legacy');
-                diag.steps.push("Legacy Found, Migrating...");
-                
-                // Atomic migration
+                // Migrate to canonical source silently
                 setDoc(profileRef, resolvedProfile, { merge: true }).catch(console.warn);
               } else {
                 setProfile(null);
                 setIdentitySource('none');
-                diag.steps.push("No Profile Found");
               }
             } catch (err: any) {
-              setError(`فشل استرجاع الهوية: ${err.code}`);
+              // Only treat as error if not a missing doc
+              if (err.code !== 'permission-denied') {
+                setError(`فشل استرجاع الهوية: ${err.code}`);
+              } else {
+                setIdentitySource('none');
+              }
             }
             setLoading(false);
           }
         }, 
         (err) => {
-          // If permission denied to profile, it's a critical error
-          setError(`خطأ أمني: Firestore رفض الوصول لهويتك. (${err.code})`);
+          if (err.code === 'permission-denied') {
+            // This happens if the rule is failing for the owner
+            setError("خطأ أمني: Firestore رفض الوصول لملف هويتك. يرجى مراجعة القواعد.");
+          } else {
+            setError(`خطأ في المزامنة: ${err.message}`);
+          }
           setLoading(false);
         }
       );
@@ -111,7 +106,6 @@ export function useUser() {
     isSuperAdmin,
     identitySource,
     tenantId: profile?.tenantId || null,
-    isAuthenticated: !!user,
-    diagnostic
+    isAuthenticated: !!user
   };
 }

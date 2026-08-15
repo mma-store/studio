@@ -2,55 +2,62 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // --- Helper Functions ---
+    // --- Basic Auth Helpers ---
     function isAuthenticated() {
       return request.auth != null;
     }
 
-    // Safe profile data access
-    function getProfileData() {
+    function isOwner(uid) {
+      return isAuthenticated() && request.auth.uid == uid;
+    }
+
+    // --- Identity Resolution (Safe & Non-Recursive) ---
+    // Reads profile without using helper functions that might recurse
+    function getRawProfile() {
       return get(/databases/$(database)/documents/accountProfiles/$(request.auth.uid)).data;
     }
-    
-    function profileExists() {
-      return exists(/databases/$(database)/documents/accountProfiles/$(request.auth.uid));
-    }
 
-    // Internal check for roles - ONLY used where tenantId is present
     function isSuperAdmin() {
-      return isAuthenticated() && profileExists() && 
-        (getProfileData().accountType == 'super_admin' || getProfileData().role == 'super_admin');
+      return isAuthenticated() && 
+        exists(/databases/$(database)/documents/accountProfiles/$(request.auth.uid)) && 
+        (getRawProfile().accountType == 'super_admin' || getRawProfile().role == 'super_admin');
     }
 
+    function getUserTenantId() {
+      return getRawProfile().tenantId;
+    }
+
+    // --- Domain Helpers ---
     function isTenantMember(tenantId) {
       return isAuthenticated() && (
-        isSuperAdmin() || (profileExists() && getProfileData().tenantId == tenantId)
+        isSuperAdmin() || 
+        (exists(/databases/$(database)/documents/accountProfiles/$(request.auth.uid)) && getRawProfile().tenantId == tenantId)
       );
     }
 
     function isTenantAdmin(tenantId) {
       return isAuthenticated() && (
-        isSuperAdmin() || (profileExists() && getProfileData().tenantId == tenantId && getProfileData().role in ['owner', 'admin'])
+        isSuperAdmin() || 
+        (exists(/databases/$(database)/documents/accountProfiles/$(request.auth.uid)) && 
+         getRawProfile().tenantId == tenantId && 
+         getRawProfile().role in ['owner', 'admin'])
       );
     }
 
-    // --- Identity Rules (REFACTORED: No circular helpers) ---
-    // Users can ALWAYS read/write their own records using direct UID matching
+    // --- Identity Rules ---
     match /accountProfiles/{uid} {
-      allow read, write: if isAuthenticated() && (request.auth.uid == uid);
-      // Super admin can manage other profiles
-      allow read, write: if isAuthenticated() && request.auth.uid != uid && isSuperAdmin();
+      allow read: if isOwner(uid) || isSuperAdmin();
+      allow write: if isOwner(uid) || isSuperAdmin();
     }
 
     match /users/{uid} {
-      allow read, write: if isAuthenticated() && (request.auth.uid == uid);
-      allow read, write: if isAuthenticated() && request.auth.uid != uid && isSuperAdmin();
+      allow read, write: if isOwner(uid) || isSuperAdmin();
     }
 
     // --- Tenant Rules ---
     match /tenants/{tenantId} {
       allow read: if isAuthenticated() && isTenantMember(tenantId);
-      allow create: if isAuthenticated();
+      allow create: if isAuthenticated(); // New merchants can create their first tenant
       allow update: if isTenantAdmin(tenantId);
     }
 
@@ -59,40 +66,22 @@ service cloud.firestore {
       allow create, update: if isAuthenticated();
     }
 
-    // --- Global Platform Data ---
+    // --- Global Data ---
     match /plans/{planId} {
-      allow read: if true; 
+      allow read: if isAuthenticated();
       allow write: if isSuperAdmin();
     }
 
-    // --- Operational Data (Tenant Isolated) ---
-    // Products and Categories are public to read for logged-in users, but protected for write
-    match /products/{id} {
-      allow read: if isAuthenticated();
-      allow write: if isAuthenticated() && isTenantAdmin(request.resource.data.tenantId || resource.data.tenantId);
-    }
-    match /categories/{id} {
-      allow read: if isAuthenticated();
-      allow write: if isAuthenticated() && isTenantAdmin(request.resource.data.tenantId || resource.data.tenantId);
-    }
-    match /banners/{id} {
-      allow read: if isAuthenticated();
-      allow write: if isAuthenticated() && isTenantAdmin(request.resource.data.tenantId || resource.data.tenantId);
-    }
-    match /offers/{id} {
-      allow read: if isAuthenticated();
-      allow write: if isAuthenticated() && isTenantAdmin(request.resource.data.tenantId || resource.data.tenantId);
-    }
-
-    // --- Catch-all Private Tenant Data ---
+    // --- Business Data (Tenant Isolated) ---
+    // Any scoped data must match the user's tenantId
     match /{path=**} {
       allow read: if isAuthenticated() && (
         isSuperAdmin() || 
-        (resource.data.tenantId != null && profileExists() && resource.data.tenantId == getProfileData().tenantId)
+        (resource.data.tenantId != null && exists(/databases/$(database)/documents/accountProfiles/$(request.auth.uid)) && resource.data.tenantId == getUserTenantId())
       );
       allow write: if isAuthenticated() && (
         isSuperAdmin() ||
-        (request.resource.data.tenantId != null && profileExists() && request.resource.data.tenantId == getProfileData().tenantId && getProfileData().role in ['owner', 'admin'])
+        (request.resource.data.tenantId != null && exists(/databases/$(database)/documents/accountProfiles/$(request.auth.uid)) && request.resource.data.tenantId == getUserTenantId() && getRawProfile().role in ['owner', 'admin'])
       );
     }
   }
