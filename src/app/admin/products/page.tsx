@@ -1,4 +1,3 @@
-
 'use client';
 
 import { 
@@ -76,18 +75,25 @@ export default function ProductsManagementPage() {
   const { tenantId } = useUser();
   const subscription = useSubscription(tenantId);
   
-  const productsQuery = useMemo(() => query(
-    collection(db, 'products'), 
-    where('tenantId', '==', tenantId),
-    orderBy('createdAt', 'desc')
-  ), [db, tenantId]);
+  // FIXED: Only create the query if tenantId is available
+  const productsQuery = useMemo(() => {
+    if (!tenantId) return null;
+    return query(
+      collection(db, 'products'), 
+      where('tenantId', '==', tenantId),
+      orderBy('createdAt', 'desc')
+    );
+  }, [db, tenantId]);
   const { data: products, loading } = useCollection(productsQuery);
   
-  const categoriesQuery = useMemo(() => query(
-    collection(db, 'categories'), 
-    where('tenantId', '==', tenantId),
-    orderBy('name')
-  ), [db, tenantId]);
+  const categoriesQuery = useMemo(() => {
+    if (!tenantId) return null;
+    return query(
+      collection(db, 'categories'), 
+      where('tenantId', '==', tenantId),
+      orderBy('name')
+    );
+  }, [db, tenantId]);
   const { data: categories } = useCollection(categoriesQuery);
   
   const [searchQuery, setSearchQuery] = useState("");
@@ -109,10 +115,13 @@ export default function ProductsManagementPage() {
     }
   }, [isDialogOpen]);
 
-  const filteredProducts = products.filter((p: any) => 
-    (p.name?.toLowerCase() || "").includes(searchQuery.toLowerCase()) || 
-    (p.barcode || "").includes(searchQuery)
-  );
+  const filteredProducts = useMemo(() => {
+    if (!products) return [];
+    return products.filter((p: any) => 
+      (p.name?.toLowerCase() || "").includes(searchQuery.toLowerCase()) || 
+      (p.barcode || "").includes(searchQuery)
+    );
+  }, [products, searchQuery]);
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -138,7 +147,7 @@ export default function ProductsManagementPage() {
 
   const handleAction = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (isSaving) return;
+    if (isSaving || !tenantId) return;
 
     // Plan Enforcement
     if (!editingProduct && !subscription.canAddProduct(products.length)) {
@@ -242,7 +251,7 @@ export default function ProductsManagementPage() {
                     </Card>
                   )}
 
-                  {!subscription.canAddProduct(products.length) && !editingProduct && !subscription.isExpired && (
+                  {!subscription.canAddProduct(products?.length || 0) && !editingProduct && !subscription.isExpired && (
                     <Card className="bg-orange-50 border-orange-100 p-6 rounded-3xl flex flex-col items-center text-center gap-4">
                        <Zap className="h-10 w-10 text-orange-600" />
                        <div className="space-y-1">
@@ -260,7 +269,7 @@ export default function ProductsManagementPage() {
                       {editingProduct ? "تعديل المنتج" : "إضافة منتج جديد"}
                     </DialogTitle>
                     <DialogDescription className="text-muted-foreground font-bold text-right">
-                       {subscription.isTrial && !editingProduct && `متبقي لك ${subscription.limits.maxProducts - products.length} منتجات في الخطة التجريبية.`}
+                       {subscription.isTrial && !editingProduct && `متبقي لك ${subscription.limits.maxProducts - (products?.length || 0)} منتجات في الخطة التجريبية.`}
                     </DialogDescription>
                   </DialogHeader>
                   <form onSubmit={handleAction} className="space-y-8 py-4">
@@ -294,7 +303,7 @@ export default function ProductsManagementPage() {
                               <SelectValue placeholder="اختر قسم المنتج" />
                             </SelectTrigger>
                             <SelectContent className="rounded-2xl p-2 shadow-2xl border-none">
-                              {categories.length > 0 ? (
+                              {categories && categories.length > 0 ? (
                                 categories.map((cat: any) => (
                                   <SelectItem key={cat.id} value={cat.name} className="rounded-xl font-bold py-3">
                                     {cat.name}
@@ -337,7 +346,7 @@ export default function ProductsManagementPage() {
                     </div>
 
                     <DialogFooter className="pt-8 gap-4 flex-row justify-end" dir="rtl">
-                      <Button type="submit" className="rounded-2xl h-14 px-12 shadow-xl font-black text-lg gap-2" disabled={isUploading || isSaving || subscription.isExpired || (!editingProduct && !subscription.canAddProduct(products.length))}>
+                      <Button type="submit" className="rounded-2xl h-14 px-12 shadow-xl font-black text-lg gap-2" disabled={isUploading || isSaving || subscription.isExpired || (!editingProduct && !subscription.canAddProduct(products?.length || 0))}>
                         {isSaving ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}
                         {editingProduct ? "حفظ التعديلات" : "حفظ المنتج والنشـر"}
                       </Button>

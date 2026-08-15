@@ -37,17 +37,22 @@ export default function NotificationsPage() {
   const [message, setMessage] = useState("");
   const [target, setTarget] = useState("all");
 
-  // FIXED: Scoped to tenantId
-  const historyQuery = useMemo(() => query(
-    collection(db, 'notifications'), 
-    where('tenantId', '==', tenantId),
-    orderBy('timestamp', 'desc'), 
-    limit(10)
-  ), [db, tenantId]);
+  // FIXED: Scoped to tenantId and ONLY runs when tenantId is available to prevent permission-denied
+  const historyQuery = useMemo(() => {
+    if (!tenantId) return null;
+    return query(
+      collection(db, 'notifications'), 
+      where('tenantId', '==', tenantId),
+      orderBy('timestamp', 'desc'), 
+      limit(10)
+    );
+  }, [db, tenantId]);
+  
   const { data: history, loading } = useCollection(historyQuery);
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!tenantId) return;
     setIsSending(true);
     try {
       await addDoc(collection(db, 'notifications'), {
@@ -109,7 +114,7 @@ export default function NotificationsPage() {
                     <Label className="font-bold">محتوى الرسالة</Label>
                     <Textarea required value={message} onChange={(e) => setMessage(e.target.value)} placeholder="اكتب نص الإشعار هنا..." className="rounded-2xl bg-muted/30 border-none min-h-[120px]" />
                  </div>
-                 <Button disabled={isSending} className="w-full h-14 rounded-2xl font-black text-lg gap-2 shadow-xl shadow-primary/20 transition-all hover:scale-[1.01] active:scale-95">
+                 <Button disabled={isSending || !tenantId} className="w-full h-14 rounded-2xl font-black text-lg gap-2 shadow-xl shadow-primary/20 transition-all hover:scale-[1.01] active:scale-95">
                     {isSending ? <Loader2 className="h-6 w-6 animate-spin" /> : <Send className="h-6 w-6" />}
                     إرسال الإشعار الآن
                  </Button>
@@ -129,7 +134,7 @@ export default function NotificationsPage() {
                 <div className="flex justify-between items-center p-4 rounded-2xl bg-white/5 border border-white/10">
                    <div className="space-y-1">
                       <p className="text-[10px] font-black uppercase opacity-60">إجمالي السجلات</p>
-                      <p className="text-2xl font-black">{history.length}</p>
+                      <p className="text-2xl font-black">{history?.length || 0}</p>
                    </div>
                    <Users className="h-8 w-8 opacity-20" />
                 </div>
@@ -145,7 +150,7 @@ export default function NotificationsPage() {
              <CardContent className="space-y-4">
                 {loading ? (
                   Array(3).fill(0).map((_, i) => <Skeleton key={i} className="h-16 w-full rounded-2xl" />)
-                ) : history.length > 0 ? (
+                ) : history && history.length > 0 ? (
                   history.map((notif: any) => (
                     <div key={notif.id} className="p-4 rounded-2xl bg-muted/30 space-y-2 border-r-4 border-primary">
                        <p className="text-sm font-bold truncate">{notif.title}</p>

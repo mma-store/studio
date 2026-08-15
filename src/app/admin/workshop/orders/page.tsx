@@ -1,4 +1,3 @@
-
 'use client';
 
 import { 
@@ -38,18 +37,25 @@ export default function WorkshopOrdersPage() {
   const { tenantId } = useUser();
   const [search, setSearch] = useState("");
   
-  const repairOrdersQuery = useMemo(() => query(
-    collection(db, 'repairOrders'), 
-    where('tenantId', '==', tenantId),
-    orderBy('createdAt', 'desc')
-  ), [db, tenantId]);
+  // FIXED: Scoped to tenantId and ONLY runs when tenantId is available
+  const repairOrdersQuery = useMemo(() => {
+    if (!tenantId) return null;
+    return query(
+      collection(db, 'repairOrders'), 
+      where('tenantId', '==', tenantId),
+      orderBy('createdAt', 'desc')
+    );
+  }, [db, tenantId]);
   const { data: orders, loading } = useCollection(repairOrdersQuery);
 
-  const filtered = orders.filter((o: any) => 
-    o.customerName?.toLowerCase().includes(search.toLowerCase()) || 
-    o.orderNumber?.toLowerCase().includes(search.toLowerCase()) ||
-    o.bikeModel?.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = useMemo(() => {
+    if (!orders) return [];
+    return orders.filter((o: any) => 
+      o.customerName?.toLowerCase().includes(search.toLowerCase()) || 
+      o.orderNumber?.toLowerCase().includes(search.toLowerCase()) ||
+      o.bikeModel?.toLowerCase().includes(search.toLowerCase())
+    );
+  }, [orders, search]);
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
