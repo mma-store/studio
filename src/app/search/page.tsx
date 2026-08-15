@@ -9,16 +9,26 @@ import { useState, useMemo } from "react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { useFirestore, useCollection } from "@/firebase";
-import { collection, query, orderBy } from "firebase/firestore";
+import { useFirestore, useCollection, useUser } from "@/firebase";
+import { collection, query, orderBy, where } from "firebase/firestore";
 import Image from "next/image";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function SearchPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const db = useFirestore();
+  const { tenantId } = useUser();
   
-  const productsQuery = useMemo(() => query(collection(db, 'products'), orderBy('name')), [db]);
+  // SECURE: Only query products belonging to the current tenant context
+  const productsQuery = useMemo(() => {
+    if (!tenantId) return null;
+    return query(
+      collection(db, 'products'), 
+      where('tenantId', '==', tenantId),
+      orderBy('name')
+    );
+  }, [db, tenantId]);
+  
   const { data: products, loading } = useCollection(productsQuery);
 
   const filteredResults = useMemo(() => {
@@ -62,8 +72,13 @@ export default function SearchPage() {
            </div>
         </div>
 
-        <div className="container p-6 space-y-8 animate-in fade-in duration-500">
-          {!searchTerm ? (
+        <div className="container p-6 space-y-8 animate-in fade-in duration-500 max-w-7xl mx-auto">
+          {!tenantId ? (
+            <div className="flex flex-col items-center justify-center pt-20 text-center gap-4 opacity-30">
+               <Package className="h-20 w-20" />
+               <p className="font-bold">يرجى تسجيل الدخول للبدء بالبحث</p>
+            </div>
+          ) : !searchTerm ? (
             <>
               <section className="space-y-4">
                 <div className="flex items-center justify-between">
@@ -84,25 +99,6 @@ export default function SearchPage() {
                      </Badge>
                    ))}
                 </div>
-              </section>
-
-              <section className="space-y-4">
-                 <h3 className="font-black text-sm flex items-center gap-2">
-                    <TrendingUp className="h-4 w-4 text-primary" />
-                    الأكثر طلباً الآن
-                 </h3>
-                 <div className="grid gap-3">
-                    {["دراجة CBR 600", "تعديل محرك", "إكسسوارات"].map((item, i) => (
-                      <div 
-                        key={i} 
-                        className="flex items-center justify-between p-4 rounded-2xl bg-muted/20 cursor-pointer hover:bg-muted/40 transition-all border border-transparent hover:border-primary/10"
-                        onClick={() => setSearchTerm(item)}
-                      >
-                         <span className="font-bold text-sm">{item}</span>
-                         <Search className="h-4 w-4 text-muted-foreground" />
-                      </div>
-                    ))}
-                 </div>
               </section>
             </>
           ) : (

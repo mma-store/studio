@@ -3,19 +3,19 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // --- Helper Functions ---
+    // --- وظائف مساعدة (Helper Functions) ---
     function isAuthenticated() {
       return request.auth != null;
     }
 
     function getProfile() {
-      // Direct access with Auth UID should be safe within limits
+      // الوصول المباشر لملف الهوية الموحد بالـ UID
       return get(/databases/$(database)/documents/accountProfiles/$(request.auth.uid)).data;
     }
 
     function isSuperAdmin() {
       return isAuthenticated() && (
-        getProfile().accountType == 'super_admin'
+        getProfile().accountType == 'super_admin' || getProfile().role == 'super_admin'
       );
     }
 
@@ -30,7 +30,7 @@ service cloud.firestore {
       );
     }
 
-    // --- Identity Rules ---
+    // --- قواعد الهوية (Identity Rules) ---
     match /accountProfiles/{uid} {
       allow read, write: if isAuthenticated() && (request.auth.uid == uid || isSuperAdmin());
     }
@@ -40,8 +40,8 @@ service cloud.firestore {
     }
 
     match /tenants/{tenantId} {
-      allow read: if isAuthenticated(); // Allow reading metadata for any store
-      allow create: if isAuthenticated();
+      allow read: if isAuthenticated(); // السماح بقراءة بيانات المتجر الأساسية لأي مستخدم مسجل
+      allow create: if isAuthenticated(); // السماح للمستخدمين الجدد بإنشاء متجر
       allow update: if isTenantAdmin(tenantId);
     }
 
@@ -55,7 +55,8 @@ service cloud.firestore {
       allow write: if isSuperAdmin();
     }
 
-    // --- Global Read Access for Storefront Discovery ---
+    // --- قواعد البيانات العامة للمتجر (Discovery) ---
+    // يمكن للزبائن المسجلين القراءة، والمديرين فقط الكتابة
     match /products/{id} {
       allow read: if isAuthenticated();
       allow write: if isTenantAdmin(request.resource.data.tenantId || resource.data.tenantId);
@@ -72,14 +73,10 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow write: if isTenantAdmin(request.resource.data.tenantId || resource.data.tenantId);
     }
-    match /motorcycleTypes/{id} {
-      allow read: if isAuthenticated();
-      allow write: if isTenantAdmin(request.resource.data.tenantId || resource.data.tenantId);
-    }
 
-    // --- Private Operational Data Rules ---
+    // --- قواعد البيانات التشغيلية والخاصة (Private/Operational) ---
+    // تفرض عزلاً تاماً بناءً على الـ tenantId
     match /{path=**} {
-      // Force tenant matching for all other operational data (orders, etc)
       allow read: if isAuthenticated() && (
         (resource.data.tenantId != null && resource.data.tenantId == getProfile().tenantId) || 
         isSuperAdmin()
