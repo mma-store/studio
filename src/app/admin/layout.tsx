@@ -6,7 +6,7 @@ import { AdminHeader } from "@/components/admin/header";
 import { useUser } from "@/firebase";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { ScrollText, ShieldAlert, Bug, BadgeCheck, RefreshCw, AlertCircle } from "lucide-react";
+import { ScrollText, ShieldAlert, Bug, BadgeCheck, RefreshCw } from "lucide-react";
 import { ReliabilityProvider } from "@/components/reliability/reliability-provider";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -17,17 +17,21 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
+    // ننتظر حتى ينتهي التحميل تماماً قبل اتخاذ أي قرار توجيه
     if (!loading && !error) {
       if (!isAuthenticated) {
         router.replace('/login');
         return;
       }
 
+      // إذا كان المستخدم موثقاً، نتحقق من وجود الـ tenantId في البروفايل المرجعي
       if (profile?.tenantId) {
         setReady(true);
       } else if (profile && !profile.tenantId) {
+        // مستخدم مسجل ولكن ليس لديه متجر بعد
         router.replace('/onboarding');
-      } else if (!profile) {
+      } else if (!profile && !loading) {
+        // لم يتم العثور على بروفايل إطلاقاً
         router.replace('/onboarding');
       }
     }
