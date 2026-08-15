@@ -9,13 +9,13 @@ service cloud.firestore {
     }
 
     function getProfile() {
+      // Use UID-keyed lookup for performance and security
       return get(/databases/$(database)/documents/accountProfiles/$(request.auth.uid)).data;
     }
 
     function isSuperAdmin() {
       return isAuthenticated() && (
-        get(/databases/$(database)/documents/accountProfiles/$(request.auth.uid)).data.role == 'super_admin' ||
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'super_admin'
+        get(/databases/$(database)/documents/accountProfiles/$(request.auth.uid)).data.accountType == 'super_admin'
       );
     }
 
@@ -30,29 +30,24 @@ service cloud.firestore {
       );
     }
 
-    // --- Rules ---
-
+    // --- Identity Rules ---
     match /accountProfiles/{uid} {
-      allow read: if isAuthenticated() && (request.auth.uid == uid || isSuperAdmin());
-      allow write: if isAuthenticated() && (request.auth.uid == uid || isSuperAdmin());
+      allow read, write: if isAuthenticated() && (request.auth.uid == uid || isSuperAdmin());
     }
 
     match /users/{uid} {
-      allow read: if isAuthenticated() && (request.auth.uid == uid || isSuperAdmin());
-      allow write: if isAuthenticated() && (request.auth.uid == uid || isSuperAdmin());
+      allow read, write: if isAuthenticated() && (request.auth.uid == uid || isSuperAdmin());
     }
 
     match /tenants/{tenantId} {
       allow read: if isTenantMember(tenantId);
-      // السماح بإنشاء متجر جديد إذا كان المستخدم موثقاً
       allow create: if isAuthenticated();
-      allow update, delete: if isTenantAdmin(tenantId);
+      allow update: if isTenantAdmin(tenantId);
     }
 
     match /slugs/{slug} {
       allow read: if true;
-      allow create: if isAuthenticated();
-      allow update, delete: if isAuthenticated() && resource.data.ownerUid == request.auth.uid;
+      allow create, update: if isAuthenticated();
     }
 
     match /plans/{planId} {
@@ -60,8 +55,9 @@ service cloud.firestore {
       allow write: if isSuperAdmin();
     }
 
-    // القواعد العامة للبيانات التشغيلية
+    // --- Operational Data Rules ---
     match /{path=**} {
+      // General rule for all documents: check tenantId field
       allow read: if isAuthenticated() && (
         resource.data.tenantId == getProfile().tenantId || isSuperAdmin()
       );

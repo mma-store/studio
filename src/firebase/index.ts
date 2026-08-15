@@ -1,18 +1,18 @@
+
 'use client';
 
 import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
 import { 
   getFirestore, 
   Firestore,
-  terminate,
-  clearIndexedDbPersistence
+  onSnapshotsInSync
 } from 'firebase/firestore';
 import { getAuth, Auth } from 'firebase/auth';
 import { firebaseConfig } from './config';
 
 /**
  * Singleton Firebase Instance Manager
- * يضمن عدم تكرار الاتصال وقفل قاعدة البيانات
+ * Ensures strict initialization and prevents internal SDK conflicts.
  */
 let cachedApp: FirebaseApp | undefined;
 let cachedFirestore: Firestore | undefined;
@@ -21,7 +21,6 @@ let cachedAuth: Auth | undefined;
 export function initializeFirebase() {
   if (typeof window !== 'undefined') {
     if (!cachedApp) {
-      // التحقق من وجود مثيلات سابقة لتجنب التضارب
       const existingApps = getApps();
       cachedApp = existingApps.length ? existingApps[0] : initializeApp(firebaseConfig);
       cachedFirestore = getFirestore(cachedApp);
@@ -35,7 +34,7 @@ export function initializeFirebase() {
     };
   }
   
-  // للطرف السيرفر (SSR)
+  // SSR Path
   const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
   return { 
     app, 

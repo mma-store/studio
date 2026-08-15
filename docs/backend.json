@@ -16,14 +16,17 @@
         "address": { "type": "string" },
         "status": { "type": "string", "enum": ["active", "trial", "suspended", "expired"] },
         "subscriptionPlan": { "type": "string" },
+        "subscriptionPlanId": { "type": "string" },
         "createdAt": { "type": "number" },
+        "trialEndDate": { "type": "number" },
+        "currentPeriodEnd": { "type": "number" },
         "settings": { "type": "object" }
       },
       "required": ["tenantId", "slug", "ownerUid"]
     },
     "AccountProfile": {
       "title": "AccountProfile",
-      "description": "Canonical identity record for any user in the platform",
+      "description": "Canonical identity record for any user in the platform, keyed by UID",
       "type": "object",
       "properties": {
         "uid": { "type": "string" },
@@ -37,29 +40,6 @@
       },
       "required": ["uid", "accountType", "role"]
     },
-    "Product": {
-      "title": "Product",
-      "type": "object",
-      "properties": {
-        "tenantId": { "type": "string" },
-        "name": { "type": "string" },
-        "barcode": { "type": "string" },
-        "retailPrice": { "type": "number" },
-        "stock": { "type": "number" },
-        "category": { "type": "string" }
-      }
-    },
-    "Order": {
-      "title": "Order",
-      "type": "object",
-      "properties": {
-        "tenantId": { "type": "string" },
-        "orderNumber": { "type": "string" },
-        "total": { "type": "number" },
-        "status": { "type": "string" },
-        "createdAt": { "type": "number" }
-      }
-    },
     "Plan": {
       "title": "Plan",
       "description": "Global subscription plans",
@@ -68,7 +48,9 @@
         "name": { "type": "string" },
         "monthlyPrice": { "type": "number" },
         "maxProducts": { "type": "number" },
-        "active": { "type": "boolean" }
+        "maxEmployees": { "type": "number" },
+        "active": { "type": "boolean" },
+        "features": { "type": "array", "items": { "type": "string" } }
       }
     }
   },
@@ -76,22 +58,22 @@
     "providers": ["password", "phone"]
   },
   "firestore": {
+    "/accountProfiles/{uid}": { "schema": "AccountProfile", "description": "Primary identity (UID-Keyed)" },
+    "/users/{uid}": { "schema": "AccountProfile", "description": "Legacy compatible identity (UID-Keyed)" },
     "/tenants/{tenantId}": { "schema": "Tenant", "description": "Tenant configuration" },
-    "/accountProfiles/{uid}": { "schema": "AccountProfile", "description": "Primary user identity" },
-    "/users/{uid}": { "schema": "AccountProfile", "description": "Legacy compatible user record" },
-    "/plans/{planId}": { "schema": "Plan", "description": "Global plans" },
-    "/products/{productId}": { "schema": "Product", "description": "Multi-tenant products" },
-    "/orders/{orderId}": { "schema": "Order", "description": "Multi-tenant orders" },
+    "/plans/{planId}": { "schema": "Plan", "description": "Global subscription plans" },
+    "/slugs/{slug}": { "schema": "object", "description": "Slug unique registry" },
+    "/products/{id}": { "schema": "object", "description": "Multi-tenant products" },
+    "/orders/{id}": { "schema": "object", "description": "Multi-tenant orders" },
     "/repairOrders/{id}": { "schema": "object", "description": "Workshop tasks" },
-    "/suppliers/{id}": { "schema": "object", "description": "Store suppliers" },
+    "/suppliers/{id}": { "schema": "object", "description": "Suppliers" },
     "/purchases/{id}": { "schema": "object", "description": "Inventory purchases" },
-    "/financialTransactions/{id}": { "schema": "object", "description": "Finance log" },
-    "/cashShifts/{id}": { "schema": "object", "description": "Daily shifts" },
-    "/expenses/{id}": { "schema": "object", "description": "Store expenses" },
-    "/auditLogs/{id}": { "schema": "object", "description": "System changes" },
-    "/categories/{id}": { "schema": "object", "description": "Tenant categories" },
-    "/banners/{id}": { "schema": "object", "description": "Tenant banners" },
-    "/offers/{id}": { "schema": "object", "description": "Tenant offers" },
-    "/slugs/{slug}": { "schema": "object", "description": "Registry for unique URLs" }
+    "/expenses/{id}": { "schema": "object", "description": "Expenses" },
+    "/auditLogs/{id}": { "schema": "object", "description": "Audit trails" },
+    "/categories/{id}": { "schema": "object", "description": "Categories" },
+    "/banners/{id}": { "schema": "object", "description": "Banners" },
+    "/offers/{id}": { "schema": "object", "description": "Offers" },
+    "/financialTransactions/{id}": { "schema": "object", "description": "Finance" },
+    "/cashShifts/{id}": { "schema": "object", "description": "Shifts" }
   }
 }

@@ -13,29 +13,19 @@ export function useSyncStatus() {
   const [lastSync, setLastSync] = useState<Date | null>(null);
 
   useEffect(() => {
-    const updateOnlineStatus = () => {
-      setStatus(navigator.onLine ? 'online' : 'offline');
-    };
+    const updateStatus = () => setStatus(navigator.onLine ? 'online' : 'offline');
+    window.addEventListener('online', updateStatus);
+    window.addEventListener('offline', updateStatus);
+    updateStatus();
 
-    window.addEventListener('online', updateOnlineStatus);
-    window.addEventListener('offline', updateOnlineStatus);
-    
-    // Initial check
-    updateOnlineStatus();
-
-    // Firestore's onSnapshotsInSync fires when all local changes 
-    // have been successfully acknowledged by the server.
+    // Singleton listener for sync events to prevent SDK Internal Assertion errors
     const unsubscribe = onSnapshotsInSync(db, () => {
       setLastSync(new Date());
-      // If we are online, after a snapshot sync we can assume we are stable
-      if (navigator.onLine) {
-        setStatus('online');
-      }
     });
 
     return () => {
-      window.removeEventListener('online', updateOnlineStatus);
-      window.removeEventListener('offline', updateOnlineStatus);
+      window.removeEventListener('online', updateStatus);
+      window.removeEventListener('offline', updateStatus);
       unsubscribe();
     };
   }, [db]);
