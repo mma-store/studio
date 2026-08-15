@@ -5,8 +5,8 @@ import { useEffect } from 'react';
 import { errorEmitter } from '@/firebase/error-emitter';
 
 /**
- * @fileOverview مستمع مركزي لأخطاء أذونات Firestore.
- * تم تحديثه ليمنع انهيار الواجهة في حالات القراءة غير الحرجة (مثل الباقات).
+ * @fileOverview مستمع مركزي لأخطاء Firestore.
+ * تم تحسينه ليكون أقل حدة في بيئة التطوير للعمليات غير الحرجة.
  */
 export function FirebaseErrorListener() {
   useEffect(() => {
@@ -15,20 +15,21 @@ export function FirebaseErrorListener() {
       const operation = error.context?.operation || '';
       
       if (process.env.NODE_ENV === 'development') {
-        // تسجيل الخطأ في وحدة التحكم للتشخيص دون إيقاف التطبيق
-        console.group('🔥 Firestore Permission Event');
-        console.warn('Path:', path);
-        console.warn('Operation:', operation);
-        console.groupEnd();
-        
-        // استثناء: لا تظهر شاشة الخطأ الحمراء لقائمة الباقات أو عمليات القراءة البسيطة
-        // هذا يضمن بقاء المستخدم في صفحة الدخول حتى لو فشلت قراءة الخلفية
-        if (operation === 'get' || operation === 'list' || path.includes('plans')) {
+        // تسجيل صامت للأخطاء المعروفة التي لا يجب أن تعطل التطبيق
+        if (path.includes('plans') || path.includes('slugs')) {
+          console.warn(`[Silent Permission Denied] Path: ${path}, Op: ${operation}`);
           return;
         }
+
+        console.group('🔥 Firestore Security Diagnostic');
+        console.error('Path:', path);
+        console.error('Operation:', operation);
+        console.groupEnd();
         
-        // رمي الخطأ للعمليات الحرجة فقط (كتابة، حذف) لضمان انتباه المطور
-        throw error;
+        // رمي الخطأ للعمليات الحرجة فقط لضمان انتباه المطور
+        if (['create', 'update', 'delete', 'write'].includes(operation)) {
+          throw error;
+        }
       }
     };
 

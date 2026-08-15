@@ -7,11 +7,9 @@ import { doc, onSnapshot } from 'firebase/firestore';
 import { useAuth, useFirestore } from '../provider';
 import { UserProfile } from '@/lib/types/roles';
 
-const MASTER_RAW_PHONES = ['7858833838', '7703687932'];
-
 /**
  * @fileOverview المحرك المركزي للهوية (Identity Engine).
- * يضمن ربط Firebase Auth UID بسجلات Firestore بشكل تفاعلي.
+ * يضمن الربط الدقيق بين Auth UID وبين سجلات Firestore.
  */
 export function useUser() {
   const auth = useAuth();
@@ -19,40 +17,37 @@ export function useUser() {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [profileLoading, setProfileLoading] = useState(false);
 
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
       setUser(firebaseUser);
+      setAuthLoading(false);
       
       if (firebaseUser) {
-        // مراقبة حية للملف الشخصي لضمان استلام الـ tenantId فوراً
+        setProfileLoading(true);
         const profileRef = doc(db, 'users', firebaseUser.uid);
+        
+        // استخدام onSnapshot لضمان المزامنة اللحظية
         const unsubscribeProfile = onSnapshot(profileRef, (docSnap) => {
           if (docSnap.exists()) {
-            const data = docSnap.data() as UserProfile;
-            setProfile(data);
-            
-            // التشخيص في وضع التطوير
-            if (process.env.NODE_ENV === 'development') {
-              console.group('🛡️ Identity Diagnosis');
-              console.log('Firebase UID:', firebaseUser.uid);
-              console.log('Profile UID:', data.uid);
-              console.log('Tenant ID:', data.tenantId);
-              console.log('User Role:', data.role);
-              console.groupEnd();
-            }
+            setProfile(docSnap.data() as UserProfile);
           } else {
             setProfile(null);
           }
+          setProfileLoading(false);
           setLoading(false);
         }, (err) => {
-          console.error("Profile sync error:", err);
+          console.error("Critical Profile Sync Error:", err);
+          setProfileLoading(false);
           setLoading(false);
         });
         
         return () => unsubscribeProfile();
       } else {
         setProfile(null);
+        setProfileLoading(false);
         setLoading(false);
       }
     });
@@ -60,21 +55,16 @@ export function useUser() {
     return () => unsubscribeAuth();
   }, [auth, db]);
 
-  // التحقق من صلاحيات المدير العام للمنصة
+  // منطق تحديد رتبة السوبر أدمن
   const isSuperAdmin = profile?.role === 'super_admin' || 
-    (user?.email && MASTER_RAW_PHONES.some(p => user.email!.includes(p)));
-
-  // حل معرف المتجر (Tenant Resolution)
-  // الأولوية 1: المعرف المسجل في البروفايل (للتجار والمدراء)
-  // الأولوية 2: المعرف العام (للمدير العام إذا لم يكن يدير متجراً خاصاً)
-  const resolvedTenantId = profile?.tenantId || (isSuperAdmin ? 'PLATFORM_OWNER' : null);
+    (user?.email && (user.email.includes('7858833838') || user.email.includes('7703687932')));
 
   return { 
     user, 
     profile, 
-    loading,
+    loading: authLoading || profileLoading || loading,
     isSuperAdmin,
-    tenantId: resolvedTenantId,
+    tenantId: profile?.tenantId || null,
     isAuthenticated: !!user
   };
 }
