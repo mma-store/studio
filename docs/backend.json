@@ -10,11 +10,7 @@
         "slug": { "type": "string" },
         "ownerName": { "type": "string" },
         "ownerUid": { "type": "string" },
-        "logo": { "type": "string" },
-        "phone": { "type": "string" },
-        "address": { "type": "string" },
         "status": { "type": "string", "enum": ["active", "trial", "suspended", "expired"] },
-        "subscriptionPlan": { "type": "string" },
         "createdAt": { "type": "number" }
       },
       "required": ["tenantId", "slug", "ownerUid"]
@@ -41,7 +37,7 @@
   },
   "firestore": {
     "/accountProfiles/{uid}": { "schema": "AccountProfile", "description": "Primary identity (UID-Keyed)" },
-    "/users/{uid}": { "schema": "AccountProfile", "description": "Legacy compatible identity" },
+    "/users/{uid}": { "schema": "AccountProfile", "description": "User identity records" },
     "/tenants/{tenantId}": { "schema": "Tenant", "description": "Tenant configuration" },
     "/products/{id}": { "schema": "object", "description": "Tenant products" },
     "/categories/{id}": { "schema": "object", "description": "Tenant categories" },
@@ -50,6 +46,10 @@
     "/auditLogs/{id}": { "schema": "object", "description": "System audit logs" },
     "/subscriptionInvoices/{id}": { "schema": "object", "description": "Billing records" },
     "/suppliers/{id}": { "schema": "object", "description": "Store suppliers" },
-    "/expenses/{id}": { "schema": "object", "description": "Store expenses" }
+    "/expenses/{id}": { "schema": "object", "description": "Store expenses" },
+    "/repairOrders/{id}": { "schema": "object", "description": "Workshop tasks" },
+    "/financialTransactions/{id}": { "schema": "object", "description": "Ledger" },
+    "/apiKeys/{id}": { "schema": "object", "description": "API access" },
+    "/webhooks/{id}": { "schema": "object", "description": "Integrations" }
   }
 }
