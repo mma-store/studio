@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect } from "react";
@@ -33,11 +32,16 @@ export default function CategoriesPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [uploadedImageUrl, setUploadedImageUrl] = useState("");
 
-  const categoriesQuery = useMemo(() => query(
-    collection(db, 'categories'), 
-    where('tenantId', '==', tenantId),
-    orderBy('name')
-  ), [db, tenantId]);
+  // SECURE: Scope by tenantId and protect against null
+  const categoriesQuery = useMemo(() => {
+    if (!tenantId) return null;
+    return query(
+      collection(db, 'categories'), 
+      where('tenantId', '==', tenantId),
+      orderBy('name')
+    );
+  }, [db, tenantId]);
+  
   const { data: categories, loading } = useCollection(categoriesQuery);
 
   useEffect(() => {
@@ -49,23 +53,9 @@ export default function CategoriesPage() {
 
   const filtered = categories.filter((c: any) => c.name.toLowerCase().includes(search.toLowerCase()));
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setIsUploading(true);
-    try {
-      const url = await uploadToCloudinary(file);
-      setUploadedImageUrl(url);
-      toast({ title: "تم رفع الصورة بنجاح" });
-    } catch (e) {
-      toast({ variant: "destructive", title: "خطأ في الرفع" });
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
   const handleAction = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (!tenantId) return;
     setIsSaving(true);
     const formData = new FormData(e.currentTarget);
     const name = formData.get('name') as string;

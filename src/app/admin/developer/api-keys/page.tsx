@@ -51,13 +51,21 @@ export default function ApiKeysPage() {
   const [selectedPerms, setSelectedPerms] = useState<string[]>([]);
   const [generatedKey, setGeneratedKey] = useState<string | null>(null);
 
-  const keysQuery = useMemo(() => 
-    tenantId ? query(collection(db, 'apiKeys'), where('tenantId', '==', tenantId), orderBy('createdAt', 'desc')) : null,
-  [db, tenantId]);
+  // SECURE: Scope by tenantId and protect against null
+  const keysQuery = useMemo(() => {
+    if (!tenantId) return null;
+    return query(
+      collection(db, 'apiKeys'), 
+      where('tenantId', '==', tenantId), 
+      orderBy('createdAt', 'desc')
+    );
+  }, [db, tenantId]);
+  
   const { data: apiKeys, loading } = useCollection(keysQuery);
 
   const handleGenerateKey = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (!tenantId) return;
     if (selectedPerms.length === 0) {
       toast({ variant: "destructive", title: "تنبيه", description: "يرجى اختيار صلاحية واحدة على الأقل." });
       return;
@@ -66,19 +74,17 @@ export default function ApiKeysPage() {
     setIsSaving(true);
     const fd = new FormData(e.currentTarget);
     const name = fd.get('name') as string;
-    
-    // Generate a secure random key
     const rawKey = `sk_live_${Math.random().toString(36).substring(2)}${Math.random().toString(36).substring(2)}`;
 
     try {
       await addDoc(collection(db, 'apiKeys'), {
         tenantId,
         name,
-        key: rawKey, // In production, hash this. This is for demonstration.
+        key: rawKey,
         permissions: selectedPerms,
         status: 'active',
         createdAt: Date.now(),
-        expiresAt: Date.now() + (365 * 24 * 60 * 60 * 1000), // 1 year
+        expiresAt: Date.now() + (365 * 24 * 60 * 60 * 1000),
         lastUsed: null
       });
 
@@ -117,10 +123,12 @@ export default function ApiKeysPage() {
             </Button>
           </DialogTrigger>
           <DialogContent className="rounded-[40px] max-w-lg p-0 overflow-hidden border-none shadow-2xl">
-            <DialogHeader className="p-8 bg-slate-900 text-white">
-               <DialogTitle className="text-2xl font-black">تهيئة مفتاح API</DialogTitle>
-               <DialogDescription className="text-slate-400 font-bold">حدد اسماً للمفتاح والصلاحيات المطلوبة.</DialogDescription>
-            </DialogHeader>
+            <div className="p-8 bg-slate-900 text-white">
+               <DialogHeader>
+                  <DialogTitle className="text-2xl font-black text-right">تهيئة مفتاح API</DialogTitle>
+                  <DialogDescription className="text-slate-400 font-bold text-right">حدد اسماً للمفتاح والصلاحيات المطلوبة.</DialogDescription>
+               </DialogHeader>
+            </div>
             
             {generatedKey ? (
               <div className="p-8 space-y-6 text-right">
@@ -200,13 +208,6 @@ export default function ApiKeysPage() {
                             <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> تم الإنشاء: {new Date(apiKey.createdAt).toLocaleDateString("ar-EG")}</span>
                             <span className="flex items-center gap-1"><RefreshCw className="h-3 w-3" /> آخر استخدام: {apiKey.lastUsed ? new Date(apiKey.lastUsed).toLocaleString("ar-EG") : 'لم يستخدم بعد'}</span>
                          </div>
-                         <div className="flex flex-wrap gap-1.5 pt-1">
-                            {apiKey.permissions?.map((p: string) => (
-                              <span key={p} className="bg-slate-50 text-slate-500 text-[8px] font-black px-2 py-0.5 rounded-md border border-slate-100 uppercase tracking-tighter">
-                                 {p.replace('.', ':')}
-                              </span>
-                            ))}
-                         </div>
                       </div>
                    </div>
                    <div className="flex items-center gap-3">
@@ -227,21 +228,6 @@ export default function ApiKeysPage() {
            </div>
          )}
       </div>
-
-      <Card className="rounded-[40px] border-none bg-slate-900 text-white p-10 overflow-hidden relative group">
-         <div className="relative z-10 flex flex-col md:flex-row items-center gap-10">
-            <div className="h-20 w-20 bg-primary rounded-3xl flex items-center justify-center shadow-2xl shrink-0 group-hover:rotate-12 transition-transform">
-               <Key className="h-10 w-10 text-white" />
-            </div>
-            <div className="space-y-4 text-center md:text-right">
-               <h3 className="text-3xl font-black italic">Next Steps for Developers</h3>
-               <p className="text-slate-400 font-medium leading-relaxed max-w-xl">
-                  استخدم مفاتيح الربط لتشغيل عمليات متجرك من الخارج. يمكنك بناء لوحات تحكم مخصصة، أو ربط متجرك ببرامج المحاسبة مثل Odoo أو Quickbooks.
-               </p>
-               <Button className="bg-white text-slate-900 hover:bg-slate-100 rounded-full font-black px-10 h-12" onClick={() => window.location.href='/admin/developer/docs'}>استعرض الدليل التقني</Button>
-            </div>
-         </div>
-      </Card>
     </div>
   );
 }

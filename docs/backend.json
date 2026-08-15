@@ -1,4 +1,3 @@
-
 {
   "entities": {
     "Tenant": {
@@ -39,19 +38,6 @@
         "createdAt": { "type": "number" }
       },
       "required": ["uid", "accountType", "role"]
-    },
-    "Plan": {
-      "title": "Plan",
-      "description": "Global subscription plans",
-      "type": "object",
-      "properties": {
-        "name": { "type": "string" },
-        "monthlyPrice": { "type": "number" },
-        "maxProducts": { "type": "number" },
-        "maxEmployees": { "type": "number" },
-        "active": { "type": "boolean" },
-        "features": { "type": "array", "items": { "type": "string" } }
-      }
     }
   },
   "auth": {
@@ -61,7 +47,7 @@
     "/accountProfiles/{uid}": { "schema": "AccountProfile", "description": "Primary identity (UID-Keyed)" },
     "/users/{uid}": { "schema": "AccountProfile", "description": "Legacy compatible identity (UID-Keyed)" },
     "/tenants/{tenantId}": { "schema": "Tenant", "description": "Tenant configuration" },
-    "/plans/{planId}": { "schema": "Plan", "description": "Global subscription plans" },
+    "/plans/{planId}": { "schema": "object", "description": "Global subscription plans" },
     "/slugs/{slug}": { "schema": "object", "description": "Slug unique registry" },
     "/products/{id}": { "schema": "object", "description": "Multi-tenant products" },
     "/orders/{id}": { "schema": "object", "description": "Multi-tenant orders" },

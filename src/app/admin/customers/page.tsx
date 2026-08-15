@@ -1,4 +1,3 @@
-
 'use client';
 
 import { 
@@ -56,13 +55,16 @@ export default function CustomersManagementPage() {
   const db = useFirestore();
   const { tenantId } = useUser();
   
-  // FIXED: Server-side tenant filtering to prevent data leakage
-  const customersQuery = useMemo(() => query(
-    collection(db, 'users'), 
-    where('tenantId', '==', tenantId),
-    where('role', 'in', ['retail_customer', 'wholesale_customer']),
-    orderBy('createdAt', 'desc')
-  ), [db, tenantId]);
+  // SECURE: Scope by tenantId and protect against null
+  const customersQuery = useMemo(() => {
+    if (!tenantId) return null;
+    return query(
+      collection(db, 'users'), 
+      where('tenantId', '==', tenantId),
+      where('role', 'in', ['retail_customer', 'wholesale_customer']),
+      orderBy('createdAt', 'desc')
+    );
+  }, [db, tenantId]);
   
   const { data: customers, loading } = useCollection(customersQuery);
   const [search, setSearch] = useState("");
@@ -80,12 +82,13 @@ export default function CustomersManagementPage() {
 
   const handleAddCustomer = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (!tenantId) return;
     setIsSaving(true);
     const formData = new FormData(e.currentTarget);
     const phone = normalizePhone(formData.get('phone') as string);
     try {
       await addDoc(collection(db, 'users'), {
-        tenantId, // Tag with tenantId
+        tenantId,
         displayName: formData.get('name'),
         phoneNumber: phone,
         email: `${phone}@mma.store`,

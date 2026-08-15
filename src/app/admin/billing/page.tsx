@@ -1,4 +1,3 @@
-
 'use client';
 
 import { 
@@ -35,6 +34,7 @@ export default function BillingPage() {
   const db = useFirestore();
   const subscription = useSubscription(tenantId);
   
+  // SECURE: Only run query when tenantId is available
   const invoicesQuery = useMemo(() => {
     if (!tenantId) return null;
     return query(
@@ -58,7 +58,7 @@ export default function BillingPage() {
   }, [db, tenantId]);
   const { data: staff } = useCollection(staffQuery);
 
-  // Dynamic Plans for upgrade
+  // Dynamic Plans for upgrade - Global Data
   const plansQuery = useMemo(() => query(collection(db, 'plans'), where('active', '==', true), orderBy('displayOrder', 'asc')), [db]);
   const { data: availablePlans } = useCollection(plansQuery);
 
@@ -76,7 +76,6 @@ export default function BillingPage() {
         <p className="text-muted-foreground font-medium">إدارة باقة الاشتراك، استهلاك الموارد، وتاريخ المدفوعات.</p>
       </div>
 
-      {/* Subscription Status Card */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <Card className={cn(
           "lg:col-span-2 rounded-[40px] border-none shadow-sm overflow-hidden",
@@ -157,7 +156,6 @@ export default function BillingPage() {
         </Card>
       </div>
 
-      {/* Upgrade Options */}
       <div className="space-y-8">
          <h2 className="text-2xl font-black flex items-center gap-3">
             <Zap className="h-6 w-6 text-primary" /> الخطط المتاحة للترقية
@@ -197,7 +195,6 @@ export default function BillingPage() {
          </div>
       </div>
 
-      {/* Invoice History */}
       <Card className="rounded-[40px] border-none shadow-sm overflow-hidden bg-white">
          <CardHeader className="p-8 border-b">
             <CardTitle className="text-xl font-black flex items-center gap-3">

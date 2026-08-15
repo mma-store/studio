@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo } from "react";
@@ -26,23 +25,28 @@ export default function CustomerDebtsPage() {
   const { tenantId } = useUser();
   const [search, setSearch] = useState("");
 
-  const customersQuery = useMemo(() => query(
-    collection(db, 'users'), 
-    where('tenantId', '==', tenantId),
-    where('currentBalance', '>', 0), 
-    orderBy('currentBalance', 'desc')
-  ), [db, tenantId]);
+  // SECURE: Scope by tenantId and protect against null
+  const customersQuery = useMemo(() => {
+    if (!tenantId) return null;
+    return query(
+      collection(db, 'users'), 
+      where('tenantId', '==', tenantId),
+      where('currentBalance', '>', 0), 
+      orderBy('currentBalance', 'desc')
+    );
+  }, [db, tenantId]);
+  
   const { data: customers, loading } = useCollection(customersQuery);
 
   const filtered = customers.filter((c: any) => 
-    c.displayName?.toLowerCase().includes(search.toLowerCase()) || 
-    c.phoneNumber?.includes(search)
+    (c.displayName?.toLowerCase() || "").includes(search.toLowerCase()) || 
+    (c.phoneNumber?.includes(search))
   );
 
   const totalDebts = useMemo(() => customers.reduce((acc, c) => acc + (c.currentBalance || 0), 0), [customers]);
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
+    <div className="space-y-8 animate-in fade-in duration-500" dir="rtl">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-3xl font-black">ديون العملاء</h1>
@@ -63,7 +67,7 @@ export default function CustomerDebtsPage() {
         <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input 
           placeholder="بحث باسم العميل أو الهاتف..." 
-          className="h-12 rounded-xl pr-10 border-none shadow-sm bg-white"
+          className="h-12 rounded-xl pr-10 border-none shadow-sm bg-white font-bold"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />

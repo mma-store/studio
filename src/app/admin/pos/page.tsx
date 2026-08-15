@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect } from "react";
@@ -192,30 +191,25 @@ export default function POSPage() {
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'credit' | 'partial'>('cash');
   const [printSize, setPrintSize] = useState<'58mm' | '80mm' | 'A4'>('80mm');
 
-  // Crash Recovery: Load POS draft
-  useEffect(() => {
-    if (!editOrderId) {
-      const savedCart = localStorage.getItem(`pos_draft_cart_${tenantId}`);
-      const savedCustomer = localStorage.getItem(`pos_draft_customer_${tenantId}`);
-      if (savedCart) setCart(JSON.parse(savedCart));
-      if (savedCustomer) setSelectedCustomer(JSON.parse(savedCustomer));
-    }
-  }, [tenantId, editOrderId]);
+  // SECURE: Scope all collection queries by tenantId
+  const productsQuery = useMemo(() => {
+    if (!tenantId) return null;
+    return query(collection(db, 'products'), where('tenantId', '==', tenantId), orderBy('name'));
+  }, [db, tenantId]);
+  
+  const categoriesQuery = useMemo(() => {
+    if (!tenantId) return null;
+    return query(collection(db, 'categories'), where('tenantId', '==', tenantId), orderBy('name'));
+  }, [db, tenantId]);
+  
+  const usersQuery = useMemo(() => {
+    if (!tenantId) return null;
+    return query(collection(db, 'users'), where('tenantId', '==', tenantId), orderBy('displayName'));
+  }, [db, tenantId]);
 
-  // Crash Recovery: Save POS draft on change
-  useEffect(() => {
-    if (!editOrderId && cart.length > 0) {
-      localStorage.setItem(`pos_draft_cart_${tenantId}`, JSON.stringify(cart));
-      localStorage.setItem(`pos_draft_customer_${tenantId}`, JSON.stringify(selectedCustomer));
-    } else if (cart.length === 0) {
-      localStorage.removeItem(`pos_draft_cart_${tenantId}`);
-      localStorage.removeItem(`pos_draft_customer_${tenantId}`);
-    }
-  }, [cart, selectedCustomer, tenantId, editOrderId]);
-
-  const { data: products, loading } = useCollection(query(collection(db, 'products'), where('tenantId', '==', tenantId), orderBy('name')));
-  const { data: categories } = useCollection(query(collection(db, 'categories'), where('tenantId', '==', tenantId), orderBy('name')));
-  const { data: allUsers } = useCollection(query(collection(db, 'users'), where('tenantId', '==', tenantId), orderBy('displayName')));
+  const { data: products, loading } = useCollection(productsQuery);
+  const { data: categories } = useCollection(categoriesQuery);
+  const { data: allUsers } = useCollection(usersQuery);
 
   const filteredProducts = useMemo(() => {
     if (!products) return [];
@@ -248,6 +242,7 @@ export default function POSPage() {
   };
 
   const handleCompleteSale = async () => {
+    if (!tenantId) return;
     setProcessingOrder(true);
     const batch = writeBatch(db);
     const orderNumber = `POS-${Date.now().toString().slice(-6)}`;
@@ -271,7 +266,6 @@ export default function POSPage() {
     try {
       batch.set(orderRef, orderData);
       
-      // Update inventory and customer balance in background
       cart.forEach(item => {
         batch.update(doc(db, "products", item.id), { stock: increment(-item.quantity) });
       });
@@ -282,7 +276,6 @@ export default function POSPage() {
 
       await batch.commit();
       
-      // Clear draft on success
       localStorage.removeItem(`pos_draft_cart_${tenantId}`);
       setCart([]);
       setIsCheckoutOpen(false);
@@ -305,7 +298,7 @@ export default function POSPage() {
   };
 
   return (
-    <div className="flex flex-col lg:flex-row h-[calc(100vh-64px)] overflow-hidden bg-background -m-4 md:-m-8">
+    <div className="flex flex-col lg:flex-row h-[calc(100vh-64px)] overflow-hidden bg-background -m-4 md:-m-8" dir="rtl">
       <div className="flex-1 flex flex-col p-3 md:p-6 overflow-y-auto">
         <div className="flex gap-2 mb-4 shrink-0">
           <div className="relative flex-1">
@@ -367,8 +360,8 @@ export default function POSPage() {
       <Dialog open={isCheckoutOpen} onOpenChange={setIsCheckoutOpen}>
         <DialogContent className="rounded-[40px] max-w-lg p-0 overflow-hidden border-none">
            <DialogHeader className="p-8 bg-primary text-white space-y-2">
-              <DialogTitle className="text-2xl font-black">تأكيد العملية</DialogTitle>
-              <DialogDescription className="text-white/80 font-bold">حدد طريقة الدفع لإصدار الفاتورة النهائية.</DialogDescription>
+              <DialogTitle className="text-2xl font-black text-right">تأكيد العملية</DialogTitle>
+              <DialogDescription className="text-white/80 font-bold text-right">حدد طريقة الدفع لإصدار الفاتورة النهائية.</DialogDescription>
            </DialogHeader>
            <div className="p-8 space-y-6 text-right">
               <div className="grid grid-cols-3 gap-3">
