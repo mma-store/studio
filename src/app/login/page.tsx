@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { toast } from "@/hooks/use-toast";
-import { Loader2, Lock, Phone, ArrowLeft, ScrollText } from "lucide-react";
+import { Loader2, Lock, Phone, ArrowLeft, ScrollText, AlertCircle } from "lucide-react";
 import Link from "next/link";
 import { normalizePhoneNumber, getInternalEmail } from "@/lib/auth-utils";
 
@@ -43,24 +43,26 @@ export default function LoginPage() {
       return;
     }
 
+    // تجربة كافة التنسيقات التاريخية والحديثة للبريد الإلكتروني الداخلي
     const emailAttempts = [
-      getInternalEmail(purePhone),
-      `${purePhone}@mma.store`,
-      `${purePhone}@platform.store`,
-      `0${purePhone}@dubsar.platform`
+      getInternalEmail(purePhone), // التنسيق القياسي (7XXXXXXXXX)
+      `${purePhone}@mma.store`,    // تنسيق قديم 1
+      `${purePhone}@platform.store`, // تنسيق قديم 2
+      `0${purePhone}@dubsar.platform` // تنسيق قديم 3
     ];
 
     let userCredential = null;
-    let authError = null;
+    let lastError = null;
 
     try {
-      // المرحلة الأولى: التوثيق (Auth)
+      // المرحلة الأولى: التوثيق عبر Firebase Auth
       for (const attemptEmail of emailAttempts) {
         try {
           userCredential = await signInWithEmailAndPassword(auth, attemptEmail, trimmedPassword);
-          if (userCredential) break;
+          if (userCredential) break; 
         } catch (err: any) {
-          authError = err;
+          lastError = err;
+          // إذا كان الخطأ تقنياً وليس في البيانات، نتوقف عن المحاولة
           if (err.code === 'auth/network-request-failed' || err.code === 'auth/too-many-requests') {
             throw err;
           }
@@ -69,20 +71,21 @@ export default function LoginPage() {
       }
 
       if (!userCredential) {
-        throw authError || new Error("auth/invalid-credential");
+        throw lastError || new Error("auth/invalid-credential");
       }
 
-      // المرحلة الثانية: جلب الملف الشخصي (Firestore)
-      // تم وضعها في try-catch منفصل لتمييز أخطاء الأذونات عن أخطاء الدخول
+      const user = userCredential.user;
+
+      // المرحلة الثانية: جلب بيانات الملف الشخصي من Firestore
       try {
-        const user = userCredential.user;
         const userRef = doc(db, "users", user.uid);
         const userSnap = await getDoc(userRef);
         
         if (userSnap.exists()) {
           const userData = userSnap.data();
-          // تحديث وقت الدخول (اختياري، لا يمنع الدخول في حال فشله)
-          await updateDoc(userRef, { lastLogin: Date.now() }).catch(e => console.warn("Failed to update lastLogin:", e.message));
+          
+          // محاولة تحديث وقت الدخول (لا نجعل فشلها يعيق الدخول)
+          updateDoc(userRef, { lastLogin: Date.now() }).catch(() => {});
 
           toast({ title: "تم تسجيل الدخول بنجاح" });
 
@@ -94,19 +97,15 @@ export default function LoginPage() {
             router.push("/");
           }
         } else {
-          // المستخدم موثق ولكن لا يمتلك بروفايل
+          // المستخدم موثق ولكن لا يمتلك بروفايل - نوجهه للإكمال
           toast({ title: "اكتمل التوثيق", description: "يرجى إكمال إعداد متجرك." });
           router.push("/onboarding");
         }
       } catch (fsError: any) {
+        console.error("Firestore stage failed:", fsError.code);
+        // في حال وجود مشكلة في الأذونات ولكن التوثيق سليم، نوجه المستخدم للتأسيس كحل وقائي
         if (fsError.code === 'permission-denied') {
-          // خطأ أذونات - المستخدم موثق لكن لا يمكنه قراءة وثيقته
-          console.error("Firestore Permission Denied during login:", fsError);
-          toast({ 
-            variant: "destructive", 
-            title: "خطأ في الصلاحيات", 
-            description: "تم التعرف عليك ولكن لا يمكن الوصول لبياناتك. تواصل مع الدعم." 
-          });
+          router.push("/onboarding");
         } else {
           throw fsError;
         }
@@ -114,7 +113,7 @@ export default function LoginPage() {
       
     } catch (error: any) {
       if (process.env.NODE_ENV === 'development') {
-        console.error("Login flow failed:", error.code || error.message);
+        console.error("Final Login Failure:", error.code);
       }
 
       let errorMessage = "رقم الهاتف أو كلمة المرور غير صحيحة.";
