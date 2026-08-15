@@ -8,7 +8,7 @@ import { UserProfile, AccountType, UserRole } from '@/lib/types/roles';
 
 /**
  * @fileOverview محرك حل الهوية المرن (Resilient Identity Engine).
- * يدعم التراجع التلقائي (Fallback) لضمان عدم انقطاع الخدمة عن التجار.
+ * مجهز بأدوات تشخيصية متقدمة لكشف أخطاء الأذونات.
  */
 export function useUser() {
   const auth = useAuth();
@@ -18,6 +18,7 @@ export function useUser() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [identitySource, setIdentitySource] = useState<'canonical' | 'legacy' | 'none'>('none');
+  const [diagnostic, setDiagnostic] = useState<any>(null);
 
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -26,11 +27,20 @@ export function useUser() {
       if (!firebaseUser) {
         setProfile(null);
         setLoading(false);
+        setDiagnostic(null);
         return;
       }
 
       setLoading(true);
       setError(null);
+
+      // Diagnostic Start
+      const diag = {
+        authUid: firebaseUser.uid,
+        authEmail: firebaseUser.email,
+        steps: [] as string[]
+      };
+      diag.steps.push("Auth Authenticated");
 
       // 1. محاولة قراءة البروفايل المرجعي (Canonical Profile)
       const profileRef = doc(db, 'accountProfiles', firebaseUser.uid);
@@ -40,8 +50,10 @@ export function useUser() {
           if (snap.exists()) {
             setProfile(snap.data() as UserProfile);
             setIdentitySource('canonical');
+            diag.steps.push("Canonical Profile Found");
             setLoading(false);
           } else {
+            diag.steps.push("Canonical Profile Missing, trying Legacy...");
             // 2. البحث في السجلات القديمة (Migration/Fallback)
             try {
               const legacyRef = doc(db, 'users', firebaseUser.uid);
@@ -62,25 +74,28 @@ export function useUser() {
                 
                 setProfile(resolvedProfile);
                 setIdentitySource('legacy');
+                diag.steps.push("Legacy Profile Found");
                 
                 // محاولة ترقية السجل في الخلفية دون تعطيل المستخدم
-                setDoc(profileRef, resolvedProfile, { merge: true }).catch(() => {
-                  console.warn("Silent background migration failed (likely permissions)");
+                setDoc(profileRef, resolvedProfile, { merge: true }).catch((e) => {
+                  console.warn("Background migration deferred:", e.code);
                 });
               } else {
                 setProfile(null);
                 setIdentitySource('none');
+                diag.steps.push("No Profile Found Anywhere");
               }
-            } catch (err) {
-              console.error("Legacy Lookup Failed:", err);
-              // لا نضع خطأ هنا لنسمح لصفحة التأسيس بالعمل
+            } catch (err: any) {
+              diag.steps.push(`Legacy Lookup Error: ${err.code}`);
+              setError(`خطأ أذونات (Legacy): ${err.code}`);
             }
             setLoading(false);
           }
+          setDiagnostic(diag);
         }, 
         async (err) => {
-          // 3. معالجة فشل الأذونات (Graceful Degradation)
-          // إذا فشل الـ Snapshot (غالباً بسبب قواعد الأمان الجديدة)، نحاول قراءة Users مباشرة
+          diag.steps.push(`Canonical Snapshot Error: ${err.code}`);
+          
           if (err.code === 'permission-denied') {
             try {
               const legacyRef = doc(db, 'users', firebaseUser.uid);
@@ -88,14 +103,19 @@ export function useUser() {
               if (legacySnap.exists()) {
                 setProfile(legacySnap.data() as UserProfile);
                 setIdentitySource('legacy');
+                diag.steps.push("Permission Denied on Canonical, but Legacy Found");
+              } else {
+                diag.steps.push("Permission Denied on Canonical and Legacy Not Found");
+                setError(`خطأ أذونات Firestore: يرجى التحقق من قواعد الأمان لمجموعة accountProfiles. (Code: ${err.code})`);
               }
-            } catch (innerErr) {
-              console.error("Critical identity resolution failure:", innerErr);
-              setError("فشل التحقق من الأمان. يرجى إعادة تسجيل الدخول.");
+            } catch (innerErr: any) {
+              diag.steps.push(`Critical Permission Failure: ${innerErr.code}`);
+              setError(`فشل التحقق من الأمان: Firestore رفض الوصول لهويتك. (Code: ${innerErr.code})`);
             }
           } else {
-            setError("فشل الاتصال بخادم الهوية.");
+            setError(`فشل الاتصال بخادم الهوية: ${err.message}`);
           }
+          setDiagnostic(diag);
           setLoading(false);
         }
       );
@@ -106,7 +126,7 @@ export function useUser() {
     return () => unsubscribeAuth();
   }, [auth, db]);
 
-  const isSuperAdmin = profile?.accountType === 'super_admin' || profile?.role === 'super_admin' || profile?.role === 'super_admin';
+  const isSuperAdmin = profile?.accountType === 'super_admin' || profile?.role === 'super_admin';
 
   return { 
     user, 
@@ -116,6 +136,7 @@ export function useUser() {
     isSuperAdmin,
     identitySource,
     tenantId: profile?.tenantId || null,
-    isAuthenticated: !!user
+    isAuthenticated: !!user,
+    diagnostic
   };
 }

@@ -6,13 +6,13 @@ import { AdminHeader } from "@/components/admin/header";
 import { useUser } from "@/firebase";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { ScrollText, ShieldAlert, Bug, BadgeCheck, AlertCircle, RefreshCw } from "lucide-react";
+import { ScrollText, ShieldAlert, Bug, BadgeCheck, RefreshCw, AlertCircle } from "lucide-react";
 import { ReliabilityProvider } from "@/components/reliability/reliability-provider";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  const { user, profile, loading, isAuthenticated, identitySource, error } = useUser();
+  const { user, profile, loading, isAuthenticated, identitySource, error, diagnostic } = useUser();
   const router = useRouter();
   const [ready, setReady] = useState(false);
 
@@ -23,13 +23,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         return;
       }
 
-      // توجيه ذكي: ننتظر حتى استقرار البروفايل
       if (profile?.tenantId) {
         setReady(true);
       } else if (profile && !profile.tenantId) {
         router.replace('/onboarding');
       } else if (!profile) {
-        // إذا انتهى التحميل ولم نجد بروفايل، نرسله للتأسيس
         router.replace('/onboarding');
       }
     }
@@ -51,7 +49,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   if (error) {
     return (
-      <div className="flex h-screen w-full flex-col items-center justify-center bg-red-50 p-6 text-center gap-6">
+      <div className="flex h-screen w-full flex-col items-center justify-center bg-red-50 p-6 text-center gap-6" dir="rtl">
          <div className="h-20 w-20 bg-white rounded-3xl shadow-xl flex items-center justify-center">
             <ShieldAlert className="h-10 w-10 text-red-600" />
          </div>
@@ -59,9 +57,31 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <h1 className="text-2xl font-black text-red-900">حدث خلل في التحقق</h1>
             <p className="text-sm font-bold text-red-700 max-w-md mx-auto">{error}</p>
          </div>
-         <Button onClick={() => window.location.reload()} className="bg-red-600 hover:bg-red-700 h-14 px-10 rounded-2xl gap-2 font-black shadow-xl">
-            <RefreshCw className="h-5 w-5" /> إعادة محاولة الاتصال
-         </Button>
+
+         {process.env.NODE_ENV === 'development' && diagnostic && (
+           <div className="max-w-xl w-full bg-slate-900 text-slate-300 p-6 rounded-3xl text-right font-mono text-xs space-y-4 shadow-2xl">
+              <p className="text-primary font-black border-b border-white/10 pb-2">DIAGNOSTIC TRACE:</p>
+              <div className="space-y-1">
+                 <p>Auth UID: {diagnostic.authUid}</p>
+                 <p>Auth Email: {diagnostic.authEmail}</p>
+              </div>
+              <div className="space-y-1 border-t border-white/10 pt-2">
+                 <p className="text-white">Execution Steps:</p>
+                 {diagnostic.steps.map((step: string, i: number) => (
+                   <p key={i} className="flex gap-2">
+                      <span className="opacity-30">[{i+1}]</span> {step}
+                   </p>
+                 ))}
+              </div>
+           </div>
+         )}
+
+         <div className="flex gap-3">
+            <Button onClick={() => window.location.reload()} className="bg-red-600 hover:bg-red-700 h-14 px-10 rounded-2xl gap-2 font-black shadow-xl">
+               <RefreshCw className="h-5 w-5" /> إعادة محاولة الاتصال
+            </Button>
+            <Button variant="outline" onClick={() => router.push('/login')} className="h-14 px-8 rounded-2xl font-bold">تسجيل الدخول مجدداً</Button>
+         </div>
       </div>
     );
   }
