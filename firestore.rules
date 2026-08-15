@@ -1,0 +1,72 @@
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // --- Helper Functions ---
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function getProfile() {
+      return get(/databases/$(database)/documents/accountProfiles/$(request.auth.uid)).data;
+    }
+
+    function isSuperAdmin() {
+      return isAuthenticated() && getProfile().role == 'super_admin';
+    }
+
+    function isTenantMember(tenantId) {
+      return isAuthenticated() && (getProfile().tenantId == tenantId || isSuperAdmin());
+    }
+
+    function isTenantAdmin(tenantId) {
+      return isAuthenticated() && (
+        (getProfile().tenantId == tenantId && getProfile().role in ['owner', 'admin']) || 
+        isSuperAdmin()
+      );
+    }
+
+    function belongsToTenant(data) {
+      return isAuthenticated() && (data.tenantId == getProfile().tenantId || isSuperAdmin());
+    }
+
+    // --- Rules ---
+
+    match /accountProfiles/{uid} {
+      allow read: if isAuthenticated() && (request.auth.uid == uid || isSuperAdmin());
+      allow write: if isAuthenticated() && (request.auth.uid == uid || isSuperAdmin());
+    }
+
+    match /users/{uid} {
+      allow read: if isAuthenticated() && (request.auth.uid == uid || isSuperAdmin());
+      allow write: if isAuthenticated() && (request.auth.uid == uid || isSuperAdmin());
+    }
+
+    match /tenants/{tenantId} {
+      allow read: if isTenantMember(tenantId);
+      allow write: if isTenantAdmin(tenantId);
+    }
+
+    match /slugs/{slug} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+
+    match /plans/{planId} {
+      allow read: if true;
+      allow write: if isSuperAdmin();
+    }
+
+    // Operational Data (Multi-tenant)
+    match /{path=**} {
+      allow read: if isAuthenticated() && (
+        resource.data.tenantId == getProfile().tenantId || isSuperAdmin()
+      );
+      allow write: if isAuthenticated() && (
+        (request.resource.data.tenantId == getProfile().tenantId && getProfile().role in ['owner', 'admin']) ||
+        isSuperAdmin()
+      );
+    }
+  }
+}

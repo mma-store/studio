@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "Tenant": {
@@ -7,79 +8,90 @@
       "properties": {
         "tenantId": { "type": "string" },
         "businessName": { "type": "string" },
-        "slug": { "type": "string", "description": "Unique URL slug for the store (e.g. mma-store)" },
+        "slug": { "type": "string" },
         "ownerName": { "type": "string" },
+        "ownerUid": { "type": "string" },
         "logo": { "type": "string" },
         "phone": { "type": "string" },
-        "whatsapp": { "type": "string" },
         "address": { "type": "string" },
-        "businessType": { "type": "string" },
-        "status": { "type": "string", "enum": ["active", "trial", "expired", "suspended", "cancelled"] },
-        "subscriptionPlanId": { "type": "string" },
-        "subscriptionPlan": { "type": "string", "enum": ["trial", "starter", "business", "enterprise"] },
-        "trialStartDate": { "type": "number" },
-        "trialEndDate": { "type": "number" },
-        "currentPeriodStart": { "type": "number" },
-        "currentPeriodEnd": { "type": "number" },
-        "autoRenew": { "type": "boolean" },
-        "suspendedReason": { "type": "string" },
+        "status": { "type": "string", "enum": ["active", "trial", "suspended", "expired"] },
+        "subscriptionPlan": { "type": "string" },
         "createdAt": { "type": "number" },
         "settings": { "type": "object" }
       },
-      "required": ["tenantId", "slug", "businessName"]
+      "required": ["tenantId", "slug", "ownerUid"]
     },
-    "SlugRegistry": {
-      "title": "SlugRegistry",
-      "description": "Global registry to enforce unique store slugs and allow public resolution",
+    "AccountProfile": {
+      "title": "AccountProfile",
+      "description": "Canonical identity record for any user in the platform",
       "type": "object",
       "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "accountType": { "type": "string", "enum": ["merchant", "super_admin", "customer"] },
+        "role": { "type": "string", "enum": ["owner", "admin", "employee", "customer"] },
         "tenantId": { "type": "string" },
-        "businessName": { "type": "string" },
+        "status": { "type": "string" },
         "createdAt": { "type": "number" }
       },
-      "required": ["tenantId"]
+      "required": ["uid", "accountType", "role"]
     },
-    "ApiKey": {
-      "title": "ApiKey",
-      "description": "Developer API access keys",
+    "Product": {
+      "title": "Product",
       "type": "object",
       "properties": {
-        "id": { "type": "string" },
         "tenantId": { "type": "string" },
         "name": { "type": "string" },
-        "key": { "type": "string" },
-        "permissions": { "type": "array" },
-        "status": { "type": "string", "enum": ["active", "revoked", "expired"] },
-        "createdAt": { "type": "number" },
-        "expiresAt": { "type": "number" },
-        "lastUsed": { "type": "number" }
+        "barcode": { "type": "string" },
+        "retailPrice": { "type": "number" },
+        "stock": { "type": "number" },
+        "category": { "type": "string" }
       }
     },
-    "Webhook": {
-      "title": "Webhook",
-      "description": "Outbound event notifications",
+    "Order": {
+      "title": "Order",
       "type": "object",
       "properties": {
-        "id": { "type": "string" },
         "tenantId": { "type": "string" },
-        "url": { "type": "string" },
-        "secret": { "type": "string" },
-        "events": { "type": "array" },
-        "enabled": { "type": "boolean" },
+        "orderNumber": { "type": "string" },
+        "total": { "type": "number" },
         "status": { "type": "string" },
-        "createdAt": { "type": "number" },
-        "lastDelivery": { "type": "number" }
+        "createdAt": { "type": "number" }
+      }
+    },
+    "Plan": {
+      "title": "Plan",
+      "description": "Global subscription plans",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "monthlyPrice": { "type": "number" },
+        "maxProducts": { "type": "number" },
+        "active": { "type": "boolean" }
       }
     }
   },
   "auth": {
-    "providers": ["google", "password"]
+    "providers": ["password", "phone"]
   },
   "firestore": {
-    "/tenants/{tenantId}": { "schema": "Tenant", "description": "Tenant business configuration" },
-    "/slugs/{slug}": { "schema": "SlugRegistry", "description": "Registry to ensure unique store slugs across the platform" },
-    "/apiKeys/{id}": { "schema": "ApiKey", "description": "Tenant API credentials" },
-    "/webhooks/{id}": { "schema": "Webhook", "description": "Tenant outbound webhooks" },
-    "/apiLogs/{id}": { "schema": "object", "description": "API request logs" }
+    "/tenants/{tenantId}": { "schema": "Tenant", "description": "Tenant configuration" },
+    "/accountProfiles/{uid}": { "schema": "AccountProfile", "description": "Primary user identity" },
+    "/users/{uid}": { "schema": "AccountProfile", "description": "Legacy compatible user record" },
+    "/plans/{planId}": { "schema": "Plan", "description": "Global plans" },
+    "/products/{productId}": { "schema": "Product", "description": "Multi-tenant products" },
+    "/orders/{orderId}": { "schema": "Order", "description": "Multi-tenant orders" },
+    "/repairOrders/{id}": { "schema": "object", "description": "Workshop tasks" },
+    "/suppliers/{id}": { "schema": "object", "description": "Store suppliers" },
+    "/purchases/{id}": { "schema": "object", "description": "Inventory purchases" },
+    "/financialTransactions/{id}": { "schema": "object", "description": "Finance log" },
+    "/cashShifts/{id}": { "schema": "object", "description": "Daily shifts" },
+    "/expenses/{id}": { "schema": "object", "description": "Store expenses" },
+    "/auditLogs/{id}": { "schema": "object", "description": "System changes" },
+    "/categories/{id}": { "schema": "object", "description": "Tenant categories" },
+    "/banners/{id}": { "schema": "object", "description": "Tenant banners" },
+    "/offers/{id}": { "schema": "object", "description": "Tenant offers" },
+    "/slugs/{slug}": { "schema": "object", "description": "Registry for unique URLs" }
   }
 }
