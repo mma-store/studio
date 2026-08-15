@@ -1,4 +1,3 @@
-
 'use client';
 
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
@@ -7,36 +6,34 @@ import { AdminHeader } from "@/components/admin/header";
 import { useUser } from "@/firebase";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { ScrollText, Loader2, ShieldAlert, Bug, ShieldCheck, AlertCircle } from "lucide-react";
+import { ScrollText, ShieldAlert, Bug, BadgeCheck, AlertCircle, RefreshCw } from "lucide-react";
 import { ReliabilityProvider } from "@/components/reliability/reliability-provider";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  const { user, profile, loading, isAuthenticated, tenantId, error } = useUser();
+  const { user, profile, loading, isAuthenticated, identitySource, error } = useUser();
   const router = useRouter();
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    if (!loading) {
+    if (!loading && !error) {
       if (!isAuthenticated) {
         router.replace('/login');
         return;
       }
 
-      // توجيه ذكي بناءً على البروفايل المرجعي
-      if (profile) {
-        if (profile.tenantId) {
-          setReady(true);
-        } else {
-          // مستخدم موثق ولكن لا يملك متجر
-          router.replace('/onboarding');
-        }
-      } else {
-        // لا يوجد بروفايل على الإطلاق
+      // توجيه ذكي: ننتظر حتى استقرار البروفايل
+      if (profile?.tenantId) {
+        setReady(true);
+      } else if (profile && !profile.tenantId) {
+        router.replace('/onboarding');
+      } else if (!profile) {
+        // إذا انتهى التحميل ولم نجد بروفايل، نرسله للتأسيس
         router.replace('/onboarding');
       }
     }
-  }, [isAuthenticated, profile, loading, router]);
+  }, [isAuthenticated, profile, loading, error, router]);
 
   if (loading) {
     return (
@@ -54,11 +51,17 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   if (error) {
     return (
-      <div className="flex h-screen w-full flex-col items-center justify-center bg-red-50 p-6 text-center gap-4">
-         <ShieldAlert className="h-16 w-16 text-red-600" />
-         <h1 className="text-2xl font-black text-red-900">خطأ في تحديد الهوية</h1>
-         <p className="text-sm font-bold text-red-700 max-w-md">{error}</p>
-         <button onClick={() => window.location.reload()} className="mt-4 px-8 h-12 bg-red-600 text-white rounded-xl font-black">إعادة المحاولة</button>
+      <div className="flex h-screen w-full flex-col items-center justify-center bg-red-50 p-6 text-center gap-6">
+         <div className="h-20 w-20 bg-white rounded-3xl shadow-xl flex items-center justify-center">
+            <ShieldAlert className="h-10 w-10 text-red-600" />
+         </div>
+         <div className="space-y-2">
+            <h1 className="text-2xl font-black text-red-900">حدث خلل في التحقق</h1>
+            <p className="text-sm font-bold text-red-700 max-w-md mx-auto">{error}</p>
+         </div>
+         <Button onClick={() => window.location.reload()} className="bg-red-600 hover:bg-red-700 h-14 px-10 rounded-2xl gap-2 font-black shadow-xl">
+            <RefreshCw className="h-5 w-5" /> إعادة محاولة الاتصال
+         </Button>
       </div>
     );
   }
@@ -75,51 +78,30 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <main className="flex-1 p-4 md:p-8 overflow-y-auto">
               <div className="mx-auto max-w-7xl w-full relative">
                 
-                {/* 🛡️ RESOLVE CURRENT ACCOUNT - DIAGNOSTIC OVERLAY (DEV ONLY) */}
+                {/* 🛡️ IDENTITY DIAGNOSTIC BAR (DEV ONLY) */}
                 {process.env.NODE_ENV === 'development' && (
-                  <div className="mb-6 p-5 rounded-[28px] bg-slate-900 text-white shadow-2xl border-l-8 border-emerald-500 overflow-hidden relative">
-                    <div className="flex items-center justify-between mb-4">
-                       <div className="flex items-center gap-3">
-                          <Bug className="h-5 w-5 text-emerald-400" />
-                          <span className="font-black text-sm tracking-tight">DIAGNOSTIC: resolveCurrentAccount()</span>
+                  <div className={cn(
+                    "mb-6 p-4 rounded-[24px] text-white shadow-xl flex items-center justify-between border-l-8 overflow-hidden",
+                    identitySource === 'canonical' ? "bg-slate-900 border-emerald-500" : "bg-amber-900 border-orange-500"
+                  )}>
+                    <div className="flex items-center gap-4">
+                       <div className={cn(
+                         "h-10 w-10 rounded-xl flex items-center justify-center",
+                         identitySource === 'canonical' ? "bg-emerald-500/20 text-emerald-400" : "bg-orange-500/20 text-orange-400"
+                       )}>
+                          <Bug className="h-5 w-5" />
                        </div>
-                       <BadgeCheck className="h-5 w-5 text-emerald-400" />
-                    </div>
-                    
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-6 font-mono text-[10px]">
-                       <div className="space-y-1">
-                          <p className="opacity-50 uppercase font-black">Auth UID</p>
-                          <p className="truncate font-bold text-emerald-400">{user?.uid}</p>
-                       </div>
-                       <div className="space-y-1">
-                          <p className="opacity-50 uppercase font-black">Profile ID</p>
-                          <p className={cn("truncate font-bold", profile?.uid === user?.uid ? "text-emerald-400" : "text-red-400")}>
-                             {profile?.uid || 'MISSING'}
-                          </p>
-                       </div>
-                       <div className="space-y-1">
-                          <p className="opacity-50 uppercase font-black">Tenant ID</p>
-                          <p className="truncate font-bold text-blue-400">{profile?.tenantId || 'NONE'}</p>
-                       </div>
-                       <div className="space-y-1">
-                          <p className="opacity-50 uppercase font-black">Account Role</p>
-                          <p className="truncate font-bold text-orange-400">{profile?.role} / {profile?.accountType}</p>
+                       <div>
+                          <p className="font-black text-xs">DIAGNOSTIC: Identity Resolved ({identitySource})</p>
+                          <p className="text-[10px] opacity-60 font-mono">UID: {user?.uid}</p>
                        </div>
                     </div>
-
-                    <div className="mt-4 pt-4 border-t border-white/10 flex items-center gap-4">
-                       <div className="flex items-center gap-1.5 text-[9px] font-black">
-                          <div className={cn("h-2 w-2 rounded-full", profile?.uid === user?.uid ? "bg-emerald-500" : "bg-red-500")} />
-                          Auth Match
+                    <div className="flex gap-4">
+                       <div className="text-right">
+                          <p className="text-[10px] font-black uppercase opacity-40 leading-none mb-1">Tenant Status</p>
+                          <p className="text-xs font-bold text-emerald-400">ACTIVE: {profile?.tenantId}</p>
                        </div>
-                       <div className="flex items-center gap-1.5 text-[9px] font-black">
-                          <div className={cn("h-2 w-2 rounded-full", profile?.tenantId ? "bg-emerald-500" : "bg-red-500")} />
-                          Tenant Resolved
-                       </div>
-                       <div className="flex items-center gap-1.5 text-[9px] font-black">
-                          <div className={cn("h-2 w-2 rounded-full", profile?.status === 'active' ? "bg-emerald-500" : "bg-red-500")} />
-                          Account Active
-                       </div>
+                       <BadgeCheck className={cn("h-6 w-6", identitySource === 'canonical' ? "text-emerald-400" : "text-orange-400")} />
                     </div>
                   </div>
                 )}
