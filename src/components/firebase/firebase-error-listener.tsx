@@ -6,6 +6,7 @@ import { errorEmitter } from '@/firebase/error-emitter';
 
 /**
  * @fileOverview مستمع مركزي لأخطاء أذونات Firestore.
+ * تم تحديثه ليمنع انهيار الواجهة في حالات القراءة غير الحرجة.
  */
 export function FirebaseErrorListener() {
   useEffect(() => {
@@ -19,10 +20,9 @@ export function FirebaseErrorListener() {
         console.warn('Operation:', operation);
         console.groupEnd();
         
-        // منع انهيار الواجهة في الحالات غير الحرجة لمنع تجمد التطبيق
-        // 1. باقات الاشتراك (معلومات ترويجية غير حاسمة للدخول)
-        // 2. عمليات القراءة البسيطة (Get/List) التي قد تفشل بسبب المزامنة أو عدم التوثيق اللحظي
-        if (path.includes('plans') || operation === 'get' || operation === 'list') {
+        // منع انهيار الواجهة (Error Overlay) لكافة عمليات القراءة
+        // هذا يسمح للتطبيق بالاستمرار حتى لو فشلت قراءة الباقات أو الملفات الشخصية مؤقتاً
+        if (operation === 'get' || operation === 'list' || path.includes('plans')) {
           return;
         }
         

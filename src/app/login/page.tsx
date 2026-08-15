@@ -2,22 +2,20 @@
 "use client";
 
 import { useState } from "react";
-import { useAuth, useFirestore } from "@/firebase";
+import { useAuth } from "@/firebase";
 import { signInWithEmailAndPassword } from "firebase/auth";
-import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { toast } from "@/hooks/use-toast";
-import { Loader2, Lock, Phone, ArrowLeft, ScrollText, AlertCircle } from "lucide-react";
+import { Loader2, Lock, Phone, ArrowLeft, ScrollText } from "lucide-react";
 import Link from "next/link";
 import { normalizePhoneNumber, getInternalEmail } from "@/lib/auth-utils";
 
 export default function LoginPage() {
   const auth = useAuth();
-  const db = useFirestore();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [phoneNumber, setPhoneNumber] = useState("");
@@ -28,103 +26,57 @@ export default function LoginPage() {
     if (loading) return;
     
     setLoading(true);
-    
     const rawPhoneInput = phoneNumber.trim();
     const trimmedPassword = password.trim();
     const purePhone = normalizePhoneNumber(rawPhoneInput);
     
     if (!purePhone || purePhone.length < 9) {
-      toast({ 
-        variant: "destructive", 
-        title: "خطأ في الرقم", 
-        description: "يرجى إدخال رقم هاتف صالح." 
-      });
+      toast({ variant: "destructive", title: "رقم هاتف غير صالح" });
       setLoading(false);
       return;
     }
 
-    // تجربة كافة التنسيقات التاريخية والحديثة للبريد الإلكتروني الداخلي
+    // تجربة كافة التنسيقات التاريخية للبريد الإلكتروني الداخلي
     const emailAttempts = [
-      getInternalEmail(purePhone), // التنسيق القياسي (7XXXXXXXXX)
-      `${purePhone}@mma.store`,    // تنسيق قديم 1
-      `${purePhone}@platform.store`, // تنسيق قديم 2
-      `0${purePhone}@dubsar.platform` // تنسيق قديم 3
+      getInternalEmail(purePhone), 
+      `${purePhone}@mma.store`,    
+      `${purePhone}@platform.store`, 
+      `0${purePhone}@dubsar.platform`
     ];
 
-    let userCredential = null;
-    let lastError = null;
+    let success = false;
 
     try {
-      // المرحلة الأولى: التوثيق عبر Firebase Auth
+      // محاولة تسجيل الدخول
       for (const attemptEmail of emailAttempts) {
         try {
-          userCredential = await signInWithEmailAndPassword(auth, attemptEmail, trimmedPassword);
-          if (userCredential) break; 
+          await signInWithEmailAndPassword(auth, attemptEmail, trimmedPassword);
+          success = true;
+          break; 
         } catch (err: any) {
-          lastError = err;
-          // إذا كان الخطأ تقنياً وليس في البيانات، نتوقف عن المحاولة
-          if (err.code === 'auth/network-request-failed' || err.code === 'auth/too-many-requests') {
-            throw err;
-          }
+          if (err.code === 'auth/network-request-failed') throw err;
           continue;
         }
       }
 
-      if (!userCredential) {
-        throw lastError || new Error("auth/invalid-credential");
+      if (success) {
+        toast({ title: "تم التوثيق بنجاح", description: "جاري فتح لوحة التحكم..." });
+        // التوجه للوحة الإدارة؛ الـ Layout سيتكفل بالتحقق من وجود البروفايل
+        router.push("/admin");
+      } else {
+        toast({ 
+          variant: "destructive", 
+          title: "فشل الدخول", 
+          description: "رقم الهاتف أو كلمة المرور غير صحيحة." 
+        });
       }
-
-      const user = userCredential.user;
-
-      // المرحلة الثانية: جلب بيانات الملف الشخصي من Firestore
-      try {
-        const userRef = doc(db, "users", user.uid);
-        const userSnap = await getDoc(userRef);
-        
-        if (userSnap.exists()) {
-          const userData = userSnap.data();
-          
-          // محاولة تحديث وقت الدخول (لا نجعل فشلها يعيق الدخول)
-          updateDoc(userRef, { lastLogin: Date.now() }).catch(() => {});
-
-          toast({ title: "تم تسجيل الدخول بنجاح" });
-
-          if (userData.role === 'super_admin') {
-            router.push("/super-admin");
-          } else if (['owner', 'admin', 'sales_employee', 'workshop_technician', 'warehouse_employee'].includes(userData.role)) {
-            router.push("/admin");
-          } else {
-            router.push("/");
-          }
-        } else {
-          // المستخدم موثق ولكن لا يمتلك بروفايل - نوجهه للإكمال
-          toast({ title: "اكتمل التوثيق", description: "يرجى إكمال إعداد متجرك." });
-          router.push("/onboarding");
-        }
-      } catch (fsError: any) {
-        console.error("Firestore stage failed:", fsError.code);
-        // في حال وجود مشكلة في الأذونات ولكن التوثيق سليم، نوجه المستخدم للتأسيس كحل وقائي
-        if (fsError.code === 'permission-denied') {
-          router.push("/onboarding");
-        } else {
-          throw fsError;
-        }
-      }
-      
     } catch (error: any) {
-      if (process.env.NODE_ENV === 'development') {
-        console.error("Final Login Failure:", error.code);
-      }
-
-      let errorMessage = "رقم الهاتف أو كلمة المرور غير صحيحة.";
-      
-      if (error.code === 'auth/too-many-requests') {
-        errorMessage = "تم قفل الحساب مؤقتاً بسبب محاولات خاطئة متكررة.";
-      } else if (error.code === 'auth/network-request-failed') {
-        errorMessage = "فشل الاتصال، تحقق من جودة الإنترنت.";
-      }
-      
-      toast({ variant: "destructive", title: "فشل الدخول", description: errorMessage });
+      console.error("Auth Error:", error.code);
+      toast({ 
+        variant: "destructive", 
+        title: "خطأ في الاتصال", 
+        description: "يرجى التحقق من جودة الإنترنت والمحاولة ثانية." 
+      });
     } finally {
       setLoading(false);
     }

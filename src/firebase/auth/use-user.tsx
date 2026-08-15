@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -5,10 +6,13 @@ import { onAuthStateChanged, User } from 'firebase/auth';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { useAuth, useFirestore } from '../provider';
 import { UserProfile } from '@/lib/types/roles';
-import { normalizePhoneNumber } from '@/lib/auth-utils';
 
 const MASTER_RAW_PHONES = ['7858833838', '7703687932'];
 
+/**
+ * @fileOverview Hook موحد لإدارة حالة المستخدم والتحقق من الصلاحيات.
+ * تم تحسينه لضمان استقرار جلسة التاجر والمدير العام.
+ */
 export function useUser() {
   const auth = useAuth();
   const db = useFirestore();
@@ -23,7 +27,7 @@ export function useUser() {
       if (firebaseUser) {
         const profileRef = doc(db, 'users', firebaseUser.uid);
         
-        // استخدام onSnapshot لضمان تحديث الرتبة والـ tenantId فوراً
+        // استخدام onSnapshot لضمان تحديث الرتبة والـ tenantId فوراً وبشكل تفاعلي
         const unsubscribeProfile = onSnapshot(profileRef, (docSnap) => {
           if (docSnap.exists()) {
             setProfile(docSnap.data() as UserProfile);
@@ -32,8 +36,8 @@ export function useUser() {
           }
           setLoading(false);
         }, (err) => {
-          console.warn("Profile fetch failed:", err.message);
-          setProfile(null);
+          // في حال فشل الوصول للملف الشخصي (مثلاً خطأ أذونات عابر)
+          console.warn("Profile sync error:", err.message);
           setLoading(false);
         });
         
@@ -47,12 +51,12 @@ export function useUser() {
     return () => unsubscribeAuth();
   }, [auth, db]);
 
-  // 1. تحديد ما إذا كان المستخدم سوبر أدمن
+  // التحقق من هوية المدير العام
   const isSuperAdmin = profile?.role === 'super_admin' || 
     (user?.email && MASTER_RAW_PHONES.some(p => user.email!.includes(p)));
 
-  // 2. حل معرف المتجر (Tenant ID)
-  // الأولوية دائماً لمعرف المتجر الموجود في البروفايل لضمان الوصول للبيانات الصحيحة
+  // حل معرف المتجر (Tenant ID)
+  // الأولوية دائماً لمعرف المتجر الموجود في الملف الشخصي الفعلي
   const resolvedTenantId = profile?.tenantId || (isSuperAdmin ? 'PLATFORM_OWNER' : null);
 
   return { 
