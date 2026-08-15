@@ -54,20 +54,32 @@ export default function AdminDashboard() {
   const db = useFirestore();
   const { tenantId, profile } = useUser();
   
-  const recentOrdersQuery = useMemo(() => 
-    query(collection(db, 'orders'), where('tenantId', '==', tenantId), orderBy('createdAt', 'desc'), limit(5)), 
-  [db, tenantId]);
+  const recentOrdersQuery = useMemo(() => {
+    if (!tenantId) return null;
+    return query(collection(db, 'orders'), where('tenantId', '==', tenantId), orderBy('createdAt', 'desc'), limit(5));
+  }, [db, tenantId]);
+  
   const { data: recentOrders, loading: ordersLoading } = useCollection(recentOrdersQuery);
 
-  const lowStockQuery = useMemo(() => 
-    query(collection(db, 'products'), where('tenantId', '==', tenantId), orderBy('stock', 'asc'), limit(4)), 
-  [db, tenantId]);
+  const lowStockQuery = useMemo(() => {
+    if (!tenantId) return null;
+    return query(collection(db, 'products'), where('tenantId', '==', tenantId), orderBy('stock', 'asc'), limit(4));
+  }, [db, tenantId]);
+  
   const { data: lowStockProducts, loading: stockLoading } = useCollection(lowStockQuery);
 
-  const allOrdersQuery = useMemo(() => query(collection(db, 'orders'), where('tenantId', '==', tenantId)), [db, tenantId]);
+  const allOrdersQuery = useMemo(() => {
+    if (!tenantId) return null;
+    return query(collection(db, 'orders'), where('tenantId', '==', tenantId));
+  }, [db, tenantId]);
+  
   const { data: allOrders } = useCollection(allOrdersQuery);
 
-  const allUsersQuery = useMemo(() => query(collection(db, 'users'), where('tenantId', '==', tenantId)), [db, tenantId]);
+  const allUsersQuery = useMemo(() => {
+    if (!tenantId) return null;
+    return query(collection(db, 'users'), where('tenantId', '==', tenantId));
+  }, [db, tenantId]);
+  
   const { data: allUsers } = useCollection(allUsersQuery);
 
   const totalSales = useMemo(() => {
@@ -75,8 +87,8 @@ export default function AdminDashboard() {
   }, [allOrders]);
 
   const isNewStore = useMemo(() => {
-    return allOrders.length === 0 && lowStockProducts.length === 0;
-  }, [allOrders, lowStockProducts]);
+    return !ordersLoading && !stockLoading && allOrders.length === 0 && lowStockProducts.length === 0;
+  }, [allOrders, lowStockProducts, ordersLoading, stockLoading]);
 
   if (isNewStore && !ordersLoading && !stockLoading) {
     return (

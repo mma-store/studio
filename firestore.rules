@@ -9,7 +9,6 @@ service cloud.firestore {
     }
 
     function getProfile() {
-      // Use UID-keyed lookup for performance and security
       return get(/databases/$(database)/documents/accountProfiles/$(request.auth.uid)).data;
     }
 
@@ -40,7 +39,7 @@ service cloud.firestore {
     }
 
     match /tenants/{tenantId} {
-      allow read: if isTenantMember(tenantId);
+      allow read: if isTenantMember(tenantId) || isAuthenticated(); // Allow customers to see tenant info
       allow create: if isAuthenticated();
       allow update: if isTenantAdmin(tenantId);
     }
@@ -55,9 +54,31 @@ service cloud.firestore {
       allow write: if isSuperAdmin();
     }
 
-    // --- Operational Data Rules ---
+    // --- Public Shop Data (Read access for all authenticated users) ---
+    match /products/{id} {
+      allow read: if isAuthenticated();
+      allow write: if isTenantAdmin(request.resource.data.tenantId || resource.data.tenantId);
+    }
+    match /categories/{id} {
+      allow read: if isAuthenticated();
+      allow write: if isTenantAdmin(request.resource.data.tenantId || resource.data.tenantId);
+    }
+    match /banners/{id} {
+      allow read: if isAuthenticated();
+      allow write: if isTenantAdmin(request.resource.data.tenantId || resource.data.tenantId);
+    }
+    match /offers/{id} {
+      allow read: if isAuthenticated();
+      allow write: if isTenantAdmin(request.resource.data.tenantId || resource.data.tenantId);
+    }
+    match /motorcycleTypes/{id} {
+      allow read: if isAuthenticated();
+      allow write: if isTenantAdmin(request.resource.data.tenantId || resource.data.tenantId);
+    }
+
+    // --- Private Operational Data Rules ---
     match /{path=**} {
-      // General rule for all documents: check tenantId field
+      // General rule for private docs: check tenantId field match with user profile
       allow read: if isAuthenticated() && (
         resource.data.tenantId == getProfile().tenantId || isSuperAdmin()
       );

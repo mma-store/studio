@@ -33,11 +33,15 @@ export default function InventoryPage() {
   const [newStock, setNewStock] = useState<number>(0);
   const [isUpdating, setIsUpdating] = useState(false);
 
-  const productsQuery = useMemo(() => query(
-    collection(db, 'products'), 
-    where('tenantId', '==', tenantId),
-    orderBy('stock', 'asc')
-  ), [db, tenantId]);
+  const productsQuery = useMemo(() => {
+    if (!tenantId) return null;
+    return query(
+      collection(db, 'products'), 
+      where('tenantId', '==', tenantId),
+      orderBy('stock', 'asc')
+    );
+  }, [db, tenantId]);
+  
   const { data: products, loading } = useCollection(productsQuery);
 
   const filtered = products.filter((p: any) => 
@@ -45,7 +49,7 @@ export default function InventoryPage() {
   );
 
   const handleUpdateStock = async () => {
-    if (!editingProduct) return;
+    if (!editingProduct || !tenantId) return;
     setIsUpdating(true);
     
     const docRef = doc(db, 'products', editingProduct.id);
