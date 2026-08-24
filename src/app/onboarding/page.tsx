@@ -9,8 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { toast } from "@/hooks/use-toast";
-import { Loader2, ArrowLeft, ScrollText, ShieldCheck, AlertCircle } from "lucide-react";
-import Link from "next/link";
+import { Loader2, ShieldCheck, Store } from "lucide-react";
 
 export default function OnboardingPage() {
   const db = useFirestore();
@@ -24,7 +23,7 @@ export default function OnboardingPage() {
     address: "",
   });
 
-  // توجيه التاجر إذا كان يملك متجراً بالفعل
+  // توجيه التاجر إذا كان يملك متجراً بالفعل في saas-prod
   useEffect(() => {
     if (!identityLoading && profile?.tenantId && profile.tenantId !== 'PENDING_ESTABLISHMENT') {
       router.replace('/admin');
@@ -35,18 +34,20 @@ export default function OnboardingPage() {
     e.preventDefault();
     
     if (!user) {
-      toast({ variant: "destructive", title: "غير مصرح", description: "يرجى إنشاء حساب أولاً." });
+      toast({ variant: "destructive", title: "غير مصرح", description: "يرجى تسجيل الدخول أو إنشاء حساب أولاً." });
       router.push('/register');
       return;
     }
 
     setLoading(true);
+    console.log("ONBOARDING_STARTED", { uid: user.uid, businessName: formData.businessName });
+
     try {
-      const slug = formData.businessName.trim().toLowerCase().replace(/\s+/g, '-');
+      const slug = formData.businessName.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]/g, '');
       const newTenantId = `T-${Date.now().toString().slice(-6)}`;
       const now = Date.now();
 
-      // 1. التحقق من السلوج
+      // 1. التحقق من الرابط (Slug)
       const slugRef = doc(db, "slugs", slug);
       const slugSnap = await getDoc(slugRef);
       if (slugSnap.exists()) {
@@ -55,10 +56,10 @@ export default function OnboardingPage() {
         return;
       }
 
-      // 2. عملية التأسيس الموحدة
+      // 2. عملية التأسيس الموحدة في saas-prod
       const batch = writeBatch(db);
 
-      // إنشاء المتجر
+      // إنشاء وثيقة المتجر
       batch.set(doc(db, "tenants", newTenantId), {
         tenantId: newTenantId,
         businessName: formData.businessName.trim(),
@@ -68,26 +69,35 @@ export default function OnboardingPage() {
         address: formData.address,
         status: 'active',
         subscriptionPlan: 'trial',
+        trialEndDate: now + (14 * 24 * 60 * 60 * 1000), // 14 يوم تجريبي
         createdAt: now
       });
 
-      // حجز الرابط
+      // حجز الرابط العالمي
       batch.set(slugRef, { tenantId: newTenantId, createdAt: now });
 
-      // تحديث البروفايل بالـ tenantId الجديد
-      const updatedProfile = {
-        ...profile,
-        tenantId: newTenantId,
+      // تحديث البروفايل بالـ tenantId الجديد وفك حالة الانتظار
+      const updatedProfileRef = doc(db, "accountProfiles", user.uid);
+      batch.update(updatedProfileRef, { 
+        tenantId: newTenantId, 
         displayName: formData.ownerName.trim(),
         updatedAt: now
-      };
+      });
 
-      batch.update(doc(db, "accountProfiles", user.uid), { tenantId: newTenantId, displayName: formData.ownerName.trim() });
-      batch.update(doc(db, "users", user.uid), { tenantId: newTenantId, displayName: formData.ownerName.trim() });
+      // تحديث نسخة المستخدم لضمان التوافق مع الكود
+      const userRef = doc(db, "users", user.uid);
+      batch.update(userRef, { 
+        tenantId: newTenantId, 
+        displayName: formData.ownerName.trim(),
+        updatedAt: now
+      });
 
       await batch.commit();
       
-      toast({ title: "تم إطلاق المتجر!", description: "أهلاً بك في لوحة تحكم دوبسار." });
+      console.log("ONBOARDING_SUCCESS", { tenantId: newTenantId });
+      toast({ title: "تم إطلاق المتجر بنجاح!", description: "أهلاً بك في لوحة تحكم دوبسار." });
+      
+      // التوجيه فوراً للوحة الإدارة
       router.replace("/admin");
       
     } catch (error: any) {
@@ -108,7 +118,7 @@ export default function OnboardingPage() {
               <Store className="h-10 w-10" />
            </div>
            <h2 className="text-3xl font-black text-primary">تأسيس متجرك السحابي</h2>
-           <CardDescription className="font-bold">أدخل بيانات متجرك للبدء في البيع فوراً</CardDescription>
+           <CardDescription className="font-bold">أدخل بيانات متجرك للبدء في البيع فوراً على المشروع الجديد</CardDescription>
         </CardHeader>
 
         <CardContent className="px-10 pb-12">
@@ -133,11 +143,5 @@ export default function OnboardingPage() {
         </CardContent>
       </Card>
     </div>
-  );
-}
-
-function Store(props: any) {
-  return (
-    <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m2 7 4.41-4.41A2 2 0 0 1 7.83 2h8.34a2 2 0 0 1 1.42.59L22 7" /><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" /><path d="M15 22v-4a2 2 0 0 0-2-2h-2a2 2 0 0 0-2 2v4" /><path d="M2 7h20" /><path d="M22 7v3a2 2 0 0 1-2 2v0a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 16 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 12 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 8 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 4 12v0a2 2 0 0 1-2-2V7" /></svg>
   );
 }

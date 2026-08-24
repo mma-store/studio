@@ -7,8 +7,7 @@ import { useAuth, useFirestore } from '../provider';
 import { UserProfile } from '@/lib/types/roles';
 
 /**
- * @fileOverview Identity Resolver for 'saas-prod' Database.
- * يتم التحقق من الهوية من قاعدة البيانات الجديدة حصراً.
+ * @fileOverview Identity Resolver for 'saas-prod' Database on 'dubsar-bb6e6'.
  */
 export function useUser() {
   const auth = useAuth();
@@ -18,7 +17,7 @@ export function useUser() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // UID الخاص بالـ Super Admin للوصول السريع
+  // UID الخاص بالـ Super Admin في المشروع الجديد
   const SUPER_ADMIN_UID = 'rQR8k4ZzIZVtvkQ2pUHNlvIDSI13';
 
   useEffect(() => {
@@ -32,7 +31,7 @@ export function useUser() {
       }
 
       setLoading(true);
-      // جلب البروفايل من قاعدة saas-prod الجديدة
+      // جلب البروفايل من قاعدة saas-prod الجديدة حصراً
       const profileRef = doc(db, 'accountProfiles', firebaseUser.uid);
       
       const unsubscribeProfile = onSnapshot(profileRef, 
@@ -40,13 +39,12 @@ export function useUser() {
           if (snap.exists()) {
             setProfile(snap.data() as UserProfile);
           } else {
-            // في حالة عدم وجود بروفايل (أثناء عملية التأسيس)
             setProfile(null);
           }
           setLoading(false);
         }, 
         (err) => {
-          console.error("Identity Fetch Failed:", err);
+          console.error("Identity Fetch Failed in New Project:", err);
           setError(err.message);
           setLoading(false);
         }

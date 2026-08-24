@@ -2,7 +2,6 @@
 
 /**
  * @fileOverview إعدادات Firebase للمشروع الجديد (Dubsar).
- * تم التحديث للارتباط بمشروع dubsar-bb6e6 الفعلي.
  */
 export const firebaseConfig = {
   apiKey: "AIzaSyB88eedP2qC2-KxJ_k1wKEn89b5tjjKeeQ",

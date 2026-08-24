@@ -3,14 +3,14 @@
 import { useState } from "react";
 import { useAuth, useFirestore } from "@/firebase";
 import { createUserWithEmailAndPassword } from "firebase/auth";
-import { doc, setDoc, writeBatch } from "firebase/firestore";
+import { doc, writeBatch } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { toast } from "@/hooks/use-toast";
-import { User, Phone, Lock, Loader2, Store, ArrowRight, ScrollText } from "lucide-react";
+import { User, Phone, Lock, Loader2, ScrollText } from "lucide-react";
 import Link from "next/link";
 import { normalizePhoneNumber, getInternalEmail } from "@/lib/auth-utils";
 
@@ -40,15 +40,15 @@ export default function RegisterPage() {
 
       const email = getInternalEmail(purePhone);
 
-      // 1. إنشاء المستخدم في Firebase Auth
+      // 1. إنشاء المستخدم في Firebase Auth للمشروع الجديد
       const userCredential = await createUserWithEmailAndPassword(auth, email, formData.password.trim());
       const user = userCredential.user;
 
-      // 2. إنشاء البروفايل الأولي (Pending Onboarding) باستخدام Batch
+      // 2. إنشاء البروفايل الأولي (Pending Onboarding) في saas-prod
       const batch = writeBatch(db);
       const profileData = {
         uid: user.uid,
-        tenantId: 'PENDING_ESTABLISHMENT', // حالة انتظار التأسيس
+        tenantId: 'PENDING_ESTABLISHMENT',
         displayName: formData.displayName.trim(),
         phoneNumber: `0${purePhone}`,
         email,
@@ -58,20 +58,21 @@ export default function RegisterPage() {
         createdAt: Date.now()
       };
 
+      // الربط بمجموعة accountProfiles و users لضمان التعرف على الهوية
       batch.set(doc(db, "accountProfiles", user.uid), profileData);
       batch.set(doc(db, "users", user.uid), profileData);
 
       await batch.commit();
 
-      toast({ title: "تم إنشاء الحساب", description: "جاري نقلك لتأسيس متجرك..." });
+      toast({ title: "تم إنشاء الحساب بنجاح", description: "جاري نقلك لتأسيس متجرك السحابي..." });
       
-      // التوجيه الفوري لصفحة التأسيس
+      // التوجيه الفوري لصفحة التأسيس دون الحاجة لتسجيل دخول مرة ثانية
       router.push("/onboarding");
       
     } catch (error: any) {
       console.error('REGISTER_ERROR:', error);
       let message = "فشل إنشاء الحساب.";
-      if (error.code === 'auth/email-already-in-use') message = "رقم الهاتف مسجل مسبقاً.";
+      if (error.code === 'auth/email-already-in-use') message = "رقم الهاتف مسجل مسبقاً في هذا المشروع.";
       toast({ variant: "destructive", title: "خطأ في التسجيل", description: message });
     } finally {
       setLoading(false);
@@ -88,7 +89,7 @@ export default function RegisterPage() {
              </div>
              <CardTitle className="text-3xl font-black text-primary tracking-tighter">إنشاء حساب جديد</CardTitle>
           </div>
-          <CardDescription className="font-medium text-muted-foreground">انضم إلى منصة دوبسار للتجارة السحابية</CardDescription>
+          <CardDescription className="font-medium text-muted-foreground">انضم إلى منصة دوبسار (المشروع الجديد)</CardDescription>
         </CardHeader>
         
         <CardContent className="px-8 space-y-6">
