@@ -17,7 +17,8 @@ import {
   Cloud,
   CheckCircle2,
   Loader2,
-  Printer
+  Printer,
+  ExternalLink
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,19 +37,19 @@ import { Badge } from "@/components/ui/badge";
 import { useState, useEffect, useMemo } from "react";
 import { toast } from "@/hooks/use-toast";
 import { useFirestore, useDoc, useUser } from "@/firebase";
-import { doc, updateDoc } from "firebase/firestore";
+import { doc, updateDoc, getDoc, writeBatch, collection } from "firebase/firestore";
 
 export default function AdminSettingsPage() {
   const db = useFirestore();
-  const { tenantId } = useUser();
+  const { tenantId, user, profile } = useUser();
   
-  // FIXED: Settings now scope to the tenant document directly for branding/metadata
   const tenantRef = useMemo(() => tenantId ? doc(db, 'tenants', tenantId) : null, [db, tenantId]);
   const { data: tenant, loading } = useDoc<any>(tenantRef);
   
   const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState<any>({
     businessName: "",
+    slug: "",
     phone: "",
     whatsapp: "",
     address: "",
@@ -60,10 +61,13 @@ export default function AdminSettingsPage() {
     }
   });
 
+  const [originalSlug, setOriginalSlug] = useState("");
+
   useEffect(() => {
     if (tenant) {
-      setFormData({
+      const initialData = {
         businessName: tenant.businessName || "",
+        slug: tenant.slug || "",
         phone: tenant.phone || "",
         whatsapp: tenant.whatsapp || "",
         address: tenant.address || "",
@@ -73,17 +77,69 @@ export default function AdminSettingsPage() {
           notificationsEnabled: tenant.settings?.notificationsEnabled ?? true,
           stockAlertsEnabled: tenant.settings?.stockAlertsEnabled ?? true,
         }
-      });
+      };
+      setFormData(initialData);
+      setOriginalSlug(tenant.slug || "");
     }
   }, [tenant]);
 
+  const sanitizeSlug = (val: string) => {
+    return val.toLowerCase()
+      .replace(/\s+/g, '-')
+      .replace(/[^\w\u0621-\u064A-]/g, '');
+  };
+
   const handleSave = async () => {
-    if (!tenantRef) return;
+    if (!tenantRef || !tenantId || !user) return;
     setIsSaving(true);
+
     try {
-      await updateDoc(tenantRef, formData);
+      const newSlug = sanitizeSlug(formData.slug);
+      
+      // Check if slug changed and if new slug is available
+      if (newSlug !== originalSlug && newSlug !== "") {
+        const slugRef = doc(db, "slugs", newSlug);
+        const slugSnap = await getDoc(slugRef);
+        
+        if (slugSnap.exists() && slugSnap.data().tenantId !== tenantId) {
+          toast({ variant: "destructive", title: "الرابط محجوز", description: "هذا الرابط مستخدم من قبل متجر آخر، يرجى اختيار اسم مختلف." });
+          setIsSaving(false);
+          return;
+        }
+
+        // Execute batch update for slug change
+        const batch = writeBatch(db);
+        
+        // 1. Update Tenant doc
+        batch.update(tenantRef, { ...formData, slug: newSlug });
+        
+        // 2. Add new slug entry
+        batch.set(doc(db, "slugs", newSlug), {
+          tenantId,
+          slug: newSlug,
+          active: true,
+          updatedAt: Date.now()
+        });
+
+        // 3. Delete old slug entry if exists
+        if (originalSlug) {
+          batch.delete(doc(db, "slugs", originalSlug));
+        }
+
+        // 4. Update Profile
+        batch.update(doc(db, "accountProfiles", user.uid), { slug: newSlug });
+        batch.update(doc(db, "users", user.uid), { slug: newSlug });
+
+        await batch.commit();
+        setOriginalSlug(newSlug);
+      } else {
+        // Normal update if slug didn't change
+        await updateDoc(tenantRef, formData);
+      }
+
       toast({ title: "تم الحفظ", description: "تم تحديث إعدادات متجرك بنجاح." });
     } catch (e) {
+      console.error(e);
       toast({ variant: "destructive", title: "خطأ", description: "فشل حفظ الإعدادات." });
     } finally {
       setIsSaving(false);
@@ -92,8 +148,10 @@ export default function AdminSettingsPage() {
 
   if (loading) return <div className="p-10 text-center"><Loader2 className="h-10 w-10 animate-spin mx-auto opacity-20" /></div>;
 
+  const storeFullUrl = typeof window !== 'undefined' ? `${window.location.origin}/store/${formData.slug}` : "";
+
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
+    <div className="space-y-8 animate-in fade-in duration-500 pb-20" dir="rtl">
       <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <div className="space-y-1">
           <h1 className="text-4xl font-black tracking-tight text-foreground">الإعدادات والربط</h1>
@@ -118,15 +176,38 @@ export default function AdminSettingsPage() {
             <Card className="rounded-[40px] border-none shadow-sm overflow-hidden">
               <CardHeader className="bg-primary/5 p-8 border-b border-primary/5">
                 <CardTitle className="flex items-center gap-3 text-2xl font-black">
-                  <Store className="h-7 w-7 text-primary" /> المعلومات الأساسية
+                  <Store className="h-7 w-7 text-primary" /> المعلومات الأساسية والرابط
                 </CardTitle>
-                <CardDescription className="font-bold text-sm">البيانات الرسمية التي تظهر للعملاء في الفواتير والتطبيق.</CardDescription>
+                <CardDescription className="font-bold text-sm">البيانات الرسمية ورابط المتجر الذي يظهر للعملاء.</CardDescription>
               </CardHeader>
               <CardContent className="p-8 space-y-6">
                 <div className="space-y-2">
                   <Label className="font-black text-sm mr-1 uppercase tracking-widest opacity-60">اسم المجمع التجاري</Label>
                   <Input value={formData.businessName} onChange={(e) => setFormData({...formData, businessName: e.target.value})} className="rounded-2xl h-14 bg-muted/30 border-none font-bold text-lg px-6" />
                 </div>
+
+                <div className="space-y-2">
+                  <Label className="font-black text-sm mr-1 uppercase tracking-widest opacity-60">رابط المتجر المخصص (URL Slug)</Label>
+                  <div className="flex gap-2">
+                    <div className="flex-1 relative">
+                       <Input 
+                        value={formData.slug} 
+                        onChange={(e) => setFormData({...formData, slug: sanitizeSlug(e.target.value)})} 
+                        placeholder="my-store-name"
+                        className="rounded-2xl h-14 bg-muted/30 border-none font-black text-left pl-4 pr-12" 
+                        dir="ltr"
+                       />
+                       <Globe className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
+                    </div>
+                  </div>
+                  <div className="p-4 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-between">
+                     <code className="text-[10px] font-bold text-blue-700 truncate" dir="ltr">{storeFullUrl}</code>
+                     <Button variant="ghost" size="sm" className="h-7 text-[10px] font-black" onClick={() => window.open(storeFullUrl, '_blank')}>
+                        معاينة <ExternalLink className="mr-1 h-3 w-3" />
+                     </Button>
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <Label className="font-black text-sm mr-1 opacity-60">رقم الهاتف الأساسي</Label>
@@ -151,6 +232,12 @@ export default function AdminSettingsPage() {
                 <div className="space-y-2">
                   <Label className="font-black text-sm mr-1 opacity-60">العنوان الرئيسي</Label>
                   <Input value={formData.address} onChange={(e) => setFormData({...formData, address: e.target.value})} className="rounded-2xl h-14 bg-muted/30 border-none font-bold px-6" />
+                </div>
+                <div className="p-6 rounded-3xl bg-slate-50 border-2 border-dashed flex flex-col items-center justify-center text-center gap-2">
+                   <div className="h-12 w-12 rounded-2xl bg-white flex items-center justify-center shadow-sm">
+                      <LinkIcon className="h-6 w-6 text-slate-400" />
+                   </div>
+                   <p className="text-sm font-bold text-slate-500">ميزات الربط الاجتماعي ستتوفر قريباً</p>
                 </div>
               </CardContent>
             </Card>

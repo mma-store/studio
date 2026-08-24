@@ -1,3 +1,4 @@
+
 'use client';
 
 import { StatsCard } from "@/components/admin/stats-card";
@@ -72,14 +73,23 @@ export default function AdminDashboard() {
   
   const { data: lowStockProducts, loading: stockLoading } = useCollection(lowStockQuery);
 
-  const storeUrl = typeof window !== 'undefined' ? `${window.location.origin}/store/${profile?.slug || ''}` : '';
+  const currentSlug = profile?.slug || "";
+  const storeUrl = typeof window !== 'undefined' ? `${window.location.origin}/store/${currentSlug}` : '';
 
   const copyStoreLink = () => {
+    if (!currentSlug) {
+      toast({ variant: "destructive", title: "تنبيه", description: "يرجى إعداد رابط المتجر من الإعدادات أولاً." });
+      return;
+    }
     navigator.clipboard.writeText(storeUrl);
     toast({ title: "تم نسخ الرابط", description: "يمكنك الآن مشاركته مع عملائك." });
   };
 
   const handleShare = async () => {
+    if (!currentSlug) {
+      toast({ variant: "destructive", title: "تنبيه", description: "يرجى إعداد رابط المتجر من الإعدادات أولاً." });
+      return;
+    }
     if (navigator.share) {
       try {
         await navigator.share({
@@ -103,7 +113,7 @@ export default function AdminDashboard() {
           <p className="text-muted-foreground font-medium text-sm">مرحباً {profile?.displayName}، إليك ملخص أداء متجرك اليوم.</p>
         </div>
         <div className="flex items-center gap-3">
-           <Link href={`/store/${profile?.slug}`} target="_blank">
+           <Link href={currentSlug ? `/store/${currentSlug}` : "/admin/settings"} target={currentSlug ? "_blank" : "_self"}>
              <Button variant="outline" className="rounded-xl border-2 font-bold h-11 px-6 gap-2">
                 <Globe className="h-4 w-4" /> عرض المتجر
              </Button>
@@ -127,11 +137,11 @@ export default function AdminDashboard() {
                   </div>
                </div>
                <div className="bg-white/10 p-4 rounded-2xl border border-white/10 flex items-center justify-between gap-4">
-                  <code className="text-xs font-mono font-bold truncate flex-1" dir="ltr">{storeUrl || '/store/...'}</code>
+                  <code className="text-xs font-mono font-bold truncate flex-1" dir="ltr">{currentSlug ? storeUrl : '/store/your-slug'}</code>
                   <div className="flex gap-2 shrink-0">
                      <Button onClick={copyStoreLink} size="icon" variant="ghost" className="h-10 w-10 rounded-xl hover:bg-white/20"><Copy className="h-4 w-4" /></Button>
                      <Button onClick={handleShare} size="icon" variant="ghost" className="h-10 w-10 rounded-xl hover:bg-white/20"><Share2 className="h-4 w-4" /></Button>
-                     <Link href={`/store/${profile?.slug}`} target="_blank">
+                     <Link href={currentSlug ? `/store/${currentSlug}` : "/admin/settings"} target={currentSlug ? "_blank" : "_self"}>
                         <Button size="icon" variant="ghost" className="h-10 w-10 rounded-xl hover:bg-white/20"><ExternalLink className="h-4 w-4" /></Button>
                      </Link>
                   </div>

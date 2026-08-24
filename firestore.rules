@@ -1,45 +1,54 @@
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // وظائف مساعدة
+    // وظائف مساعدة مركزية
     function isAuthenticated() {
       return request.auth != null;
     }
 
+    function isOwner(uid) {
+      return isAuthenticated() && request.auth.uid == uid;
+    }
+
+    // الحصول على tenantId للمستخدم الحالي من بروفايله
+    function getTenantId() {
+      return get(/databases/$(database)/documents/accountProfiles/$(request.auth.uid)).data.tenantId;
+    }
+
     // القواعد الأساسية للهوية الرقمية
     match /accountProfiles/{uid} {
-      allow read, write: if request.auth != null && request.auth.uid == uid;
+      allow read, write: if isOwner(uid);
     }
 
     match /users/{uid} {
-      allow read, write: if request.auth != null && request.auth.uid == uid;
+      allow read, write: if isOwner(uid) || (isAuthenticated() && getTenantId() == resource.data.tenantId);
     }
 
-    // سجل الروابط (Slug Registry) - قراءة عامة للجميع
+    // سجل الروابط (Slug Registry)
     match /slugs/{slug} {
       allow read: if true;
+      // السماح بإنشاء رابط إذا كان غير موجود
       allow create: if isAuthenticated();
+      // السماح بحذف الرابط القديم فقط لصاحب المتجر المرتبط به
+      allow delete: if isAuthenticated() && resource.data.tenantId == getTenantId();
     }
 
-    // بيانات المتجر الأساسية (Branding) - قراءة عامة
+    // بيانات المتجر الأساسية
     match /tenants/{tenantId} {
       allow read: if true;
       allow create: if isAuthenticated();
-      allow update: if isAuthenticated() && (
-        get(/databases/$(database)/documents/accountProfiles/$(request.auth.uid)).data.tenantId == tenantId
-      );
+      allow update: if isAuthenticated() && getTenantId() == tenantId;
     }
 
-    // المجموعات التسويقية العامة للمتجر (Public Storefront)
+    // المنتجات والأقسام والبنرات (قراءة عامة للجمهور، كتابة للتاجر فقط)
     match /{collectionName}/{docId} {
-      allow read: if collectionName in ['products', 'categories', 'banners', 'offers', 'motorcycleTypes'] 
-                  && (resource == null || resource.data.tenantId != null);
+      allow read: if collectionName in ['products', 'categories', 'banners', 'offers', 'motorcycleTypes'];
       
-      // الكتابة محصورة فقط لأعضاء الـ Tenant بناءً على الهوية الموثقة
       allow write: if isAuthenticated() && (
-        request.resource.data.tenantId == get(/databases/$(database)/documents/accountProfiles/$(request.auth.uid)).data.tenantId ||
-        resource.data.tenantId == get(/databases/$(database)/documents/accountProfiles/$(request.auth.uid)).data.tenantId
+        (request.resource != null && request.resource.data.tenantId == getTenantId()) ||
+        (resource != null && resource.data.tenantId == getTenantId())
       );
     }
 
@@ -49,10 +58,11 @@ service cloud.firestore {
         'orders', 'suppliers', 'purchases', 'expenses', 
         'repairOrders', 'financialTransactions', 'receiptVouchers', 
         'paymentVouchers', 'cashShifts', 'auditLogs', 'apiKeys', 
-        'webhooks', 'tenantIntegrations', 'returns', 'subscriptionInvoices'
+        'webhooks', 'tenantIntegrations', 'returns', 'subscriptionInvoices',
+        'notifications'
       ] && isAuthenticated() && (
-        (resource != null && resource.data.tenantId == get(/databases/$(database)/documents/accountProfiles/$(request.auth.uid)).data.tenantId) || 
-        (request.resource != null && request.resource.data.tenantId == get(/databases/$(database)/documents/accountProfiles/$(request.auth.uid)).data.tenantId)
+        (resource != null && resource.data.tenantId == getTenantId()) || 
+        (request.resource != null && request.resource.data.tenantId == getTenantId())
       );
     }
 
@@ -67,6 +77,11 @@ service cloud.firestore {
 
     match /settings/{id} {
       allow read: if true;
+    }
+
+    // سجلات النظام (لأغراض الموثوقية)
+    match /systemLogs/{id} {
+      allow create: if true; // السماح للنظام بتسجيل الأخطاء حتى بدون توثيق أحياً
     }
   }
 }
