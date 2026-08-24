@@ -11,7 +11,7 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // Direct profile lookup - No dependencies
+    // Direct profile lookup - No dependencies to avoid recursion
     function getUserProfile(uid) {
       return get(/databases/$(database)/documents/accountProfiles/$(uid)).data;
     }
@@ -29,6 +29,7 @@ service cloud.firestore {
     // ==========================================
     
     match /accountProfiles/{uid} {
+      // Must use direct comparison without helpers to avoid circular dependencies
       allow read, write: if isAuthenticated() && request.auth.uid == uid;
     }
 
@@ -47,7 +48,7 @@ service cloud.firestore {
       // Rule for all tenant-scoped business data
       allow read: if isAuthenticated() && (
         isTenantMember(resource.data.tenantId) || 
-        // Support Public Storefront Read
+        // Support Public Storefront Read (Unauthenticated or different tenant customers)
         (collectionName in ['products', 'categories', 'banners', 'offers'] && resource.data.tenantId != null)
       );
       

@@ -1,8 +1,8 @@
 
 'use client';
 
-import { useState, useMemo, useEffect } from "react";
-import { Plus, Search, Layers, Edit2, Trash2, ImageIcon, Loader2, Save, X, AlertTriangle } from "lucide-react";
+import { useState, useMemo } from "react";
+import { Plus, Edit2, ImageIcon, Loader2, Save, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { 
@@ -18,7 +18,7 @@ import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useFirestore, useCollection } from "@/firebase";
 import { useTenant } from "@/hooks/use-tenant";
-import { collection, query, orderBy, deleteDoc, doc, addDoc, updateDoc, where } from "firebase/firestore";
+import { collection, query, orderBy, doc, addDoc, updateDoc, where } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/hooks/use-toast";
 import Image from "next/image";
@@ -27,7 +27,6 @@ import { uploadToCloudinary, getOptimizedUrl } from "@/lib/cloudinary";
 export default function CategoriesPage() {
   const db = useFirestore();
   const { tenantId, isLinkedToStore } = useTenant();
-  const [search, setSearch] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<any>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -62,7 +61,7 @@ export default function CategoriesPage() {
   const handleAction = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     
-    // VERIFY TENANT BEFORE WRITE
+    // VERIFY TENANT BEFORE WRITE - CRITICAL FOR saas-prod
     if (!tenantId || !isLinkedToStore) {
       console.error("DIAGNOSTIC: Write blocked - No active tenantId context found.");
       toast({ variant: "destructive", title: "خطأ أمني", description: "لم يتم التعرف على متجرك. يرجى تسجيل الدخول مجدداً." });
@@ -94,6 +93,8 @@ export default function CategoriesPage() {
         toast({ title: "تمت الإضافة بنجاح" });
       }
       setIsDialogOpen(false);
+      setUploadedImageUrl("");
+      setEditingCategory(null);
     } catch (error: any) {
       console.error("DIAGNOSTIC: CATEGORY WRITE FAILED", { code: error.code, message: error.message });
       toast({ variant: "destructive", title: "فشل الحفظ", description: `Firestore Error: ${error.code}` });

@@ -11,13 +11,13 @@ import { firebaseConfig } from './config';
 
 /**
  * Singleton Firebase Instance Manager
- * Using 'saas-prod' as the clean, dedicated database for the Multi-Tenant system.
+ * Connecting explicitly to 'saas-prod' for the clean Multi-Tenant system.
  */
 let cachedApp: FirebaseApp | undefined;
 let cachedFirestore: Firestore | undefined;
 let cachedAuth: Auth | undefined;
 
-// The explicit ID for the new clean database
+// The explicit ID for the new clean database created by the user
 const DATABASE_ID = 'saas-prod';
 
 export function initializeFirebase() {
@@ -25,7 +25,7 @@ export function initializeFirebase() {
     if (!cachedApp) {
       const existingApps = getApps();
       cachedApp = existingApps.length ? existingApps[0] : initializeApp(firebaseConfig);
-      // Explicitly connecting to saas-prod
+      // Explicitly connecting to the new clean database saas-prod
       cachedFirestore = getFirestore(cachedApp, DATABASE_ID);
       cachedAuth = getAuth(cachedApp);
     }
