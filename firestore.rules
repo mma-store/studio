@@ -1,9 +1,10 @@
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/saas-prod/documents {
     
     // ==========================================
-    // 1. الوظائف المساعدة (Secure Helpers)
+    // 1. الوظائف المساعدة الأساسية
     // ==========================================
     
     function isAuthenticated() {
@@ -11,30 +12,31 @@ service cloud.firestore {
     }
 
     // جلب بيانات البروفايل للتحقق من الصلاحيات والـ Tenant
-    function getProfile() {
+    function getProfileData() {
       return get(/databases/$(database)/documents/accountProfiles/$(request.auth.uid)).data;
     }
 
     function isTenantMember(tid) {
-      return isAuthenticated() && getProfile().tenantId == tid;
+      return isAuthenticated() && getProfileData().tenantId == tid;
     }
 
     function isSuperAdmin() {
-      return isAuthenticated() && (getProfile().accountType == 'super_admin' || getProfile().role == 'super_admin');
+      return isAuthenticated() && (getProfileData().accountType == 'super_admin' || getProfileData().role == 'super_admin');
     }
 
     // ==========================================
     // 2. إدارة الهوية (Identity Layer)
     // ==========================================
     
-    // القاعدة الأساسية: لا تستدعي getProfile داخل accountProfiles لتجنب الـ Recursion
+    // فك الارتباط: لا نستدعي getProfileData داخل هذه القاعدة لمنع الحلقة المفرغة
     match /accountProfiles/{uid} {
       allow read, write: if isAuthenticated() && request.auth.uid == uid;
       allow read: if isSuperAdmin();
     }
 
     match /users/{uid} {
-      allow read: if isAuthenticated() && (request.auth.uid == uid || isTenantMember(resource.data.tenantId));
+      allow read, write: if isAuthenticated() && request.auth.uid == uid;
+      allow read: if isAuthenticated() && isTenantMember(resource.data.tenantId);
       allow write: if isAuthenticated() && isTenantMember(request.resource.data.tenantId);
       allow read, write: if isSuperAdmin();
     }
@@ -44,18 +46,18 @@ service cloud.firestore {
     // ==========================================
     
     match /{collectionName}/{id} {
-      // السماح بالقراءة العامة لبيانات واجهة المتجر
+      // السماح بالقراءة العامة لبيانات واجهة المتجر لغير المسجلين
       allow read: if collectionName in ['products', 'categories', 'banners', 'offers', 'motorcycleTypes'];
       
-      // قواعد الكتابة العامة المعزولة بالـ Tenant
+      // قواعد القراءة والكتابة للأعضاء (معزولة بالـ Tenant)
       allow read: if isAuthenticated() && isTenantMember(resource.data.tenantId);
       allow write: if isAuthenticated() && isTenantMember(request.resource.data.tenantId);
       
-      // صلاحيات الـ Super Admin الشاملة
+      // صلاحيات الـ Super Admin
       allow read, write: if isSuperAdmin();
     }
 
-    // استثناء للمجموعات المالية الحساسة (لا قراءة عامة أبداً)
+    // استثناء للسجلات الحساسة (لا قراءة عامة)
     match /subscriptionInvoices/{id} {
       allow read, write: if isAuthenticated() && isTenantMember(resource.data.tenantId);
       allow read, write: if isSuperAdmin();
@@ -68,18 +70,20 @@ service cloud.firestore {
     }
 
     // ==========================================
-    // 4. السجلات العامة (Global Infrastructure)
+    // 4. البنية التحتية العالمية (Global Registry)
     // ==========================================
     
     match /tenants/{tenantId} {
-      allow read: if isAuthenticated() && (getProfile().tenantId == tenantId || isSuperAdmin());
+      // السماح بالإنشاء لأي مستخدم موثق (أثناء الـ Onboarding)
       allow create: if isAuthenticated();
-      allow update: if isAuthenticated() && getProfile().tenantId == tenantId;
+      allow read: if isAuthenticated() && (getProfileData().tenantId == tenantId || isSuperAdmin());
+      allow update: if isAuthenticated() && getProfileData().tenantId == tenantId;
     }
 
     match /slugs/{slug} {
       allow read: if true;
-      allow create, update: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && isSuperAdmin();
     }
 
     match /plans/{planId} {
@@ -87,12 +91,12 @@ service cloud.firestore {
       allow write: if isSuperAdmin();
     }
 
-    match /integrations/{id} {
+    match /settings/{id} {
       allow read: if true;
       allow write: if isSuperAdmin();
     }
 
-    match /settings/{id} {
+    match /integrations/{id} {
       allow read: if true;
       allow write: if isSuperAdmin();
     }

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
@@ -8,7 +9,7 @@ import { firebaseConfig } from './config';
 
 /**
  * Singleton Firebase Instance Manager
- * تم ضبط المحرك ليرتبط حصرياً بقاعدة البيانات saas-prod في المشروع الجديد Dubsar.
+ * تم ضبط المحرك ليرتبط حصرياً بقاعدة البيانات saas-prod في مشروع Dubsar الجديد.
  */
 let cachedApp: FirebaseApp | undefined;
 let cachedFirestore: Firestore | undefined;
