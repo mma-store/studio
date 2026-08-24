@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -29,6 +30,7 @@ export function useTenantData(slug: string) {
     }
 
     setLoading(true);
+    console.log(`📡 FETCHING_TENANT_FOR_SLUG: ${slug}`);
 
     // البحث عن الـ Slug في سجل الروابط العالمي
     const slugRef = doc(db, 'slugs', slug);
@@ -36,6 +38,7 @@ export function useTenantData(slug: string) {
     const unsubscribeSlug = onSnapshot(slugRef, async (slugSnap) => {
       if (slugSnap.exists()) {
         const { tenantId } = slugSnap.data();
+        console.log(`✅ SLUG_RESOLVED: ${slug} -> ${tenantId}`);
         
         // جلب بيانات المتجر الحقيقية
         const tenantRef = doc(db, 'tenants', tenantId);
@@ -44,31 +47,32 @@ export function useTenantData(slug: string) {
           const tenantSnap = await getDoc(tenantRef);
           if (tenantSnap.exists()) {
             const data = tenantSnap.data() as TenantData;
-            // التحقق من حالة المتجر
+            
             if (data.status === 'suspended') {
-              setError('هذا المتجر غير متاح حالياً بإمر الإدارة.');
-              setTenant(null);
-            } else if (data.status === 'expired' && (!data.trialEndDate || data.trialEndDate < Date.now())) {
-              setError('هذا المتجر غير متاح حالياً بسبب انتهاء الصلاحية.');
+              setError('هذا المتجر معلق مؤقتاً.');
               setTenant(null);
             } else {
               setTenant({ ...data, tenantId: tenantSnap.id });
               setError(null);
             }
           } else {
-            setError('المعذرة، بيانات المتجر غير موجودة.');
+            console.error("❌ TENANT_DOC_MISSING");
+            setError('بيانات المتجر غير موجودة.');
             setTenant(null);
           }
         } catch (err) {
+          console.error("❌ TENANT_FETCH_ERROR:", err);
           setError('فشل الوصول لبيانات المتجر.');
           setTenant(null);
         }
       } else {
+        console.warn(`⚠️ SLUG_NOT_FOUND: ${slug}`);
         setError('عذراً، هذا المتجر غير موجود على منصة دوبسار.');
         setTenant(null);
       }
       setLoading(false);
     }, (err) => {
+      console.error("❌ SLUG_LISTENER_ERROR:", err);
       setError('حدث خطأ في مزامنة البيانات.');
       setLoading(false);
     });
