@@ -3,26 +3,20 @@ service cloud.firestore {
   match /databases/saas-prod/documents {
     
     // ==========================================
-    // 1. الوظائف المساعدة (Helpers)
+    // 1. الوظائف المساعدة (Secure Helpers)
     // ==========================================
     
     function isAuthenticated() {
       return request.auth != null;
     }
 
-    // جلب ملف الهوية - نستخدم UID الوثيقة مباشرة كمرجع
+    // جلب بيانات البروفايل للتحقق من الصلاحيات والـ Tenant
     function getProfile() {
       return get(/databases/$(database)/documents/accountProfiles/$(request.auth.uid)).data;
     }
 
-    // الحصول على معرف المتجر الخاص بالمستخدم
-    function getUserTenantId() {
-      return getProfile().tenantId;
-    }
-
-    // التحقق من الانتماء للمتجر
     function isTenantMember(tid) {
-      return isAuthenticated() && getUserTenantId() == tid;
+      return isAuthenticated() && getProfile().tenantId == tid;
     }
 
     function isSuperAdmin() {
@@ -30,57 +24,61 @@ service cloud.firestore {
     }
 
     // ==========================================
-    // 2. الهوية الرقمية (Root of Trust)
+    // 2. إدارة الهوية (Identity Layer)
     // ==========================================
     
+    // القاعدة الأساسية: لا تستدعي getProfile داخل accountProfiles لتجنب الـ Recursion
     match /accountProfiles/{uid} {
-      // السماح للمستخدم بقراءة ملفه الخاص فقط بناءً على UID الموثق
       allow read, write: if isAuthenticated() && request.auth.uid == uid;
-      // السماح لمدير المنصة بالقراءة
       allow read: if isSuperAdmin();
     }
 
     match /users/{uid} {
-      // صلاحية المستخدم لنفسه
-      allow read: if isAuthenticated() && request.auth.uid == uid;
-      // صلاحية أعضاء المتجر لقراءة زملائهم أو عملائهم
-      allow read: if isAuthenticated() && isTenantMember(resource.data.tenantId);
-      // صلاحية الكتابة للمسؤولين
-      allow write: if isAuthenticated() && isTenantMember(getUserTenantId());
-    }
-
-    // ==========================================
-    // 3. البيانات التشغيلية المعزولة (Tenant-Scoped)
-    // ==========================================
-    
-    match /{collectionName}/{id} {
-      // نطبق العزل على كافة المجموعات التي تحتوي على tenantId
-      allow read: if isAuthenticated() && (
-        isTenantMember(resource.data.tenantId) ||
-        // دعم المتجر الإلكتروني (قراءة عامة لبعض البيانات)
-        (collectionName in ['products', 'categories', 'banners', 'offers'] && resource.data.tenantId != null)
-      );
-
-      allow write: if isAuthenticated() && 
-                    isTenantMember(getUserTenantId()) &&
-                    (request.resource.data.tenantId == getUserTenantId());
-                    
-      // استثناء للمجموعات الخاصة بمدير المنصة
+      allow read: if isAuthenticated() && (request.auth.uid == uid || isTenantMember(resource.data.tenantId));
+      allow write: if isAuthenticated() && isTenantMember(request.resource.data.tenantId);
       allow read, write: if isSuperAdmin();
     }
 
     // ==========================================
-    // 4. السجلات العامة للمنصة (Global)
+    // 3. البيانات التشغيلية (Tenant-Scoped Data)
+    // ==========================================
+    
+    match /{collectionName}/{id} {
+      // السماح بالقراءة العامة لبيانات واجهة المتجر
+      allow read: if collectionName in ['products', 'categories', 'banners', 'offers', 'motorcycleTypes'];
+      
+      // قواعد الكتابة العامة المعزولة بالـ Tenant
+      allow read: if isAuthenticated() && isTenantMember(resource.data.tenantId);
+      allow write: if isAuthenticated() && isTenantMember(request.resource.data.tenantId);
+      
+      // صلاحيات الـ Super Admin الشاملة
+      allow read, write: if isSuperAdmin();
+    }
+
+    // استثناء للمجموعات المالية الحساسة (لا قراءة عامة أبداً)
+    match /subscriptionInvoices/{id} {
+      allow read, write: if isAuthenticated() && isTenantMember(resource.data.tenantId);
+      allow read, write: if isSuperAdmin();
+    }
+
+    match /auditLogs/{id} {
+      allow read: if isAuthenticated() && isTenantMember(resource.data.tenantId);
+      allow create: if isAuthenticated();
+      allow read, write: if isSuperAdmin();
+    }
+
+    // ==========================================
+    // 4. السجلات العامة (Global Infrastructure)
     // ==========================================
     
     match /tenants/{tenantId} {
-      allow read: if isAuthenticated() && (getUserTenantId() == tenantId || isSuperAdmin());
-      allow create: if isAuthenticated(); // السماح بإنشاء متجر عند الـ Onboarding
-      allow update: if isAuthenticated() && getUserTenantId() == tenantId;
+      allow read: if isAuthenticated() && (getProfile().tenantId == tenantId || isSuperAdmin());
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && getProfile().tenantId == tenantId;
     }
 
     match /slugs/{slug} {
-      allow read: if true; // القراءة العامة مطلوبة للـ Storefront
+      allow read: if true;
       allow create, update: if isAuthenticated();
     }
 
@@ -90,7 +88,7 @@ service cloud.firestore {
     }
 
     match /integrations/{id} {
-      allow read: if isAuthenticated();
+      allow read: if true;
       allow write: if isSuperAdmin();
     }
 

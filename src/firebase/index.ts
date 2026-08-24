@@ -8,7 +8,7 @@ import { firebaseConfig } from './config';
 
 /**
  * Singleton Firebase Instance Manager
- * تم ضبط المحرك ليرتبط حصرياً بقاعدة البيانات saas-prod في المشروع الجديد.
+ * تم ضبط المحرك ليرتبط حصرياً بقاعدة البيانات saas-prod في المشروع الجديد Dubsar.
  */
 let cachedApp: FirebaseApp | undefined;
 let cachedFirestore: Firestore | undefined;
