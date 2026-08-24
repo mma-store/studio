@@ -24,7 +24,7 @@ export default function OnboardingPage() {
   });
 
   useEffect(() => {
-    if (!identityLoading && profile?.tenantId && profile.tenantId !== 'PENDING_ESTABLISHMENT') {
+    if (!identityLoading && profile?.tenantId && profile.tenantId !== 'PENDING_ESTABLISHMENT' && profile.tenantId !== 'GUEST') {
       router.replace('/admin');
     }
   }, [identityLoading, profile, router]);
@@ -33,18 +33,18 @@ export default function OnboardingPage() {
     e.preventDefault();
     
     if (!user) {
-      toast({ variant: "destructive", title: "غير مصرح", description: "يرجى تسجيل الدخول أو إنشاء حساب أولاً." });
-      router.push('/register');
+      toast({ variant: "destructive", title: "غير مصرح", description: "يرجى تسجيل الدخول أولاً." });
+      router.push('/login');
       return;
     }
 
     setLoading(true);
 
     try {
-      // توليد Slug من اسم المتجر
+      // توليد Slug فريد من اسم المتجر
       const slug = formData.businessName.trim().toLowerCase()
         .replace(/\s+/g, '-')
-        .replace(/[^\w\u0621-\u064A-]/g, ''); // دعم الحروف العربية في الروابط
+        .replace(/[^\w\u0621-\u064A-]/g, '');
         
       const newTenantId = `T-${Date.now().toString().slice(-6)}`;
       const now = Date.now();
@@ -53,7 +53,7 @@ export default function OnboardingPage() {
       const slugRef = doc(db, "slugs", slug);
       const slugSnap = await getDoc(slugRef);
       if (slugSnap.exists()) {
-        toast({ variant: "destructive", title: "الرابط محجوز", description: "يرجى اختيار اسم متجر مختلف أو إضافة أرقام." });
+        toast({ variant: "destructive", title: "الرابط محجوز", description: "يرجى اختيار اسم متجر مختلف." });
         setLoading(false);
         return;
       }
@@ -72,10 +72,6 @@ export default function OnboardingPage() {
         subscriptionPlan: 'trial',
         trialEndDate: now + (14 * 24 * 60 * 60 * 1000),
         createdAt: now,
-        settings: {
-          notificationsEnabled: true,
-          stockAlertsEnabled: true
-        }
       });
 
       // 3. حجز الرابط العالمي
@@ -86,11 +82,12 @@ export default function OnboardingPage() {
         createdAt: now 
       });
 
-      // 4. تحديث البروفايل
+      // 4. تحديث البروفايل بالهوية الجديدة والـ Slug
       const profileRef = doc(db, "accountProfiles", user.uid);
       batch.update(profileRef, { 
         tenantId: newTenantId, 
         displayName: formData.ownerName.trim(),
+        slug: slug,
         updatedAt: now
       });
 
@@ -98,16 +95,17 @@ export default function OnboardingPage() {
       batch.update(userRef, { 
         tenantId: newTenantId, 
         displayName: formData.ownerName.trim(),
+        slug: slug,
         updatedAt: now
       });
 
       await batch.commit();
       
-      toast({ title: "مبارك! تم إطلاق متجرك", description: `رابط متجرك: /store/${slug}` });
+      toast({ title: "تم التأسيس بنجاح", description: "جاري نقلك للوحة التحكم..." });
       router.replace("/admin");
       
     } catch (error: any) {
-      toast({ variant: "destructive", title: "فشل التأسيس", description: error.message });
+      toast({ variant: "destructive", title: "خطأ", description: error.message });
     } finally {
       setLoading(false);
     }
@@ -130,7 +128,7 @@ export default function OnboardingPage() {
           <form onSubmit={handleOnboarding} className="space-y-6">
             <div className="space-y-2">
               <Label className="font-black text-xs opacity-60 uppercase">اسم المتجر / المجمع</Label>
-              <Input required value={formData.businessName} onChange={(e)=>setFormData({...formData, businessName: e.target.value})} className="h-14 rounded-2xl bg-slate-50 border-none font-black text-lg" placeholder="مثال: مجمع السلام للتجارة" />
+              <Input required value={formData.businessName} onChange={(e)=>setFormData({...formData, businessName: e.target.value})} className="h-14 rounded-2xl bg-slate-50 border-none font-black text-lg" placeholder="مثال: مجمع السلام" />
             </div>
             <div className="space-y-2">
               <Label className="font-black text-xs opacity-60 uppercase">اسم المدير المسؤول</Label>

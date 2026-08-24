@@ -15,7 +15,8 @@ import {
   Rocket,
   Globe,
   Copy,
-  ExternalLink
+  ExternalLink,
+  Share2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { 
@@ -71,10 +72,27 @@ export default function AdminDashboard() {
   
   const { data: lowStockProducts, loading: stockLoading } = useCollection(lowStockQuery);
 
+  const storeUrl = typeof window !== 'undefined' ? `${window.location.origin}/store/${profile?.slug || ''}` : '';
+
   const copyStoreLink = () => {
-    const link = `${window.location.origin}/store/${profile?.slug || ''}`;
-    navigator.clipboard.writeText(link);
+    navigator.clipboard.writeText(storeUrl);
     toast({ title: "تم نسخ الرابط", description: "يمكنك الآن مشاركته مع عملائك." });
+  };
+
+  const handleShare = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: profile?.businessName || 'متجري الإلكتروني',
+          text: `تفضل بزيارة متجري الإلكتروني على منصة دوبسار:`,
+          url: storeUrl,
+        });
+      } catch (err) {
+        copyStoreLink();
+      }
+    } else {
+      copyStoreLink();
+    }
   };
 
   return (
@@ -91,7 +109,7 @@ export default function AdminDashboard() {
              </Button>
            </Link>
            <Link href="/admin/pos">
-             <Button className="rounded-xl font-bold h-11 px-8 shadow-lg shadow-primary/20">إضافة طلب POS</Button>
+             <Button className="rounded-xl font-bold h-11 px-8 shadow-lg shadow-primary/20">نقطة بيع POS</Button>
            </Link>
         </div>
       </div>
@@ -108,16 +126,17 @@ export default function AdminDashboard() {
                      <p className="text-xs text-white/70 font-medium">رابطك المباشر للطلبات الأونلاين.</p>
                   </div>
                </div>
-               <div className="bg-white/10 p-4 rounded-2xl border border-white/10 flex items-center justify-between">
-                  <code className="text-xs font-mono font-bold truncate">/store/{profile?.slug || '...'}</code>
-                  <div className="flex gap-2">
-                     <Button onClick={copyStoreLink} size="icon" variant="ghost" className="h-8 w-8 rounded-lg hover:bg-white/20"><Copy className="h-4 w-4" /></Button>
+               <div className="bg-white/10 p-4 rounded-2xl border border-white/10 flex items-center justify-between gap-4">
+                  <code className="text-xs font-mono font-bold truncate flex-1" dir="ltr">{storeUrl || '/store/...'}</code>
+                  <div className="flex gap-2 shrink-0">
+                     <Button onClick={copyStoreLink} size="icon" variant="ghost" className="h-10 w-10 rounded-xl hover:bg-white/20"><Copy className="h-4 w-4" /></Button>
+                     <Button onClick={handleShare} size="icon" variant="ghost" className="h-10 w-10 rounded-xl hover:bg-white/20"><Share2 className="h-4 w-4" /></Button>
                      <Link href={`/store/${profile?.slug}`} target="_blank">
-                        <Button size="icon" variant="ghost" className="h-8 w-8 rounded-lg hover:bg-white/20"><ExternalLink className="h-4 w-4" /></Button>
+                        <Button size="icon" variant="ghost" className="h-10 w-10 rounded-xl hover:bg-white/20"><ExternalLink className="h-4 w-4" /></Button>
                      </Link>
                   </div>
                </div>
-               <p className="text-[10px] font-bold opacity-60">شارك الرابط مع زبائنك لزيادة مبيعاتك.</p>
+               <p className="text-[10px] font-bold opacity-60">* شارك الرابط مع زبائنك لزيادة مبيعاتك عبر الإنترنت.</p>
             </div>
             <Globe className="absolute -right-10 -bottom-10 h-48 w-48 opacity-10 group-hover:rotate-12 transition-transform duration-1000" />
          </Card>

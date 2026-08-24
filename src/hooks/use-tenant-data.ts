@@ -12,7 +12,7 @@ export interface TenantData {
   phone?: string;
   whatsapp?: string;
   address?: string;
-  status: 'active' | 'suspended' | 'expired';
+  status: 'active' | 'suspended' | 'expired' | 'trial';
   settings?: any;
 }
 
@@ -23,33 +23,40 @@ export function useTenantData(slug: string) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!slug) return;
+    if (!slug) {
+      setLoading(false);
+      return;
+    }
 
     setLoading(true);
 
-    // التحقق من الرابط عبر سجل الروابط (Slug Registry) للوصول المباشر والآمن
+    // البحث عن الـ Slug في سجل الروابط العالمي
     const slugRef = doc(db, 'slugs', slug);
 
     const unsubscribeSlug = onSnapshot(slugRef, async (slugSnap) => {
       if (slugSnap.exists()) {
         const { tenantId } = slugSnap.data();
         
-        // جلب بيانات المتجر بناءً على المعرف الحقيقي
+        // جلب بيانات المتجر الحقيقية
         const tenantRef = doc(db, 'tenants', tenantId);
         
         try {
           const tenantSnap = await getDoc(tenantRef);
           if (tenantSnap.exists()) {
             const data = tenantSnap.data() as TenantData;
-            if (data.status !== 'active' && data.status !== 'trial') {
-              setError('هذا المتجر غير نشط حالياً.');
+            // التحقق من حالة المتجر
+            if (data.status === 'suspended') {
+              setError('هذا المتجر غير متاح حالياً بإمر الإدارة.');
+              setTenant(null);
+            } else if (data.status === 'expired' && (!data.trialEndDate || data.trialEndDate < Date.now())) {
+              setError('هذا المتجر غير متاح حالياً بسبب انتهاء الصلاحية.');
               setTenant(null);
             } else {
               setTenant({ ...data, tenantId: tenantSnap.id });
               setError(null);
             }
           } else {
-            setError('المعذرة، المتجر المطلوب غير موجود.');
+            setError('المعذرة، بيانات المتجر غير موجودة.');
             setTenant(null);
           }
         } catch (err) {
@@ -57,12 +64,12 @@ export function useTenantData(slug: string) {
           setTenant(null);
         }
       } else {
-        setError('المعذرة، المتجر المطلوب غير موجود.');
+        setError('عذراً، هذا المتجر غير موجود على منصة دوبسار.');
         setTenant(null);
       }
       setLoading(false);
     }, (err) => {
-      setError('حدث خطأ في الاتصال بالسيرفر.');
+      setError('حدث خطأ في مزامنة البيانات.');
       setLoading(false);
     });
 

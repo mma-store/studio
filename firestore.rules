@@ -7,59 +7,43 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // جلب بيانات البروفايل بأمان وبدون استدعاء تداخلي
-    function getProfile() {
-      return get(/databases/$(database)/documents/accountProfiles/$(request.auth.uid)).data;
-    }
-
-    function getUserTenantId() {
-      return getProfile().tenantId;
-    }
-
-    function isTenantMember(tid) {
-      return isAuthenticated() && getUserTenantId() == tid;
-    }
-
-    function isSuperAdmin() {
-      return isAuthenticated() && (
-        request.auth.uid == 'rQR8k4ZzIZVtvkQ2pUHNlvIDSI13' || 
-        getProfile().role == 'super_admin'
-      );
-    }
-
-    // 1. الهوية الرقمية (UID-Keyed) - الوصول مباشر وسريع
+    // القواعد الأساسية للهوية الرقمية
     match /accountProfiles/{uid} {
       allow read, write: if request.auth != null && request.auth.uid == uid;
-      allow read: if isSuperAdmin();
     }
 
     match /users/{uid} {
       allow read, write: if request.auth != null && request.auth.uid == uid;
-      allow read, write: if isAuthenticated() && isTenantMember(resource.data.tenantId);
-      allow read, write: if isSuperAdmin();
     }
 
-    // 2. سجل الروابط (Slug Registry) - قراءة عامة للجميع
+    // سجل الروابط (Slug Registry) - قراءة عامة للجميع
     match /slugs/{slug} {
       allow read: if true;
       allow create: if isAuthenticated();
-      allow update, delete: if isSuperAdmin();
     }
 
-    // 3. المجموعات التسويقية (Public Access لمتجر العميل)
+    // بيانات المتجر الأساسية (Branding) - قراءة عامة
+    match /tenants/{tenantId} {
+      allow read: if true;
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && (
+        get(/databases/$(database)/documents/accountProfiles/$(request.auth.uid)).data.tenantId == tenantId
+      );
+    }
+
+    // المجموعات التسويقية العامة للمتجر (Public Storefront)
     match /{collectionName}/{docId} {
       allow read: if collectionName in ['products', 'categories', 'banners', 'offers', 'motorcycleTypes'] 
                   && (resource == null || resource.data.tenantId != null);
       
-      // الكتابة محصورة فقط لأعضاء الـ Tenant
+      // الكتابة محصورة فقط لأعضاء الـ Tenant بناءً على الهوية الموثقة
       allow write: if isAuthenticated() && (
-        isTenantMember(resource.data.tenantId) || 
-        isTenantMember(request.resource.data.tenantId) || 
-        isSuperAdmin()
+        request.resource.data.tenantId == get(/databases/$(database)/documents/accountProfiles/$(request.auth.uid)).data.tenantId ||
+        resource.data.tenantId == get(/databases/$(database)/documents/accountProfiles/$(request.auth.uid)).data.tenantId
       );
     }
 
-    // 4. البيانات الحساسة (عزل تام حسب الـ Tenant)
+    // البيانات التشغيلية الحساسة (عزل تام حسب الـ Tenant)
     match /{collectionName}/{docId} {
       allow read, write: if collectionName in [
         'orders', 'suppliers', 'purchases', 'expenses', 
@@ -67,38 +51,22 @@ service cloud.firestore {
         'paymentVouchers', 'cashShifts', 'auditLogs', 'apiKeys', 
         'webhooks', 'tenantIntegrations', 'returns', 'subscriptionInvoices'
       ] && isAuthenticated() && (
-        (resource != null && isTenantMember(resource.data.tenantId)) || 
-        (request.resource != null && isTenantMember(request.resource.data.tenantId)) ||
-        isSuperAdmin()
+        (resource != null && resource.data.tenantId == get(/databases/$(database)/documents/accountProfiles/$(request.auth.uid)).data.tenantId) || 
+        (request.resource != null && request.resource.data.tenantId == get(/databases/$(database)/documents/accountProfiles/$(request.auth.uid)).data.tenantId)
       );
     }
 
-    // 5. البنية التحتية العالمية
-    match /tenants/{tenantId} {
-      allow read: if true; // القراءة العامة مسموحة لجلب بيانات Branding المتجر
-      allow create: if isAuthenticated();
-      allow update: if isAuthenticated() && (getUserTenantId() == tenantId || isSuperAdmin());
-      allow delete: if isSuperAdmin();
-    }
-
+    // المجموعات العالمية للمنصة
     match /plans/{planId} {
       allow read: if true;
-      allow write: if isSuperAdmin();
-    }
-
-    match /settings/{id} {
-      allow read: if true;
-      allow write: if isSuperAdmin();
     }
 
     match /integrations/{id} {
       allow read: if true;
-      allow write: if isSuperAdmin();
     }
 
-    match /systemLogs/{id} {
-      allow create: if true;
-      allow read: if isSuperAdmin();
+    match /settings/{id} {
+      allow read: if true;
     }
   }
 }
