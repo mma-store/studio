@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -30,7 +31,8 @@ import {
   Webhook,
   FileText,
   Lock,
-  ScrollText
+  ScrollText,
+  Palette
 } from "lucide-react";
 
 import {
@@ -99,11 +101,11 @@ const ADMIN_MENU = [
     ]
   },
   {
-    label: "المطورين",
+    label: "متجري الإلكتروني",
     items: [
-      { title: "مفاتيح الـ API", icon: Key, href: "/admin/developer/api-keys" },
-      { title: "الـ Webhooks", icon: Webhook, href: "/admin/developer/webhooks" },
-      { title: "دليل الربط برمجياً", icon: FileText, href: "/admin/developer/docs" },
+      { title: "تصميم المتجر", icon: Palette, href: "/admin/settings/design" },
+      { title: "البنرات والعروض", icon: ImageIcon, href: "/admin/banners" },
+      { title: "الإشعارات", icon: Bell, href: "/admin/notifications" },
     ]
   },
   {
@@ -112,7 +114,6 @@ const ADMIN_MENU = [
       { title: "الأمان والحماية", icon: Lock, href: "/admin/settings/security" },
       { title: "الربط والتكامل", icon: Puzzle, href: "/admin/integrations" },
       { title: "الاشتراك والفوترة", icon: CreditCard, href: "/admin/billing" },
-      { title: "البنرات والعروض", icon: ImageIcon, href: "/admin/banners" },
       { title: "سجل العمليات", icon: History, href: "/admin/audit-log" },
       { title: "النسخ الاحتياطي", icon: Database, href: "/admin/settings/backup" },
       { title: "الإعدادات", icon: Settings, href: "/admin/settings" },
@@ -203,5 +204,13 @@ export function AdminSidebar() {
         </SidebarMenu>
       </SidebarFooter>
     </Sidebar>
+  );
+}
+
+function Bell(props: any) {
+  return (
+    <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+    </svg>
   );
 }
