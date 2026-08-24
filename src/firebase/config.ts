@@ -1,11 +1,14 @@
-
 'use client';
 
+/**
+ * @fileOverview إعدادات Firebase للمشروع الجديد (Dubsar).
+ * يرجى استبدال القيم أدناه ببيانات تطبيق الويب (Web App) الخاصة بك من Firebase Console.
+ */
 export const firebaseConfig = {
-  apiKey: "AIzaSyAYR5jmmsOni-wXG_025UbKsJwoXFlyd88",
-  authDomain: "studio-8684920201-b89ae.firebaseapp.com",
-  projectId: "studio-8684920201-b89ae",
-  storageBucket: "studio-8684920201-b89ae.firebasestorage.app",
-  messagingSenderId: "543442685524",
-  appId: "1:543442685524:web:67e2db2fc4f8f2948b67c1"
+  apiKey: "YOUR_NEW_API_KEY", // الصق API Key الجديد هنا
+  authDomain: "YOUR_NEW_PROJECT_ID.firebaseapp.com",
+  projectId: "YOUR_NEW_PROJECT_ID", // ضع Project ID الخاص بمشروع Dubsar هنا
+  storageBucket: "YOUR_NEW_PROJECT_ID.firebasestorage.app",
+  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+  appId: "YOUR_APP_ID"
 };

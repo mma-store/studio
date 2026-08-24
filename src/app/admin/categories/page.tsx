@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo } from "react";
@@ -51,6 +50,7 @@ export default function CategoriesPage() {
     try {
       const url = await uploadToCloudinary(file);
       setUploadedImageUrl(url);
+      toast({ title: "تم رفع الصورة بنجاح" });
     } catch (e) {
       toast({ variant: "destructive", title: "فشل الرفع" });
     } finally {
@@ -61,10 +61,8 @@ export default function CategoriesPage() {
   const handleAction = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     
-    // VERIFY TENANT BEFORE WRITE - CRITICAL FOR saas-prod
     if (!tenantId || !isLinkedToStore) {
-      console.error("DIAGNOSTIC: Write blocked - No active tenantId context found.");
-      toast({ variant: "destructive", title: "خطأ أمني", description: "لم يتم التعرف على متجرك. يرجى تسجيل الدخول مجدداً." });
+      toast({ variant: "destructive", title: "خطأ أمني", description: "لم يتم التعرف على متجرك في النظام الجديد." });
       return;
     }
     
@@ -79,25 +77,20 @@ export default function CategoriesPage() {
       updatedAt: Date.now()
     };
 
-    console.log("DIAGNOSTIC: CATEGORY WRITE STARTED", { database: 'saas-prod', tenantId, categoryData });
-
     try {
       if (editingCategory) {
         await updateDoc(doc(db, 'categories', editingCategory.id), categoryData);
-        console.log("DIAGNOSTIC: CATEGORY WRITE SUCCESS (Update)", editingCategory.id);
         toast({ title: "تم التحديث بنجاح" });
       } else {
         const finalData = { ...categoryData, itemsCount: 0, createdAt: Date.now() };
-        const docRef = await addDoc(collection(db, 'categories'), finalData);
-        console.log("DIAGNOSTIC: CATEGORY WRITE SUCCESS (Add)", docRef.id);
-        toast({ title: "تمت الإضافة بنجاح" });
+        await addDoc(collection(db, 'categories'), finalData);
+        toast({ title: "تمت الإضافة بنجاح للمشروع الجديد" });
       }
       setIsDialogOpen(false);
       setUploadedImageUrl("");
       setEditingCategory(null);
     } catch (error: any) {
-      console.error("DIAGNOSTIC: CATEGORY WRITE FAILED", { code: error.code, message: error.message });
-      toast({ variant: "destructive", title: "فشل الحفظ", description: `Firestore Error: ${error.code}` });
+      toast({ variant: "destructive", title: "فشل الحفظ", description: `خطأ Firestore: ${error.code}` });
     } finally {
       setIsSaving(false);
     }
@@ -105,10 +98,10 @@ export default function CategoriesPage() {
 
   if (!isLinkedToStore && !loading) {
     return (
-      <div className="h-96 flex flex-col items-center justify-center p-8 text-center bg-red-50 rounded-[40px] gap-4">
-        <AlertTriangle className="h-16 w-16 text-red-600" />
-        <h2 className="text-2xl font-black text-red-900">غير مرتبط بمتجر</h2>
-        <p className="text-red-700 font-medium">يبدو أن حسابك غير مرتبط بمتجر في النظام الجديد. يرجى إتمام عملية التأسيس.</p>
+      <div className="h-96 flex flex-col items-center justify-center p-8 text-center bg-blue-50 rounded-[40px] gap-4">
+        <Store className="h-16 w-16 text-primary" />
+        <h2 className="text-2xl font-black text-primary">المشروع الجديد: saas-prod</h2>
+        <p className="text-muted-foreground font-medium">يرجى تسجيل الدخول أو إتمام عملية التأسيس للبدء في استخدام قاعدة البيانات الجديدة.</p>
       </div>
     );
   }
@@ -118,7 +111,7 @@ export default function CategoriesPage() {
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-3xl font-black">إدارة الأقسام</h1>
-          <p className="text-muted-foreground font-medium text-sm">قاعدة البيانات الحالية: <span className="text-primary font-bold">saas-prod</span></p>
+          <p className="text-muted-foreground font-medium text-sm">قاعدة البيانات الجديدة: <span className="text-primary font-bold">saas-prod</span></p>
         </div>
         
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -130,7 +123,7 @@ export default function CategoriesPage() {
           <DialogContent className="rounded-[32px] max-w-md">
             <DialogHeader>
               <DialogTitle className="text-2xl font-black text-right">قسم جديد</DialogTitle>
-              <DialogDescription className="text-right">سيتم ربط هذا القسم بالمتجر: {tenantId}</DialogDescription>
+              <DialogDescription className="text-right">سيتم تخزين هذا القسم في مشروع Dubsar الجديد.</DialogDescription>
             </DialogHeader>
             <form onSubmit={handleAction} className="space-y-6 pt-4">
                <div className="space-y-2">
@@ -156,7 +149,7 @@ export default function CategoriesPage() {
                <DialogFooter>
                  <Button type="submit" disabled={isSaving || isUploading} className="w-full h-14 rounded-2xl font-black text-lg">
                    {isSaving ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}
-                   تأكيد الحفظ في saas-prod
+                   تأكيد الحفظ في المشروع الجديد
                  </Button>
                </DialogFooter>
             </form>
@@ -194,11 +187,19 @@ export default function CategoriesPage() {
                 </TableRow>
               ))
             ) : (
-              <TableRow><TableCell colSpan={3} className="h-40 text-center opacity-30 font-bold">لا توجد أقسام في قاعدة البيانات الجديدة.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={3} className="h-40 text-center opacity-30 font-bold">قاعدة البيانات saas-prod فارغة حالياً.</TableCell></TableRow>
             )}
           </TableBody>
         </Table>
       </div>
     </div>
+  );
+}
+
+function Store(props: any) {
+  return (
+    <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="m2 7 4.41-4.41A2 2 0 0 1 7.83 2h8.34a2 2 0 0 1 1.42.59L22 7" /><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" /><path d="M15 22v-4a2 2 0 0 0-2-2h-2a2 2 0 0 0-2 2v4" /><path d="M2 7h20" /><path d="M22 7v3a2 2 0 0 1-2 2v0a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 16 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 12 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 8 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 4 12v0a2 2 0 0 1-2-2V7" />
+    </svg>
   );
 }

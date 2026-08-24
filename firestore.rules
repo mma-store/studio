@@ -1,82 +1,102 @@
-
 rules_version = '2';
 service cloud.firestore {
   match /databases/saas-prod/documents {
     
     // ==========================================
-    // 1. Helper Functions
+    // 1. الوظائف المساعدة (Helpers)
     // ==========================================
     
     function isAuthenticated() {
       return request.auth != null;
     }
 
-    // Direct profile lookup - No dependencies to avoid recursion
-    function getUserProfile(uid) {
-      return get(/databases/$(database)/documents/accountProfiles/$(uid)).data;
+    // جلب ملف الهوية - نستخدم UID الوثيقة مباشرة كمرجع
+    function getProfile() {
+      return get(/databases/$(database)/documents/accountProfiles/$(request.auth.uid)).data;
     }
 
-    function getTenantId() {
-      return getUserProfile(request.auth.uid).tenantId;
+    // الحصول على معرف المتجر الخاص بالمستخدم
+    function getUserTenantId() {
+      return getProfile().tenantId;
     }
 
+    // التحقق من الانتماء للمتجر
     function isTenantMember(tid) {
-      return isAuthenticated() && getTenantId() == tid;
+      return isAuthenticated() && getUserTenantId() == tid;
+    }
+
+    function isSuperAdmin() {
+      return isAuthenticated() && (getProfile().accountType == 'super_admin' || getProfile().role == 'super_admin');
     }
 
     // ==========================================
-    // 2. Identity & Access (UID-Keyed)
+    // 2. الهوية الرقمية (Root of Trust)
     // ==========================================
     
     match /accountProfiles/{uid} {
-      // Must use direct comparison without helpers to avoid circular dependencies
+      // السماح للمستخدم بقراءة ملفه الخاص فقط بناءً على UID الموثق
       allow read, write: if isAuthenticated() && request.auth.uid == uid;
+      // السماح لمدير المنصة بالقراءة
+      allow read: if isSuperAdmin();
     }
 
     match /users/{uid} {
-      allow read, write: if isAuthenticated() && (
-        request.auth.uid == uid || 
-        getTenantId() == resource.data.tenantId
-      );
+      // صلاحية المستخدم لنفسه
+      allow read: if isAuthenticated() && request.auth.uid == uid;
+      // صلاحية أعضاء المتجر لقراءة زملائهم أو عملائهم
+      allow read: if isAuthenticated() && isTenantMember(resource.data.tenantId);
+      // صلاحية الكتابة للمسؤولين
+      allow write: if isAuthenticated() && isTenantMember(getUserTenantId());
     }
 
     // ==========================================
-    // 3. Operational Data (Tenant-Scoped)
+    // 3. البيانات التشغيلية المعزولة (Tenant-Scoped)
     // ==========================================
     
     match /{collectionName}/{id} {
-      // Rule for all tenant-scoped business data
+      // نطبق العزل على كافة المجموعات التي تحتوي على tenantId
       allow read: if isAuthenticated() && (
-        isTenantMember(resource.data.tenantId) || 
-        // Support Public Storefront Read (Unauthenticated or different tenant customers)
+        isTenantMember(resource.data.tenantId) ||
+        // دعم المتجر الإلكتروني (قراءة عامة لبعض البيانات)
         (collectionName in ['products', 'categories', 'banners', 'offers'] && resource.data.tenantId != null)
       );
-      
-      allow create: if isAuthenticated() && 
-                    request.resource.data.tenantId == getTenantId();
+
+      allow write: if isAuthenticated() && 
+                    isTenantMember(getUserTenantId()) &&
+                    (request.resource.data.tenantId == getUserTenantId());
                     
-      allow update, delete: if isAuthenticated() && 
-                           resource.data.tenantId == getTenantId() &&
-                           request.resource.data.tenantId == getTenantId();
+      // استثناء للمجموعات الخاصة بمدير المنصة
+      allow read, write: if isSuperAdmin();
     }
 
     // ==========================================
-    // 4. Global Registry
+    // 4. السجلات العامة للمنصة (Global)
     // ==========================================
     
     match /tenants/{tenantId} {
-      allow read: if isAuthenticated() && (getTenantId() == tenantId);
-      allow create: if isAuthenticated();
-      allow update: if isAuthenticated() && getTenantId() == tenantId;
+      allow read: if isAuthenticated() && (getUserTenantId() == tenantId || isSuperAdmin());
+      allow create: if isAuthenticated(); // السماح بإنشاء متجر عند الـ Onboarding
+      allow update: if isAuthenticated() && getUserTenantId() == tenantId;
     }
 
     match /slugs/{slug} {
-      allow read: if true;
-      allow create: if isAuthenticated();
+      allow read: if true; // القراءة العامة مطلوبة للـ Storefront
+      allow create, update: if isAuthenticated();
     }
 
     match /plans/{planId} {
       allow read: if true;
+      allow write: if isSuperAdmin();
+    }
+
+    match /integrations/{id} {
+      allow read: if isAuthenticated();
+      allow write: if isSuperAdmin();
+    }
+
+    match /settings/{id} {
+      allow read: if true;
+      allow write: if isSuperAdmin();
     }
   }
 }
