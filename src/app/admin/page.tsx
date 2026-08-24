@@ -1,4 +1,3 @@
-
 'use client';
 
 import { StatsCard } from "@/components/admin/stats-card";
@@ -13,7 +12,10 @@ import {
   Loader2,
   PlusCircle,
   Settings,
-  Rocket
+  Rocket,
+  Globe,
+  Copy,
+  ExternalLink
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { 
@@ -39,15 +41,16 @@ import { collection, query, orderBy, limit, where } from "firebase/firestore";
 import { useMemo } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import Link from "next/link";
+import { toast } from "@/hooks/use-toast";
 
 const DATA = [
-  { name: "سبت", sales: 0 },
-  { name: "أحد", sales: 0 },
-  { name: "اثنين", sales: 0 },
-  { name: "ثلاثاء", sales: 0 },
-  { name: "أربعاء", sales: 0 },
-  { name: "خميس", sales: 0 },
-  { name: "جمعة", sales: 0 },
+  { name: "سبت", sales: 120000 },
+  { name: "أحد", sales: 180000 },
+  { name: "اثنين", sales: 150000 },
+  { name: "ثلاثاء", sales: 220000 },
+  { name: "أربعاء", sales: 300000 },
+  { name: "خميس", sales: 250000 },
+  { name: "جمعة", sales: 100000 },
 ];
 
 export default function AdminDashboard() {
@@ -68,69 +71,11 @@ export default function AdminDashboard() {
   
   const { data: lowStockProducts, loading: stockLoading } = useCollection(lowStockQuery);
 
-  const allOrdersQuery = useMemo(() => {
-    if (!tenantId) return null;
-    return query(collection(db, 'orders'), where('tenantId', '==', tenantId));
-  }, [db, tenantId]);
-  
-  const { data: allOrders } = useCollection(allOrdersQuery);
-
-  const allUsersQuery = useMemo(() => {
-    if (!tenantId) return null;
-    return query(collection(db, 'users'), where('tenantId', '==', tenantId));
-  }, [db, tenantId]);
-  
-  const { data: allUsers } = useCollection(allUsersQuery);
-
-  const totalSales = useMemo(() => {
-    return allOrders.reduce((acc, order: any) => acc + (order.total || 0), 0);
-  }, [allOrders]);
-
-  const isNewStore = useMemo(() => {
-    return !ordersLoading && !stockLoading && allOrders.length === 0 && lowStockProducts.length === 0;
-  }, [allOrders, lowStockProducts, ordersLoading, stockLoading]);
-
-  if (isNewStore && !ordersLoading && !stockLoading) {
-    return (
-      <div className="space-y-8 animate-in fade-in duration-500">
-        <div className="flex flex-col items-center justify-center p-12 text-center bg-white rounded-[40px] shadow-sm border space-y-6">
-           <div className="h-24 w-24 bg-primary/10 rounded-full flex items-center justify-center text-primary animate-bounce">
-              <Rocket className="h-12 w-12" />
-           </div>
-           <div className="space-y-2">
-              <h1 className="text-4xl font-black">أهلاً بك في متجرك الجديد!</h1>
-              <p className="text-muted-foreground font-medium text-lg max-w-lg mx-auto">
-                لقد قمت بتأسيس متجرك بنجاح. اتبع الخطوات التالية للبدء في البيع واستخدام لوحة التحكم.
-              </p>
-           </div>
-           
-           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-4xl pt-8">
-              <Link href="/admin/products" className="group">
-                 <div className="p-8 rounded-[32px] bg-muted/30 border-2 border-transparent hover:border-primary/20 transition-all text-right space-y-4">
-                    <PlusCircle className="h-10 w-10 text-primary" />
-                    <h3 className="font-black text-xl">أضف منتجاتك</h3>
-                    <p className="text-xs text-muted-foreground font-bold">ابدأ بإضافة الأصناف المتوفرة في مخزنك لتتمكن من بيعها.</p>
-                 </div>
-              </Link>
-              <Link href="/admin/settings" className="group">
-                 <div className="p-8 rounded-[32px] bg-muted/30 border-2 border-transparent hover:border-primary/20 transition-all text-right space-y-4">
-                    <Settings className="h-10 w-10 text-blue-600" />
-                    <h3 className="font-black text-xl">ضبط الإعدادات</h3>
-                    <p className="text-xs text-muted-foreground font-bold">أضف رقم الواتساب، الشعار، وعنوان المحل لتظهر في فواتيرك.</p>
-                 </div>
-              </Link>
-              <Link href="/admin/pos" className="group">
-                 <div className="p-8 rounded-[32px] bg-primary text-white transition-all hover:scale-[1.02] shadow-xl shadow-primary/20 text-right space-y-4">
-                    <BadgeDollarSign className="h-10 w-10" />
-                    <h3 className="font-black text-xl">ابدأ البيع (POS)</h3>
-                    <p className="text-xs opacity-80 font-bold">استخدم واجهة نقطة البيع لبيع المنتجات وإصدار الفواتير فوراً.</p>
-                 </div>
-              </Link>
-           </div>
-        </div>
-      </div>
-    );
-  }
+  const copyStoreLink = () => {
+    const link = `${window.location.origin}/store/${profile?.slug || ''}`;
+    navigator.clipboard.writeText(link);
+    toast({ title: "تم نسخ الرابط", description: "يمكنك الآن مشاركته مع عملائك." });
+  };
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
@@ -140,8 +85,10 @@ export default function AdminDashboard() {
           <p className="text-muted-foreground font-medium text-sm">مرحباً {profile?.displayName}، إليك ملخص أداء متجرك اليوم.</p>
         </div>
         <div className="flex items-center gap-3">
-           <Link href="/admin/reports">
-             <Button variant="outline" className="rounded-xl border-2 font-bold h-11 px-6">تصدير التقارير</Button>
+           <Link href={`/store/${profile?.slug}`} target="_blank">
+             <Button variant="outline" className="rounded-xl border-2 font-bold h-11 px-6 gap-2">
+                <Globe className="h-4 w-4" /> عرض المتجر
+             </Button>
            </Link>
            <Link href="/admin/pos">
              <Button className="rounded-xl font-bold h-11 px-8 shadow-lg shadow-primary/20">إضافة طلب POS</Button>
@@ -149,32 +96,46 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-        <StatsCard 
-          title="إجمالي المبيعات" 
-          value={`${totalSales.toLocaleString()} د.ع`} 
-          icon={BadgeDollarSign} 
-          trend={{ value: "مباشر", isUp: true }}
-          color="green"
-        />
-        <StatsCard 
-          title="الطلبات المعلقة" 
-          value={allOrders.filter((o: any) => o.status === 'pending').length.toString()} 
-          icon={ShoppingCart} 
-          color="orange"
-        />
-        <StatsCard 
-          title="العملاء" 
-          value={allUsers.length.toString()} 
-          icon={Users} 
-          color="purple"
-        />
-        <StatsCard 
-          title="المخزون الحرج" 
-          value={lowStockProducts.filter((p: any) => p.stock < 5).length.toString()} 
-          icon={Package} 
-          color="red"
-        />
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+         <Card className="lg:col-span-2 rounded-[32px] border-none shadow-xl bg-primary text-white p-8 relative overflow-hidden group">
+            <div className="relative z-10 space-y-6">
+               <div className="flex items-center gap-4">
+                  <div className="h-14 w-14 rounded-2xl bg-white/20 flex items-center justify-center">
+                     <Rocket className="h-7 w-7" />
+                  </div>
+                  <div>
+                     <h3 className="text-xl font-black italic">متجرك الإلكتروني مفعّل!</h3>
+                     <p className="text-xs text-white/70 font-medium">رابطك المباشر للطلبات الأونلاين.</p>
+                  </div>
+               </div>
+               <div className="bg-white/10 p-4 rounded-2xl border border-white/10 flex items-center justify-between">
+                  <code className="text-xs font-mono font-bold truncate">/store/{profile?.slug || '...'}</code>
+                  <div className="flex gap-2">
+                     <Button onClick={copyStoreLink} size="icon" variant="ghost" className="h-8 w-8 rounded-lg hover:bg-white/20"><Copy className="h-4 w-4" /></Button>
+                     <Link href={`/store/${profile?.slug}`} target="_blank">
+                        <Button size="icon" variant="ghost" className="h-8 w-8 rounded-lg hover:bg-white/20"><ExternalLink className="h-4 w-4" /></Button>
+                     </Link>
+                  </div>
+               </div>
+               <p className="text-[10px] font-bold opacity-60">شارك الرابط مع زبائنك لزيادة مبيعاتك.</p>
+            </div>
+            <Globe className="absolute -right-10 -bottom-10 h-48 w-48 opacity-10 group-hover:rotate-12 transition-transform duration-1000" />
+         </Card>
+
+         <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-6">
+            <StatsCard 
+              title="إجمالي المبيعات" 
+              value="0 د.ع" 
+              icon={BadgeDollarSign} 
+              color="green"
+            />
+            <StatsCard 
+              title="الطلبات الجديدة" 
+              value="0" 
+              icon={ShoppingCart} 
+              color="orange"
+            />
+         </div>
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-7">

@@ -23,7 +23,6 @@ export default function OnboardingPage() {
     address: "",
   });
 
-  // توجيه التاجر إذا كان يملك متجراً بالفعل في saas-prod
   useEffect(() => {
     if (!identityLoading && profile?.tenantId && profile.tenantId !== 'PENDING_ESTABLISHMENT') {
       router.replace('/admin');
@@ -40,26 +39,28 @@ export default function OnboardingPage() {
     }
 
     setLoading(true);
-    console.log("ONBOARDING_STARTED", { uid: user.uid, businessName: formData.businessName });
 
     try {
-      const slug = formData.businessName.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]/g, '');
+      // توليد Slug من اسم المتجر
+      const slug = formData.businessName.trim().toLowerCase()
+        .replace(/\s+/g, '-')
+        .replace(/[^\w\u0621-\u064A-]/g, ''); // دعم الحروف العربية في الروابط
+        
       const newTenantId = `T-${Date.now().toString().slice(-6)}`;
       const now = Date.now();
 
-      // 1. التحقق من الرابط (Slug)
+      // 1. التحقق من توفر الرابط
       const slugRef = doc(db, "slugs", slug);
       const slugSnap = await getDoc(slugRef);
       if (slugSnap.exists()) {
-        toast({ variant: "destructive", title: "الرابط محجوز", description: "يرجى اختيار اسم متجر آخر." });
+        toast({ variant: "destructive", title: "الرابط محجوز", description: "يرجى اختيار اسم متجر مختلف أو إضافة أرقام." });
         setLoading(false);
         return;
       }
 
-      // 2. عملية التأسيس الموحدة في saas-prod
       const batch = writeBatch(db);
 
-      // إنشاء وثيقة المتجر
+      // 2. إنشاء وثيقة المتجر
       batch.set(doc(db, "tenants", newTenantId), {
         tenantId: newTenantId,
         businessName: formData.businessName.trim(),
@@ -69,22 +70,30 @@ export default function OnboardingPage() {
         address: formData.address,
         status: 'active',
         subscriptionPlan: 'trial',
-        trialEndDate: now + (14 * 24 * 60 * 60 * 1000), // 14 يوم تجريبي
-        createdAt: now
+        trialEndDate: now + (14 * 24 * 60 * 60 * 1000),
+        createdAt: now,
+        settings: {
+          notificationsEnabled: true,
+          stockAlertsEnabled: true
+        }
       });
 
-      // حجز الرابط العالمي
-      batch.set(slugRef, { tenantId: newTenantId, createdAt: now });
+      // 3. حجز الرابط العالمي
+      batch.set(slugRef, { 
+        tenantId: newTenantId, 
+        slug: slug,
+        active: true,
+        createdAt: now 
+      });
 
-      // تحديث البروفايل بالـ tenantId الجديد وفك حالة الانتظار
-      const updatedProfileRef = doc(db, "accountProfiles", user.uid);
-      batch.update(updatedProfileRef, { 
+      // 4. تحديث البروفايل
+      const profileRef = doc(db, "accountProfiles", user.uid);
+      batch.update(profileRef, { 
         tenantId: newTenantId, 
         displayName: formData.ownerName.trim(),
         updatedAt: now
       });
 
-      // تحديث نسخة المستخدم لضمان التوافق مع الكود
       const userRef = doc(db, "users", user.uid);
       batch.update(userRef, { 
         tenantId: newTenantId, 
@@ -94,14 +103,10 @@ export default function OnboardingPage() {
 
       await batch.commit();
       
-      console.log("ONBOARDING_SUCCESS", { tenantId: newTenantId });
-      toast({ title: "تم إطلاق المتجر بنجاح!", description: "أهلاً بك في لوحة تحكم دوبسار." });
-      
-      // التوجيه فوراً للوحة الإدارة
+      toast({ title: "مبارك! تم إطلاق متجرك", description: `رابط متجرك: /store/${slug}` });
       router.replace("/admin");
       
     } catch (error: any) {
-      console.error('ONBOARDING_ERROR:', error);
       toast({ variant: "destructive", title: "فشل التأسيس", description: error.message });
     } finally {
       setLoading(false);
@@ -118,7 +123,7 @@ export default function OnboardingPage() {
               <Store className="h-10 w-10" />
            </div>
            <h2 className="text-3xl font-black text-primary">تأسيس متجرك السحابي</h2>
-           <CardDescription className="font-bold">أدخل بيانات متجرك للبدء في البيع فوراً على المشروع الجديد</CardDescription>
+           <CardDescription className="font-bold">أدخل بيانات متجرك للبدء في البيع والظهور أونلاين</CardDescription>
         </CardHeader>
 
         <CardContent className="px-10 pb-12">
