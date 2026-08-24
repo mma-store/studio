@@ -30,21 +30,18 @@ export function useTenantData(slug: string) {
     }
 
     setLoading(true);
-    console.log(`📡 FETCHING_TENANT_FOR_SLUG: ${slug}`);
-
     // البحث عن الـ Slug في سجل الروابط العالمي
     const slugRef = doc(db, 'slugs', slug);
 
     const unsubscribeSlug = onSnapshot(slugRef, async (slugSnap) => {
-      if (slugSnap.exists()) {
-        const { tenantId } = slugSnap.data();
-        console.log(`✅ SLUG_RESOLVED: ${slug} -> ${tenantId}`);
-        
-        // جلب بيانات المتجر الحقيقية
-        const tenantRef = doc(db, 'tenants', tenantId);
-        
-        try {
+      try {
+        if (slugSnap.exists()) {
+          const { tenantId } = slugSnap.data();
+          
+          // جلب بيانات المتجر الحقيقية
+          const tenantRef = doc(db, 'tenants', tenantId);
           const tenantSnap = await getDoc(tenantRef);
+          
           if (tenantSnap.exists()) {
             const data = tenantSnap.data() as TenantData;
             
@@ -56,24 +53,21 @@ export function useTenantData(slug: string) {
               setError(null);
             }
           } else {
-            console.error("❌ TENANT_DOC_MISSING");
             setError('بيانات المتجر غير موجودة.');
             setTenant(null);
           }
-        } catch (err) {
-          console.error("❌ TENANT_FETCH_ERROR:", err);
-          setError('فشل الوصول لبيانات المتجر.');
+        } else {
+          setError('عذراً، هذا المتجر غير موجود على منصة دوبسار.');
           setTenant(null);
         }
-      } else {
-        console.warn(`⚠️ SLUG_NOT_FOUND: ${slug}`);
-        setError('عذراً، هذا المتجر غير موجود على منصة دوبسار.');
+      } catch (err: any) {
+        setError(err.message || 'حدث خطأ في مزامنة البيانات.');
         setTenant(null);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     }, (err) => {
-      console.error("❌ SLUG_LISTENER_ERROR:", err);
-      setError('حدث خطأ في مزامنة البيانات.');
+      setError('فشل الاتصال بخدمة البيانات.');
       setLoading(false);
     });
 

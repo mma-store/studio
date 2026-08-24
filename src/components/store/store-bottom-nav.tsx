@@ -1,7 +1,6 @@
 
 'use client';
 
-import Link from "next/navigation";
 import { usePathname } from "next/navigation";
 import { Home, LayoutGrid, ClipboardList, User, ShoppingBag } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -24,8 +23,8 @@ export function StoreBottomNav({ slug }: { slug: string }) {
   return (
     <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-[94%] max-w-lg h-20 bg-white/80 backdrop-blur-2xl rounded-[32px] shadow-[0_20px_50px_rgba(0,0,0,0.15)] border border-white/20 flex items-center justify-around px-4 no-print">
       {NAV_ITEMS.map((item) => {
-        // Precise matching for active state
-        const isActive = pathname === item.href;
+        // Ensure active state only triggers for correct sub-paths
+        const isActive = pathname === item.href || (item.href !== baseUrl && pathname?.startsWith(item.href));
         const Icon = item.icon;
 
         return (
@@ -40,7 +39,7 @@ export function StoreBottomNav({ slug }: { slug: string }) {
             <div className="relative">
               <Icon className={cn("h-6 w-6 transition-all", isActive && "stroke-[3px]")} />
               {item.badge && item.badge > 0 && (
-                <span className="absolute -top-2 -right-2 h-5 w-5 bg-primary text-white text-[9px] font-black rounded-full flex items-center justify-center border-2 border-white shadow-lg animate-bounce">
+                <span className="absolute -top-2 -right-2 h-5 w-5 bg-primary text-white text-[9px] font-black rounded-full flex items-center justify-center border-2 border-white shadow-lg">
                   {item.badge}
                 </span>
               )}

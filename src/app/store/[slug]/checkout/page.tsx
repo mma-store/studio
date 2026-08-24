@@ -1,7 +1,7 @@
 
 'use client';
 
-import { use, useState } from "react";
+import { use, useState, useEffect } from "react";
 import { useCart } from "@/context/cart-context";
 import { useTenantData } from "@/hooks/use-tenant-data";
 import { useUser, useFirestore } from "@/firebase";
@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { toast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
-import { MapPin, Phone, Truck, Store, Loader2, CheckCircle2 } from "lucide-react";
+import { MapPin, Phone, Truck, Store, Loader2, CheckCircle2, AlertTriangle } from "lucide-react";
 
 export default function StoreCheckoutPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = use(params);
@@ -30,6 +30,7 @@ export default function StoreCheckoutPage({ params }: { params: Promise<{ slug: 
   const total = subtotal + deliveryFee;
 
   const formatWhatsAppNumber = (phone: string) => {
+    if (!phone) return "";
     let cleaned = phone.replace(/\D/g, '');
     if (cleaned.startsWith('07')) {
       return '964' + cleaned.substring(1);
@@ -40,7 +41,11 @@ export default function StoreCheckoutPage({ params }: { params: Promise<{ slug: 
     return cleaned;
   };
 
-  if (tenantLoading) return null;
+  useEffect(() => {
+    if (!tenantLoading && !tenant) {
+      toast({ variant: "destructive", title: "خطأ", description: "لم يتم العثور على بيانات المتجر." });
+    }
+  }, [tenant, tenantLoading]);
 
   async function handleOrder(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -60,7 +65,7 @@ export default function StoreCheckoutPage({ params }: { params: Promise<{ slug: 
     const customerName = formData.get("name") as string;
     const customerPhone = formData.get("phone") as string;
     const address = formData.get("address") as string;
-    const orderNumber = `${tenant?.businessName?.[0] || 'O'}-${Date.now().toString().slice(-6)}`;
+    const orderNumber = `MMA-${Date.now().toString().slice(-6)}`;
 
     const orderData = {
       tenantId: tenant?.tenantId,
@@ -114,8 +119,6 @@ export default function StoreCheckoutPage({ params }: { params: Promise<{ slug: 
 
         const waUrl = `https://wa.me/${formattedMerchantPhone}?text=${encodeURIComponent(message)}`;
         window.open(waUrl, '_blank');
-      } else {
-        console.warn("Merchant WhatsApp number not set.");
       }
 
       clearCart();
@@ -126,6 +129,20 @@ export default function StoreCheckoutPage({ params }: { params: Promise<{ slug: 
       setLoading(false);
     }
   }
+
+  if (tenantLoading) return (
+    <div className="flex h-screen items-center justify-center">
+       <Loader2 className="h-8 w-8 animate-spin text-primary opacity-20" />
+    </div>
+  );
+
+  if (!tenant) return (
+    <div className="flex h-screen flex-col items-center justify-center p-8 text-center gap-4">
+       <AlertTriangle className="h-12 w-12 text-red-500" />
+       <h2 className="text-xl font-black">المتجر غير متاح</h2>
+       <Button onClick={() => router.push('/')}>العودة للمنصة</Button>
+    </div>
+  );
 
   return (
     <div className="pb-32 min-h-screen bg-background" dir="rtl">
@@ -140,11 +157,11 @@ export default function StoreCheckoutPage({ params }: { params: Promise<{ slug: 
               <div className="grid gap-6">
                  <div className="space-y-2">
                     <Label className="font-bold mr-1">الاسم الكامل</Label>
-                    <Input name="name" defaultValue={profile?.displayName} required className="h-14 rounded-2xl bg-muted/30 border-none px-6 font-bold" />
+                    <Input name="name" defaultValue={profile?.displayName || ""} required className="h-14 rounded-2xl bg-muted/30 border-none px-6 font-bold" />
                  </div>
                  <div className="space-y-2">
                     <Label className="font-bold mr-1">رقم الهاتف</Label>
-                    <Input name="phone" defaultValue={profile?.phoneNumber} required className="h-14 rounded-2xl bg-muted/30 border-none px-6 font-black text-left" dir="ltr" />
+                    <Input name="phone" defaultValue={profile?.phoneNumber || ""} required className="h-14 rounded-2xl bg-muted/30 border-none px-6 font-black text-left" dir="ltr" />
                  </div>
               </div>
            </section>
@@ -152,12 +169,18 @@ export default function StoreCheckoutPage({ params }: { params: Promise<{ slug: 
            <section className="bg-white rounded-[32px] p-8 shadow-sm border space-y-6">
               <h3 className="text-xl font-black flex items-center gap-3"><Truck className="h-6 w-6 text-primary" /> خيارات التوصيل</h3>
               <RadioGroup value={method} onValueChange={setMethod} className="grid grid-cols-2 gap-4">
-                 <Label className={`p-6 rounded-3xl border-2 transition-all cursor-pointer flex flex-col items-center gap-3 ${method === 'delivery' ? 'border-primary bg-primary/5' : 'border-muted opacity-50'}`}>
+                 <Label className={cn(
+                   "p-6 rounded-3xl border-2 transition-all cursor-pointer flex flex-col items-center gap-3",
+                   method === 'delivery' ? 'border-primary bg-primary/5' : 'border-muted opacity-50'
+                 )}>
                     <Truck className="h-8 w-8" />
                     <span className="font-black text-xs">توصيل منزلي</span>
                     <RadioGroupItem value="delivery" className="sr-only" />
                  </Label>
-                 <Label className={`p-6 rounded-3xl border-2 transition-all cursor-pointer flex flex-col items-center gap-3 ${method === 'pickup' ? 'border-primary bg-primary/5' : 'border-muted opacity-50'}`}>
+                 <Label className={cn(
+                   "p-6 rounded-3xl border-2 transition-all cursor-pointer flex flex-col items-center gap-3",
+                   method === 'pickup' ? 'border-primary bg-primary/5' : 'border-muted opacity-50'
+                 )}>
                     <Store className="h-8 w-8" />
                     <span className="font-black text-xs">استلام من المجمع</span>
                     <RadioGroupItem value="pickup" className="sr-only" />
