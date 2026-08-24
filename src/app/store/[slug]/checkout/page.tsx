@@ -29,6 +29,17 @@ export default function StoreCheckoutPage({ params }: { params: Promise<{ slug: 
   const deliveryFee = method === "delivery" ? 5000 : 0;
   const total = subtotal + deliveryFee;
 
+  const formatWhatsAppNumber = (phone: string) => {
+    let cleaned = phone.replace(/\D/g, '');
+    if (cleaned.startsWith('07')) {
+      return '964' + cleaned.substring(1);
+    }
+    if (cleaned.startsWith('7')) {
+      return '964' + cleaned;
+    }
+    return cleaned;
+  };
+
   if (tenantLoading) return null;
 
   async function handleOrder(e: React.FormEvent<HTMLFormElement>) {
@@ -39,17 +50,25 @@ export default function StoreCheckoutPage({ params }: { params: Promise<{ slug: 
       return;
     }
 
+    if (cart.length === 0) {
+      toast({ variant: "destructive", title: "السلة فارغة" });
+      return;
+    }
+
     setLoading(true);
     const formData = new FormData(e.currentTarget);
-    const orderNumber = `${tenant?.businessName?.[0]}-${Date.now().toString().slice(-6)}`;
+    const customerName = formData.get("name") as string;
+    const customerPhone = formData.get("phone") as string;
+    const address = formData.get("address") as string;
+    const orderNumber = `${tenant?.businessName?.[0] || 'O'}-${Date.now().toString().slice(-6)}`;
 
     const orderData = {
       tenantId: tenant?.tenantId,
       orderNumber,
       userId: user.uid,
-      customerName: formData.get("name"),
-      phoneNumber: formData.get("phone"),
-      address: formData.get("address"),
+      customerName,
+      phoneNumber: customerPhone,
+      address: method === 'delivery' ? address : 'استلام من المجمع',
       deliveryMethod: method,
       items: cart,
       total,
@@ -74,6 +93,31 @@ export default function StoreCheckoutPage({ params }: { params: Promise<{ slug: 
       await batch.commit();
       
       toast({ title: "تم إرسال طلبك بنجاح!" });
+
+      // Build WhatsApp Message
+      const merchantWhatsApp = tenant?.whatsapp || tenant?.phone;
+      if (merchantWhatsApp) {
+        const formattedMerchantPhone = formatWhatsAppNumber(merchantWhatsApp);
+        const itemsList = cart.map(item => `- ${item.name} × ${item.quantity} = ${(item.price * item.quantity).toLocaleString()} د.ع`).join('\n');
+        
+        const message = `*طلب جديد من متجر ${tenant?.businessName}* 🏍️\n\n` +
+                        `*رقم الطلب:* #${orderNumber}\n` +
+                        `*الزبون:* ${customerName}\n` +
+                        `*الهاتف:* ${customerPhone}\n` +
+                        `*طريقة الاستلام:* ${method === 'delivery' ? 'توصيل منزلي' : 'استلام من المجمع'}\n` +
+                        `*العنوان:* ${method === 'delivery' ? address : '---'}\n\n` +
+                        `*المنتجات:*\n${itemsList}\n\n` +
+                        `*المجموع:* ${subtotal.toLocaleString()} د.ع\n` +
+                        `*التوصيل:* ${deliveryFee.toLocaleString()} د.ع\n` +
+                        `*الإجمالي النهائي:* ${total.toLocaleString()} د.ع\n\n` +
+                        `شكراً لتعاملكم معنا!`;
+
+        const waUrl = `https://wa.me/${formattedMerchantPhone}?text=${encodeURIComponent(message)}`;
+        window.open(waUrl, '_blank');
+      } else {
+        console.warn("Merchant WhatsApp number not set.");
+      }
+
       clearCart();
       router.push(`/store/${slug}/orders`);
     } catch (e) {
@@ -139,7 +183,7 @@ export default function StoreCheckoutPage({ params }: { params: Promise<{ slug: 
                  </div>
               </div>
               <Button disabled={loading} type="submit" className="w-full h-20 rounded-[28px] text-2xl font-black gap-4 shadow-xl active:scale-95 transition-all">
-                 {loading ? <Loader2 className="h-8 w-8 animate-spin" /> : <CheckCircle2 className="h-8 w-8" />} تأكيد طلب الشراء
+                 {loading ? <Loader2 className="h-8 w-8 animate-spin" /> : <CheckCircle2 className="h-8 w-8" />} تأكيد وطلب عبر WhatsApp
               </Button>
            </section>
         </form>

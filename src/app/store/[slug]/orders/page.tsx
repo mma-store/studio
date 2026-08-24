@@ -18,7 +18,9 @@ import {
   ShoppingBag,
   MapPin,
   Phone,
-  ArrowRight
+  ArrowRight,
+  XCircle,
+  Truck
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { 
@@ -33,11 +35,12 @@ import { Button } from "@/components/ui/button";
 const statusMap: any = {
   pending: { label: "جديد", color: "bg-orange-100 text-orange-700", icon: Clock },
   processing: { label: "قيد المعالجة", color: "bg-blue-100 text-blue-700", icon: Package },
-  preparing: { label: "قيد التجهيز", color: "bg-purple-100 text-purple-700", icon: Package },
+  preparing: { label: "جاري التجهيز", color: "bg-purple-100 text-purple-700", icon: Package },
   ready: { label: "جاهز للاستلام", color: "bg-indigo-100 text-indigo-700", icon: CheckCircle2 },
-  shipped: { label: "تم التوصيل", color: "bg-emerald-100 text-emerald-700", icon: CheckCircle2 },
+  shipped: { label: "تم الشحن", color: "bg-blue-100 text-blue-700", icon: Truck },
+  delivered: { label: "تم التسليم", color: "bg-emerald-100 text-emerald-700", icon: CheckCircle2 },
   completed: { label: "مكتمل", color: "bg-green-100 text-green-700", icon: CheckCircle2 },
-  cancelled: { label: "ملغي", color: "bg-red-100 text-red-700", icon: Clock },
+  cancelled: { label: "ملغي", color: "bg-red-100 text-red-700", icon: XCircle },
 };
 
 export default function StoreOrdersPage({ params }: { params: Promise<{ slug: string }> }) {
@@ -62,13 +65,13 @@ export default function StoreOrdersPage({ params }: { params: Promise<{ slug: st
   if (tenantLoading) return null;
 
   return (
-    <div className="pb-32 min-h-screen bg-[#F8F9FA]" dir="rtl">
+    <div className="pb-40 min-h-screen bg-[#F8F9FA]" dir="rtl">
       <StoreHeader tenant={tenant} />
       
       <main className="container mx-auto px-4 py-8 max-w-2xl space-y-8">
         <div className="space-y-1">
-           <h1 className="text-3xl font-black tracking-tight">مشترياتي</h1>
-           <p className="text-xs font-bold text-muted-foreground">تابع حالة طلباتك الحالية والسابقة في {tenant?.businessName}</p>
+           <h1 className="text-3xl font-black tracking-tight">طلباتي</h1>
+           <p className="text-xs font-bold text-muted-foreground">تابع حالة مشترياتك في {tenant?.businessName}</p>
         </div>
 
         {loading ? (
@@ -130,7 +133,7 @@ export default function StoreOrdersPage({ params }: { params: Promise<{ slug: st
                 <h2 className="text-2xl font-black">لا توجد طلبات سابقة</h2>
                 <p className="text-sm font-medium opacity-50">طلباتك التي تجريها في هذا المتجر ستظهر هنا.</p>
              </div>
-             <Link href={`/store/${slug}`}>
+             <Link href={`${baseUrl}`}>
                 <Button className="rounded-full h-14 px-10 font-black">تسوق الآن</Button>
              </Link>
           </div>
@@ -154,13 +157,13 @@ export default function StoreOrdersPage({ params }: { params: Promise<{ slug: st
             </DialogHeader>
             <div className="p-8 max-h-[60vh] overflow-y-auto custom-scrollbar text-right space-y-8">
                <div className="space-y-4">
-                  <h4 className="font-black text-sm uppercase tracking-widest opacity-40">المنتجات المشتراة</h4>
+                  <h4 className="font-black text-sm uppercase tracking-widest opacity-40">المنتجات</h4>
                   <div className="space-y-3">
                      {selectedOrder?.items?.map((item: any, i: number) => (
                        <div key={i} className="flex justify-between items-center p-4 rounded-2xl bg-muted/20 border">
                           <div className="flex items-center gap-3">
                              <div className="h-10 w-10 rounded-lg bg-white shadow-sm flex items-center justify-center font-black text-xs">{item.quantity}x</div>
-                             <span className="font-bold text-sm">{item.name}</span>
+                             <span className="font-bold text-sm truncate max-w-[150px]">{item.name}</span>
                           </div>
                           <span className="font-black text-primary">{(item.price * item.quantity).toLocaleString()} د.ع</span>
                        </div>
@@ -171,7 +174,7 @@ export default function StoreOrdersPage({ params }: { params: Promise<{ slug: st
                <div className="space-y-4 border-t pt-6">
                   <h4 className="font-black text-sm uppercase tracking-widest opacity-40">معلومات التوصيل</h4>
                   <div className="grid gap-3">
-                     <div className="flex items-center gap-3 text-sm font-bold"><MapPin className="h-4 w-4 opacity-30" /> {selectedOrder?.address || 'استلام من المجمع'}</div>
+                     <div className="flex items-center gap-3 text-sm font-bold"><MapPin className="h-4 w-4 opacity-30" /> {selectedOrder?.address}</div>
                      <div className="flex items-center gap-3 text-sm font-bold" dir="ltr"><Phone className="h-4 w-4 opacity-30" /> {selectedOrder?.phoneNumber}</div>
                   </div>
                </div>

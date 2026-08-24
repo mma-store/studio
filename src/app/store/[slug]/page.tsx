@@ -20,29 +20,34 @@ export default function StoreHomePage({ params }: { params: Promise<{ slug: stri
   const { slug } = use(params);
   const db = useFirestore();
   const { tenant, loading: tenantLoading, error: tenantError } = useTenantData(slug);
+  const baseUrl = `/store/${slug}`;
 
   // Diagnostics Logging
   useEffect(() => {
-    if (!tenantLoading) {
-      console.log("🔍 STORE_DIAGNOSTICS:", {
-        slug,
-        tenantId: tenant?.tenantId || 'NOT_FOUND',
-        status: tenant?.status,
-        hasTheme: !!tenant?.settings?.storeTheme
-      });
+    if (!tenantLoading && tenant) {
+      console.log(`📡 [Storefront Audit] Store: ${tenant.businessName}, TenantID: ${tenant.tenantId}`);
     }
-  }, [slug, tenant, tenantLoading]);
+  }, [tenant, tenantLoading]);
 
   const bannersQuery = useMemo(() => 
-    tenant?.tenantId ? query(collection(db, 'banners'), where('tenantId', '==', tenant.tenantId), where('isActive', '==', true)) : null, 
+    tenant?.tenantId ? query(
+      collection(db, 'banners'), 
+      where('tenantId', '==', tenant.tenantId), 
+      where('isActive', '==', true),
+      orderBy('createdAt', 'desc')
+    ) : null, 
   [db, tenant]);
   
   const categoriesQuery = useMemo(() => 
-    tenant?.tenantId ? query(collection(db, 'categories'), where('tenantId', '==', tenant.tenantId), limit(8)) : null, 
+    tenant?.tenantId ? query(
+      collection(db, 'categories'), 
+      where('tenantId', '==', tenant.tenantId), 
+      orderBy('name'),
+      limit(10)
+    ) : null, 
   [db, tenant]);
   
-  // Fetch Featured products, fallback to all products if none featured
-  const featuredQuery = useMemo(() => 
+  const productsQuery = useMemo(() => 
     tenant?.tenantId ? query(
       collection(db, 'products'), 
       where('tenantId', '==', tenant.tenantId), 
@@ -53,7 +58,7 @@ export default function StoreHomePage({ params }: { params: Promise<{ slug: stri
 
   const { data: banners, loading: bannersLoading } = useCollection(bannersQuery);
   const { data: categories, loading: categoriesLoading } = useCollection(categoriesQuery);
-  const { data: products, loading: productsLoading } = useCollection(featuredQuery);
+  const { data: products, loading: productsLoading } = useCollection(productsQuery);
 
   if (tenantLoading) return (
     <div className="flex h-screen items-center justify-center bg-white">
@@ -78,21 +83,20 @@ export default function StoreHomePage({ params }: { params: Promise<{ slug: stri
   );
 
   return (
-    <div className="pb-32 animate-in fade-in duration-500 min-h-screen" dir="rtl">
+    <div className="pb-40 animate-in fade-in duration-500 min-h-screen bg-[#F8F9FA]" dir="rtl">
       <StoreHeader tenant={tenant} />
       
       <main className="container mx-auto px-4 space-y-10 mt-6 max-w-4xl">
-        {/* Universal Search */}
+        {/* Search */}
         <div className="relative group">
-          <Search className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 opacity-40" />
+          <Search className="absolute right-6 top-1/2 -translate-y-1/2 h-5 w-5 opacity-30" />
           <input 
             type="text" 
-            placeholder="ابحث عن منتج أو قسم..." 
-            className="w-full h-16 rounded-[24px] border-none shadow-sm pr-12 pl-12 font-bold text-base focus:ring-2 transition-all bg-white/50 backdrop-blur-sm"
+            placeholder="ابحث عن منتج أو قسم في هذا المتجر..." 
+            onClick={() => window.location.href = `${baseUrl}/search`}
+            readOnly
+            className="w-full h-16 rounded-[28px] border-none shadow-sm pr-14 pl-12 font-bold text-base focus:ring-2 transition-all bg-white cursor-pointer"
           />
-          <button className="absolute left-3 top-1/2 -translate-y-1/2 h-10 w-10 rounded-xl bg-white shadow-sm flex items-center justify-center">
-            <SlidersHorizontal className="h-4 w-4" style={{ color: 'var(--store-primary)' }} />
-          </button>
         </div>
 
         {/* Dynamic Hero Slider */}
@@ -105,30 +109,24 @@ export default function StoreHomePage({ params }: { params: Promise<{ slug: stri
                 {banners.map((b: any) => (
                   <CarouselItem key={b.id}>
                     <div className="relative aspect-[2.4/1] w-full group">
-                       <Image src={b.image} alt={b.title} fill className="object-cover transition-transform duration-1000 group-hover:scale-105" />
+                       <Image src={b.image} alt={b.title} fill className="object-cover" />
                        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent p-6 md:p-10 flex flex-col justify-end text-white">
                           <h2 className="text-2xl md:text-5xl font-black mb-1 md:mb-2 tracking-tight">{b.title}</h2>
                           <p className="text-xs md:text-lg font-bold opacity-90 max-w-md line-clamp-2">{b.subtitle}</p>
-                          <Button className="mt-4 md:mt-6 w-fit h-10 md:h-12 px-6 md:px-8 rounded-full bg-white text-black hover:bg-white/90 font-black text-[10px] md:text-xs uppercase tracking-widest shadow-xl">اكتشف الآن</Button>
                        </div>
                     </div>
                   </CarouselItem>
                 ))}
               </CarouselContent>
             </Carousel>
-          ) : (
-            <div className="aspect-[2.4/1] bg-muted/20 flex flex-col items-center justify-center gap-4 border-2 border-dashed rounded-[40px] opacity-40">
-               <Zap className="h-12 w-12" />
-               <p className="font-black text-sm">أهلاً بك في متجرنا</p>
-            </div>
-          )}
+          ) : null}
         </section>
 
-        {/* Circular Categories */}
+        {/* Categories */}
         <section className="space-y-6">
            <div className="flex items-center justify-between">
-              <h3 className="text-2xl font-black tracking-tight">الأقسام الرئيسية</h3>
-              <Link href={`/store/${slug}/catalog`} className="text-xs font-black opacity-40 hover:opacity-100 flex items-center gap-1 transition-all">
+              <h3 className="text-2xl font-black tracking-tight">الأقسام</h3>
+              <Link href={`${baseUrl}/catalog`} className="text-xs font-black opacity-40 hover:opacity-100 flex items-center gap-1 transition-all">
                 عرض الكل <ChevronLeft className="h-3 w-3" />
               </Link>
            </div>
@@ -145,17 +143,16 @@ export default function StoreHomePage({ params }: { params: Promise<{ slug: stri
            </div>
         </section>
 
-        {/* Featured Products Grid */}
+        {/* Products Grid */}
         <section className="space-y-8">
            <div className="flex items-center justify-between">
               <h3 className="text-2xl font-black tracking-tight flex items-center gap-3">
                 <Zap className="h-6 w-6 text-yellow-500 fill-yellow-500" /> أحدث المنتجات
               </h3>
-              <Link href={`/store/${slug}/catalog`} className="text-xs font-black opacity-40 hover:opacity-100 transition-all">مشاهدة الجميع</Link>
            </div>
            
            {productsLoading ? (
-             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+             <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                {Array(4).fill(0).map((_, i) => <Skeleton key={i} className="aspect-[4/5] rounded-[32px]" />)}
              </div>
            ) : products.length > 0 ? (
@@ -167,7 +164,7 @@ export default function StoreHomePage({ params }: { params: Promise<{ slug: stri
            ) : (
              <div className="py-24 text-center opacity-20 bg-white rounded-[40px] border-2 border-dashed">
                 <Package className="h-16 w-16 mx-auto mb-4" />
-                <p className="font-black text-xl">لا توجد منتجات مضافة للمتجر حالياً</p>
+                <p className="font-black text-xl">لا توجد منتجات حالياً</p>
              </div>
            )}
         </section>
