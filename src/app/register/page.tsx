@@ -1,10 +1,9 @@
-
 "use client";
 
 import { useState } from "react";
 import { useAuth, useFirestore } from "@/firebase";
 import { createUserWithEmailAndPassword } from "firebase/auth";
-import { doc, setDoc } from "firebase/firestore";
+import { doc, setDoc, writeBatch } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,9 +31,7 @@ export default function RegisterPage() {
     setLoading(true);
 
     try {
-      const trimmedPhone = formData.phoneNumber.trim();
-      const purePhone = normalizePhoneNumber(trimmedPhone);
-      
+      const purePhone = normalizePhoneNumber(formData.phoneNumber.trim());
       if (!purePhone || purePhone.length < 9) {
         toast({ variant: "destructive", title: "رقم هاتف غير صالح" });
         setLoading(false);
@@ -43,35 +40,39 @@ export default function RegisterPage() {
 
       const email = getInternalEmail(purePhone);
 
+      // 1. إنشاء المستخدم في Firebase Auth
       const userCredential = await createUserWithEmailAndPassword(auth, email, formData.password.trim());
       const user = userCredential.user;
 
-      await setDoc(doc(db, "users", user.uid), {
+      // 2. إنشاء البروفايل الأولي (Pending Onboarding) باستخدام Batch
+      const batch = writeBatch(db);
+      const profileData = {
         uid: user.uid,
-        tenantId: 'GUEST',
+        tenantId: 'PENDING_ESTABLISHMENT', // حالة انتظار التأسيس
         displayName: formData.displayName.trim(),
         phoneNumber: `0${purePhone}`,
         email,
-        role: 'retail_customer',
+        accountType: 'merchant',
+        role: 'owner',
+        status: 'active',
         createdAt: Date.now()
-      });
+      };
 
-      toast({ title: "تم إنشاء الحساب بنجاح" });
-      router.push("/");
+      batch.set(doc(db, "accountProfiles", user.uid), profileData);
+      batch.set(doc(db, "users", user.uid), profileData);
+
+      await batch.commit();
+
+      toast({ title: "تم إنشاء الحساب", description: "جاري نقلك لتأسيس متجرك..." });
+      
+      // التوجيه الفوري لصفحة التأسيس
+      router.push("/onboarding");
       
     } catch (error: any) {
+      console.error('REGISTER_ERROR:', error);
       let message = "فشل إنشاء الحساب.";
-      if (error.code === 'auth/email-already-in-use') {
-        message = "رقم الهاتف مسجل مسبقاً.";
-      } else if (error.code === 'auth/weak-password') {
-        message = "كلمة المرور ضعيفة جداً.";
-      }
-      
-      toast({ 
-        variant: "destructive", 
-        title: "خطأ في التسجيل", 
-        description: message 
-      });
+      if (error.code === 'auth/email-already-in-use') message = "رقم الهاتف مسجل مسبقاً.";
+      toast({ variant: "destructive", title: "خطأ في التسجيل", description: message });
     } finally {
       setLoading(false);
     }
@@ -87,26 +88,13 @@ export default function RegisterPage() {
              </div>
              <CardTitle className="text-3xl font-black text-primary tracking-tighter">إنشاء حساب جديد</CardTitle>
           </div>
-          <CardDescription className="font-medium text-muted-foreground">انضم إلى مجتمع دوبسار العراقي</CardDescription>
+          <CardDescription className="font-medium text-muted-foreground">انضم إلى منصة دوبسار للتجارة السحابية</CardDescription>
         </CardHeader>
         
         <CardContent className="px-8 space-y-6">
-          <Link href="/onboarding">
-            <div className="p-4 rounded-2xl bg-primary text-white shadow-xl shadow-primary/20 flex items-center justify-between group hover:scale-[1.02] transition-transform">
-               <div className="flex items-center gap-3">
-                  <Store className="h-6 w-6" />
-                  <div className="text-right">
-                    <p className="font-black text-sm">أنا صاحب عمل</p>
-                    <p className="text-[10px] opacity-80">أريد إنشاء متجر وإدارة مبيعاتي</p>
-                  </div>
-               </div>
-               <ArrowRight className="h-5 w-5 rotate-180" />
-            </div>
-          </Link>
-
           <form onSubmit={handleRegister} className="space-y-4">
             <div className="space-y-2">
-              <Label className="font-bold mr-1">الاسم الكامل</Label>
+              <Label className="font-bold mr-1">الاسم الكامل (صاحب العمل)</Label>
               <div className="relative">
                 <User className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                 <Input placeholder="الاسم الكامل" className="h-14 rounded-2xl pr-12 bg-muted/20 border-none font-bold" value={formData.displayName} onChange={(e) => setFormData({...formData, displayName: e.target.value})} required />
@@ -126,8 +114,8 @@ export default function RegisterPage() {
                 <Input type="password" placeholder="••••••••" className="h-14 rounded-2xl pr-12 bg-muted/20 border-none" value={formData.password} onChange={(e) => setFormData({...formData, password: e.target.value})} required />
               </div>
             </div>
-            <Button type="submit" className="w-full h-14 rounded-2xl font-black text-lg gap-2 shadow-lg mt-4 bg-primary" disabled={loading}>
-              {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : "إنشاء الحساب"}
+            <Button type="submit" className="w-full h-16 rounded-[24px] font-black text-lg gap-2 shadow-lg mt-4 bg-primary" disabled={loading}>
+              {loading ? <Loader2 className="h-6 w-6 animate-spin" /> : "ابدأ تأسيس متجري الآن"}
             </Button>
           </form>
         </CardContent>

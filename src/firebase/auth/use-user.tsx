@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -9,7 +8,7 @@ import { UserProfile } from '@/lib/types/roles';
 
 /**
  * @fileOverview Identity Resolver for 'saas-prod' Database.
- * Fetches profile directly from the clean database.
+ * يتم التحقق من الهوية من قاعدة البيانات الجديدة حصراً.
  */
 export function useUser() {
   const auth = useAuth();
@@ -18,6 +17,9 @@ export function useUser() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // UID الخاص بالـ Super Admin للوصول السريع
+  const SUPER_ADMIN_UID = 'rQR8k4ZzIZVtvkQ2pUHNlvIDSI13';
 
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
@@ -30,7 +32,7 @@ export function useUser() {
       }
 
       setLoading(true);
-      // Identity check in saas-prod/accountProfiles
+      // جلب البروفايل من قاعدة saas-prod الجديدة
       const profileRef = doc(db, 'accountProfiles', firebaseUser.uid);
       
       const unsubscribeProfile = onSnapshot(profileRef, 
@@ -38,12 +40,13 @@ export function useUser() {
           if (snap.exists()) {
             setProfile(snap.data() as UserProfile);
           } else {
+            // في حالة عدم وجود بروفايل (أثناء عملية التأسيس)
             setProfile(null);
           }
           setLoading(false);
         }, 
         (err) => {
-          console.error("Identity Fetch Failed in saas-prod:", err);
+          console.error("Identity Fetch Failed:", err);
           setError(err.message);
           setLoading(false);
         }
@@ -55,7 +58,7 @@ export function useUser() {
     return () => unsubscribeAuth();
   }, [auth, db]);
 
-  const isSuperAdmin = profile?.accountType === 'super_admin' || profile?.role === 'super_admin';
+  const isSuperAdmin = user?.uid === SUPER_ADMIN_UID || profile?.role === 'super_admin' || profile?.accountType === 'super_admin';
 
   return { 
     user, 

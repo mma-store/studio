@@ -1,4 +1,3 @@
-
 'use client';
 
 import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
@@ -9,14 +8,14 @@ import { firebaseConfig } from './config';
 
 /**
  * Singleton Firebase Instance Manager
- * تم ضبط المحرك ليرتبط حصرياً بقاعدة البيانات saas-prod في مشروع Dubsar الجديد.
+ * مرتبط حصرياً بقاعدة البيانات saas-prod في مشروع dubsar-bb6e6.
  */
 let cachedApp: FirebaseApp | undefined;
 let cachedFirestore: Firestore | undefined;
 let cachedAuth: Auth | undefined;
 let cachedStorage: FirebaseStorage | undefined;
 
-// المعرف الخاص بقاعدة البيانات الجديدة التي أنشأتها
+// المعرف الخاص بقاعدة البيانات الجديدة saas-prod
 const DATABASE_ID = 'saas-prod';
 
 export function initializeFirebase() {
@@ -25,12 +24,12 @@ export function initializeFirebase() {
       const existingApps = getApps();
       cachedApp = existingApps.length ? existingApps[0] : initializeApp(firebaseConfig);
       
-      // الربط الصريح بقاعدة البيانات saas-prod
+      // الربط الصريح بقاعدة البيانات saas-prod والمشروع الجديد
       cachedFirestore = getFirestore(cachedApp, DATABASE_ID);
       cachedAuth = getAuth(cachedApp);
       cachedStorage = getStorage(cachedApp);
 
-      console.log(`[Firebase Init] Connected to Project: ${firebaseConfig.projectId}, DB: ${DATABASE_ID}`);
+      console.log(`[Firebase Init] Project: ${firebaseConfig.projectId}, DB: ${DATABASE_ID}`);
     }
     
     return { 
