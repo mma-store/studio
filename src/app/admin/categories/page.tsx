@@ -32,7 +32,6 @@ export default function CategoriesPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [uploadedImageUrl, setUploadedImageUrl] = useState("");
 
-  // SECURE: Scope by tenantId and protect against null
   const categoriesQuery = useMemo(() => {
     if (!tenantId) return null;
     return query(
@@ -70,7 +69,11 @@ export default function CategoriesPage() {
 
   const handleAction = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!tenantId) return;
+    if (!tenantId) {
+      console.error("CATEGORY WRITE FAILED: No tenantId found");
+      return;
+    }
+    
     setIsSaving(true);
     const formData = new FormData(e.currentTarget);
     const name = formData.get('name') as string;
@@ -82,21 +85,35 @@ export default function CategoriesPage() {
       updatedAt: Date.now()
     };
 
+    console.log("CATEGORY WRITE STARTED", { tenantId, categoryData });
+
     try {
       if (editingCategory) {
         await updateDoc(doc(db, 'categories', editingCategory.id), categoryData);
+        console.log("CATEGORY WRITE SUCCESS (Update)", { id: editingCategory.id });
         toast({ title: "تم تحديث القسم بنجاح" });
       } else {
-        await addDoc(collection(db, 'categories'), { 
+        const finalData = { 
           ...categoryData, 
           itemsCount: 0, 
           createdAt: Date.now() 
-        });
+        };
+        const docRef = await addDoc(collection(db, 'categories'), finalData);
+        console.log("CATEGORY WRITE SUCCESS (Add)", { id: docRef.id, data: finalData });
         toast({ title: "تم إضافة القسم الجديد بنجاح" });
       }
       setIsDialogOpen(false);
-    } catch (e) {
-      toast({ variant: "destructive", title: "خطأ في الحفظ" });
+    } catch (error: any) {
+      console.error("CATEGORY WRITE FAILED", {
+        code: error.code,
+        message: error.message,
+        fullError: error
+      });
+      toast({ 
+        variant: "destructive", 
+        title: "خطأ في الحفظ", 
+        description: `Error: ${error.code} - ${error.message}` 
+      });
     } finally {
       setIsSaving(false);
     }
