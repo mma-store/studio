@@ -5,25 +5,28 @@ import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
 import { 
   getFirestore, 
   Firestore,
-  onSnapshotsInSync
 } from 'firebase/firestore';
 import { getAuth, Auth } from 'firebase/auth';
 import { firebaseConfig } from './config';
 
 /**
  * Singleton Firebase Instance Manager
- * Ensures strict initialization and prevents internal SDK conflicts.
+ * Using 'saas-prod' as the clean, dedicated database for the Multi-Tenant system.
  */
 let cachedApp: FirebaseApp | undefined;
 let cachedFirestore: Firestore | undefined;
 let cachedAuth: Auth | undefined;
+
+// The explicit ID for the new clean database
+const DATABASE_ID = 'saas-prod';
 
 export function initializeFirebase() {
   if (typeof window !== 'undefined') {
     if (!cachedApp) {
       const existingApps = getApps();
       cachedApp = existingApps.length ? existingApps[0] : initializeApp(firebaseConfig);
-      cachedFirestore = getFirestore(cachedApp);
+      // Explicitly connecting to saas-prod
+      cachedFirestore = getFirestore(cachedApp, DATABASE_ID);
       cachedAuth = getAuth(cachedApp);
     }
     
@@ -38,7 +41,7 @@ export function initializeFirebase() {
   const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
   return { 
     app, 
-    firestore: getFirestore(app), 
+    firestore: getFirestore(app, DATABASE_ID), 
     auth: getAuth(app) 
   };
 }

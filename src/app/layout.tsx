@@ -1,14 +1,15 @@
+
 import type {Metadata, Viewport} from 'next';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 import { FirebaseClientProvider } from "@/firebase";
 import { CartProvider } from "@/context/cart-context";
+import { TenantProvider } from "@/hooks/use-tenant";
 import { FirebaseErrorListener } from "@/components/firebase/firebase-error-listener";
 
 export const metadata: Metadata = {
   title: 'دوبسار - DUBSAR | منصة التجارة السحابية المتكاملة',
   description: 'دوبسار: أول من دوّن التجارة، واليوم أول من يقودها سحابياً. نظام متكامل لإدارة المخازن، المبيعات، والورش التقنية.',
-  manifest: '/manifest.json',
   icons: {
     icon: '/favicon.ico',
     apple: '/icon.png',
@@ -42,11 +43,13 @@ export default function RootLayout({
       </head>
       <body className="font-almarai antialiased selection:bg-primary/20 overflow-x-hidden bg-background">
         <FirebaseClientProvider>
-          <CartProvider>
-            <FirebaseErrorListener />
-            {children}
-            <Toaster />
-          </CartProvider>
+          <TenantProvider>
+            <CartProvider>
+              <FirebaseErrorListener />
+              {children}
+              <Toaster />
+            </CartProvider>
+          </TenantProvider>
         </FirebaseClientProvider>
       </body>
     </html>

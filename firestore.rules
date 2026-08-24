@@ -1,144 +1,81 @@
+
 rules_version = '2';
 service cloud.firestore {
-  match /databases/{database}/documents {
+  match /databases/saas-prod/documents {
     
     // ==========================================
-    // 1. الأساسيات والوظائف المساعدة
+    // 1. Helper Functions
     // ==========================================
     
     function isAuthenticated() {
       return request.auth != null;
     }
 
-    // قراءة ملف الحساب المرجعي (المصدر الوحيد للهوية والـ tenantId)
-    function getProfile() {
-      return get(/databases/$(database)/documents/accountProfiles/$(request.auth.uid)).data;
+    // Direct profile lookup - No dependencies
+    function getUserProfile(uid) {
+      return get(/databases/$(database)/documents/accountProfiles/$(uid)).data;
     }
 
-    // التحقق من صلاحية Super Admin
-    function isSuperAdmin() {
-      return isAuthenticated() && (
-        getProfile().accountType == 'super_admin' || 
-        getProfile().role == 'super_admin'
-      );
+    function getTenantId() {
+      return getUserProfile(request.auth.uid).tenantId;
     }
 
-    // التحقق من العضوية في المتجر (Tenant Isolation)
     function isTenantMember(tid) {
-      return isAuthenticated() && (
-        isSuperAdmin() || 
-        getProfile().tenantId == tid
-      );
+      return isAuthenticated() && getTenantId() == tid;
     }
 
     // ==========================================
-    // 2. إدارة الهوية (بدون تداخل)
+    // 2. Identity & Access (UID-Keyed)
     // ==========================================
     
     match /accountProfiles/{uid} {
-      // السماح للمستخدم بالوصول لملفه الخاص فقط بالـ UID
       allow read, write: if isAuthenticated() && request.auth.uid == uid;
     }
 
     match /users/{uid} {
-      // توافق تاريخي: المستخدم يقرأ نفسه، أو عضو في المتجر يقرأ بقية الموظفين/العملاء
-      allow read: if isAuthenticated() && (
+      allow read, write: if isAuthenticated() && (
         request.auth.uid == uid || 
-        isTenantMember(resource.data.tenantId)
-      );
-      allow write: if isAuthenticated() && (
-        request.auth.uid == uid || 
-        isTenantMember(request.resource.data.tenantId)
+        getTenantId() == resource.data.tenantId
       );
     }
 
     // ==========================================
-    // 3. بيانات المتجر (العامة والخاصة)
+    // 3. Operational Data (Tenant-Scoped)
     // ==========================================
     
-    // المجموعات المتاحة للقراءة العامة (Storefront)
-    match /products/{id} {
-      allow read: if true; 
-      allow write: if isTenantMember(request.resource.data.tenantId);
-    }
-    match /categories/{id} {
-      allow read: if true;
-      allow write: if isTenantMember(request.resource.data.tenantId);
-    }
-    match /banners/{id} {
-      allow read: if true;
-      allow write: if isTenantMember(request.resource.data.tenantId);
-    }
-    match /offers/{id} {
-      allow read: if true;
-      allow write: if isTenantMember(request.resource.data.tenantId);
-    }
-    match /motorcycleTypes/{id} {
-      allow read: if true;
-      allow write: if isTenantMember(request.resource.data.tenantId);
-    }
-
-    // المجموعات الخاصة المحمية بالعزل (Tenant-Scoped Only)
-    match /orders/{id} {
+    match /{collectionName}/{id} {
+      // Rule for all tenant-scoped business data
       allow read: if isAuthenticated() && (
         isTenantMember(resource.data.tenantId) || 
-        resource.data.userId == request.auth.uid
+        // Support Public Storefront Read
+        (collectionName in ['products', 'categories', 'banners', 'offers'] && resource.data.tenantId != null)
       );
-      allow write: if isAuthenticated() && (
-        isTenantMember(request.resource.data.tenantId) || 
-        request.resource.data.userId == request.auth.uid
-      );
-    }
-
-    // قائمة المجموعات التشغيلية الممنوعة على الزبائن (Merchant/Admin Only)
-    match /{collectionName}/{id} {
-      allow read: if collectionName in [
-        'subscriptionInvoices', 'suppliers', 'purchases', 'expenses', 
-        'repairOrders', 'financialTransactions', 'receiptVouchers', 
-        'paymentVouchers', 'cashShifts', 'auditLogs', 'apiKeys', 
-        'webhooks', 'tenantIntegrations', 'returns', 'notifications'
-      ] && isTenantMember(resource.data.tenantId);
       
-      allow write: if collectionName in [
-        'subscriptionInvoices', 'suppliers', 'purchases', 'expenses', 
-        'repairOrders', 'financialTransactions', 'receiptVouchers', 
-        'paymentVouchers', 'cashShifts', 'auditLogs', 'apiKeys', 
-        'webhooks', 'tenantIntegrations', 'returns', 'notifications'
-      ] && isTenantMember(request.resource.data.tenantId);
+      allow create: if isAuthenticated() && 
+                    request.resource.data.tenantId == getTenantId();
+                    
+      allow update, delete: if isAuthenticated() && 
+                           resource.data.tenantId == getTenantId() &&
+                           request.resource.data.tenantId == getTenantId();
     }
 
     // ==========================================
-    // 4. السجلات والخدمات العالمية
+    // 4. Global Registry
     // ==========================================
     
     match /tenants/{tenantId} {
-      allow read: if isTenantMember(tenantId);
-      allow create: if isAuthenticated(); // السماح بإنشاء متجر جديد في الـ Onboarding
-      allow update: if isTenantMember(tenantId);
+      allow read: if isAuthenticated() && (getTenantId() == tenantId);
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && getTenantId() == tenantId;
     }
 
     match /slugs/{slug} {
-      allow read: if true; // مطلوب للـ Storefront Lookup
-      allow write: if isAuthenticated();
+      allow read: if true;
+      allow create: if isAuthenticated();
     }
 
     match /plans/{planId} {
-      allow read: if true; // مطلوب لصفحة الهبوط والترقية
-      allow write: if isSuperAdmin();
-    }
-
-    match /integrations/{id} {
-      allow read: if isAuthenticated();
-      allow write: if isSuperAdmin();
-    }
-
-    match /settings/platform {
       allow read: if true;
-      allow write: if isSuperAdmin();
-    }
-
-    match /systemLogs/{id} {
-      allow read, write: if isSuperAdmin();
     }
   }
 }
