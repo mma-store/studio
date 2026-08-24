@@ -18,12 +18,13 @@ export default function StoreLayout({
   if (loading) {
     return (
       <div className="flex h-screen items-center justify-center bg-white">
-        <Loader2 className="h-10 w-10 animate-spin text-slate-200" />
+        <Loader2 className="h-10 w-10 animate-spin text-primary opacity-20" />
       </div>
     );
   }
 
-  const theme = tenant?.storeTheme || {
+  // Default theme if not set
+  const theme = tenant?.settings?.storeTheme || {
     primary: "#1A365D",
     secondary: "#C05621",
     background: "#FDF8F5",
@@ -38,7 +39,6 @@ export default function StoreLayout({
       style={{ 
         backgroundColor: theme.background,
         color: theme.textPrimary,
-        // Custom CSS Variables for components to use
         "--store-primary": theme.primary,
         "--store-secondary": theme.secondary,
         "--store-bg": theme.background,
@@ -52,16 +52,20 @@ export default function StoreLayout({
           --store-primary: ${theme.primary};
           --store-secondary: ${theme.secondary};
         }
-        .store-primary-bg { background-color: ${theme.primary}; }
-        .store-primary-text { color: ${theme.primary}; }
-        .store-card { background-color: ${theme.card}; }
+        .store-primary-bg { background-color: ${theme.primary} !important; }
+        .store-primary-text { color: ${theme.primary} !important; }
+        .store-card { background-color: ${theme.card} !important; }
         .btn-store {
-          background-color: ${theme.primary};
-          color: white;
+          background-color: ${theme.primary} !important;
+          color: white !important;
         }
         .btn-store:hover {
           opacity: 0.9;
         }
+        /* Override primary button and accents */
+        .bg-primary { background-color: ${theme.primary} !important; }
+        .text-primary { color: ${theme.primary} !important; }
+        .border-primary { border-color: ${theme.primary} !important; }
       `}</style>
       {children}
     </div>
