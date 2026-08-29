@@ -1,4 +1,3 @@
-
 'use client';
 
 import { use, useState, useEffect } from "react";
@@ -13,7 +12,8 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { toast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
-import { MapPin, Phone, Truck, Store, Loader2, CheckCircle2, AlertTriangle } from "lucide-react";
+import { MapPin, Phone, Truck, Store, Loader2, CheckCircle2, AlertTriangle, ChevronRight } from "lucide-react";
+import Link from "next/link";
 
 export default function StoreCheckoutPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = use(params);
@@ -40,12 +40,6 @@ export default function StoreCheckoutPage({ params }: { params: Promise<{ slug: 
     }
     return cleaned;
   };
-
-  useEffect(() => {
-    if (!tenantLoading && !tenant) {
-      toast({ variant: "destructive", title: "خطأ", description: "لم يتم العثور على بيانات المتجر." });
-    }
-  }, [tenant, tenantLoading]);
 
   async function handleOrder(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -75,7 +69,12 @@ export default function StoreCheckoutPage({ params }: { params: Promise<{ slug: 
       phoneNumber: customerPhone,
       address: method === 'delivery' ? address : 'استلام من المجمع',
       deliveryMethod: method,
-      items: cart,
+      items: cart.map(item => ({
+        id: item.id,
+        name: item.name,
+        price: item.price,
+        quantity: item.quantity
+      })),
       total,
       subtotal,
       deliveryFee,
@@ -115,7 +114,7 @@ export default function StoreCheckoutPage({ params }: { params: Promise<{ slug: 
                         `*المجموع:* ${subtotal.toLocaleString()} د.ع\n` +
                         `*التوصيل:* ${deliveryFee.toLocaleString()} د.ع\n` +
                         `*الإجمالي النهائي:* ${total.toLocaleString()} د.ع\n\n` +
-                        `شكراً لتعاملكم معنا!`;
+                        `تم الطلب عبر منصة دوبسار.`;
 
         const waUrl = `https://wa.me/${formattedMerchantPhone}?text=${encodeURIComponent(message)}`;
         window.open(waUrl, '_blank');
@@ -136,21 +135,18 @@ export default function StoreCheckoutPage({ params }: { params: Promise<{ slug: 
     </div>
   );
 
-  if (!tenant) return (
-    <div className="flex h-screen flex-col items-center justify-center p-8 text-center gap-4">
-       <AlertTriangle className="h-12 w-12 text-red-500" />
-       <h2 className="text-xl font-black">المتجر غير متاح</h2>
-       <Button onClick={() => router.push('/')}>العودة للمنصة</Button>
-    </div>
-  );
-
   return (
     <div className="pb-32 min-h-screen bg-background" dir="rtl">
-      <StoreHeader tenant={tenant} />
+      <div className="p-6 flex items-center gap-4 bg-white border-b sticky top-0 z-50">
+        <Link href={`/store/${slug}/cart`}>
+          <Button variant="ghost" size="icon" className="rounded-full bg-muted/50">
+            <ChevronRight className="h-6 w-6" />
+          </Button>
+        </Link>
+        <h1 className="text-xl font-black">إتمام الطلب</h1>
+      </div>
       
       <main className="container mx-auto px-4 py-8 max-w-2xl space-y-10">
-        <h1 className="text-3xl font-black tracking-tight">إتمام الطلب</h1>
-
         <form onSubmit={handleOrder} className="space-y-8">
            <section className="bg-white rounded-[32px] p-8 shadow-sm border space-y-6">
               <h3 className="text-xl font-black flex items-center gap-3"><Phone className="h-6 w-6 text-primary" /> معلومات التواصل</h3>
@@ -205,7 +201,7 @@ export default function StoreCheckoutPage({ params }: { params: Promise<{ slug: 
                     <span className="text-4xl font-black text-primary">{total.toLocaleString()} <span className="text-xs">د.ع</span></span>
                  </div>
               </div>
-              <Button disabled={loading} type="submit" className="w-full h-20 rounded-[28px] text-2xl font-black gap-4 shadow-xl active:scale-95 transition-all">
+              <Button disabled={loading || subtotal === 0} type="submit" className="w-full h-20 rounded-[28px] text-2xl font-black gap-4 shadow-xl active:scale-95 transition-all">
                  {loading ? <Loader2 className="h-8 w-8 animate-spin" /> : <CheckCircle2 className="h-8 w-8" />} تأكيد وطلب عبر WhatsApp
               </Button>
            </section>

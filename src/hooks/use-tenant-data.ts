@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -14,7 +13,16 @@ export interface TenantData {
   whatsapp?: string;
   address?: string;
   status: 'active' | 'suspended' | 'expired' | 'trial';
-  settings?: any;
+  settings?: {
+    storeTheme?: {
+      primary: string;
+      secondary: string;
+      background: string;
+      card: string;
+      textPrimary: string;
+      textSecondary: string;
+    }
+  };
 }
 
 export function useTenantData(slug: string) {
@@ -30,7 +38,7 @@ export function useTenantData(slug: string) {
     }
 
     setLoading(true);
-    // البحث عن الـ Slug في سجل الروابط العالمي
+    // 1. Resolve slug to tenantId from 'slugs' collection
     const slugRef = doc(db, 'slugs', slug);
 
     const unsubscribeSlug = onSnapshot(slugRef, async (slugSnap) => {
@@ -38,7 +46,7 @@ export function useTenantData(slug: string) {
         if (slugSnap.exists()) {
           const { tenantId } = slugSnap.data();
           
-          // جلب بيانات المتجر الحقيقية
+          // 2. Fetch actual tenant data
           const tenantRef = doc(db, 'tenants', tenantId);
           const tenantSnap = await getDoc(tenantRef);
           
@@ -57,11 +65,11 @@ export function useTenantData(slug: string) {
             setTenant(null);
           }
         } else {
-          setError('عذراً، هذا المتجر غير موجود على منصة دوبسار.');
+          setError('عذراً، هذا المتجر غير موجود.');
           setTenant(null);
         }
       } catch (err: any) {
-        setError(err.message || 'حدث خطأ في مزامنة البيانات.');
+        setError(err.message || 'حدث خطأ في جلب البيانات.');
         setTenant(null);
       } finally {
         setLoading(false);

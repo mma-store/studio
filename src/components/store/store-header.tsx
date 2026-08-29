@@ -1,17 +1,22 @@
-
 'use client';
 
 import { ShoppingBag, Search, MapPin } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useCart } from "@/context/cart-context";
+import { useEffect, useState } from "react";
 
 export function StoreHeader({ tenant }: { tenant: any }) {
   const { totalItems } = useCart();
   const LOGO_PLACEHOLDER = "https://up6.cc/2026/07/178308238964931.png";
   const baseUrl = `/store/${tenant?.slug || ""}`;
+  const [mounted, setMounted] = useState(false);
 
-  if (!tenant) return null;
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!tenant || !mounted) return null;
 
   return (
     <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-black/5 px-4 h-24 no-print">
@@ -39,12 +44,12 @@ export function StoreHeader({ tenant }: { tenant: any }) {
 
         <div className="flex items-center gap-2">
            <Link href={`${baseUrl}/search`}>
-              <button className="h-12 w-12 flex items-center justify-center rounded-full hover:bg-black/5 transition-colors">
+              <button className="h-12 w-12 flex items-center justify-center rounded-full hover:bg-black/5 transition-colors text-slate-600">
                  <Search className="h-6 w-6" />
               </button>
            </Link>
            <Link href={`${baseUrl}/cart`}>
-             <button className="h-12 w-12 flex items-center justify-center rounded-full bg-black/5 relative hover:bg-black/10 transition-all active:scale-90">
+             <button className="h-12 w-12 flex items-center justify-center rounded-full bg-black/5 relative hover:bg-black/10 transition-all active:scale-90 text-slate-900">
                 <ShoppingBag className="h-6 w-6" />
                 {totalItems > 0 && (
                   <span className="absolute -top-1 -right-1 h-6 w-6 rounded-full bg-primary text-white text-[11px] font-black flex items-center justify-center shadow-lg border-2 border-white">

@@ -1,4 +1,3 @@
-
 'use client';
 
 import { use, useEffect, useState } from "react";
@@ -14,8 +13,13 @@ export default function StoreLayout({
 }) {
   const { slug } = use(params);
   const { tenant, loading } = useTenantData(slug);
+  const [mounted, setMounted] = useState(false);
 
-  if (loading) {
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (loading || !mounted) {
     return (
       <div className="flex h-screen items-center justify-center bg-white">
         <Loader2 className="h-10 w-10 animate-spin text-primary opacity-20" />
@@ -49,9 +53,13 @@ export default function StoreLayout({
     >
       <style jsx global>{`
         :root {
+          --primary: ${theme.primary.replace('#', '')};
           --store-primary: ${theme.primary};
           --store-secondary: ${theme.secondary};
         }
+        .bg-primary { background-color: ${theme.primary} !important; }
+        .text-primary { color: ${theme.primary} !important; }
+        .border-primary { border-color: ${theme.primary} !important; }
         .store-primary-bg { background-color: ${theme.primary} !important; }
         .store-primary-text { color: ${theme.primary} !important; }
         .store-card { background-color: ${theme.card} !important; }
@@ -62,10 +70,6 @@ export default function StoreLayout({
         .btn-store:hover {
           opacity: 0.9;
         }
-        /* Override primary button and accents */
-        .bg-primary { background-color: ${theme.primary} !important; }
-        .text-primary { color: ${theme.primary} !important; }
-        .border-primary { border-color: ${theme.primary} !important; }
       `}</style>
       {children}
     </div>
