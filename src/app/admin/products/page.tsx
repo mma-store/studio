@@ -1,10 +1,9 @@
+
 'use client';
 
 import { 
   Plus, 
   Search, 
-  Filter, 
-  MoreHorizontal, 
   Image as ImageIcon,
   Download,
   Trash2,
@@ -17,413 +16,174 @@ import {
   Upload,
   History,
   Save,
-  AlertTriangle,
-  Zap
+  Zap,
+  MoreHorizontal
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { 
-  DropdownMenu, 
-  DropdownMenuContent, 
-  DropdownMenuItem, 
-  DropdownMenuLabel, 
-  DropdownMenuTrigger 
-} from "@/components/ui/dropdown-menu";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogFooter,
-  DialogDescription,
-} from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from "@/components/ui/select";
-import { useFirestore, useCollection, useUser } from "@/firebase";
-import { collection, query, orderBy, addDoc, doc, deleteDoc, updateDoc, where } from "firebase/firestore";
-import { useMemo, useState, useRef, useEffect } from "react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useMemo, useState, useEffect } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import Image from "next/image";
 import { toast } from "@/hooks/use-toast";
-import { uploadToCloudinary, getOptimizedUrl } from "@/lib/cloudinary";
+import { InventoryService } from "@/services/inventory-service";
 import { cn } from "@/lib/utils";
-import { useRouter } from "next/navigation";
-import { useSubscription } from "@/hooks/use-subscription";
-import Link from "next/link";
 
 export default function ProductsManagementPage() {
-  const db = useFirestore();
-  const router = useRouter();
-  const { tenantId } = useUser();
-  const subscription = useSubscription(tenantId);
-  
-  // FIXED: Only create the query if tenantId is available
-  const productsQuery = useMemo(() => {
-    if (!tenantId) return null;
-    return query(
-      collection(db, 'products'), 
-      where('tenantId', '==', tenantId),
-      orderBy('createdAt', 'desc')
-    );
-  }, [db, tenantId]);
-  const { data: products, loading } = useCollection(productsQuery);
-  
-  const categoriesQuery = useMemo(() => {
-    if (!tenantId) return null;
-    return query(
-      collection(db, 'categories'), 
-      where('tenantId', '==', tenantId),
-      orderBy('name')
-    );
-  }, [db, tenantId]);
-  const { data: categories } = useCollection(categoriesQuery);
-  
+  const [products, setProducts] = useState<any[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<any>(null);
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadedImages, setUploadedImages] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState<string>("");
-
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const cameraInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (!isDialogOpen) {
-      setEditingProduct(null);
-      setUploadedImages([]);
-      setSelectedCategory("");
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const [p, c] = await Promise.all([
+        InventoryService.getProducts(),
+        InventoryService.getCategories()
+      ]);
+      setProducts(p);
+      setCategories(c);
+    } catch (e) {
+      toast({ variant: "destructive", title: "فشل تحميل البيانات المحلية" });
+    } finally {
+      setLoading(false);
     }
-  }, [isDialogOpen]);
+  };
 
   const filteredProducts = useMemo(() => {
-    if (!products) return [];
     return products.filter((p: any) => 
       (p.name?.toLowerCase() || "").includes(searchQuery.toLowerCase()) || 
       (p.barcode || "").includes(searchQuery)
     );
   }, [products, searchQuery]);
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-
-    setIsUploading(true);
-    const newUrls: string[] = [];
-    
-    try {
-      for (let i = 0; i < files.length; i++) {
-        const url = await uploadToCloudinary(files[i]);
-        newUrls.push(url);
-      }
-      setUploadedImages(prev => [...prev, ...newUrls]);
-      toast({ title: "تم الرفع", description: `تم رفع ${newUrls.length} صور بنجاح.` });
-    } catch (error) {
-      toast({ variant: "destructive", title: "خطأ في الرفع", description: "فشل رفع بعض الصور." });
-    } finally {
-      setIsUploading(false);
-      if (e.target) e.target.value = '';
-    }
-  };
-
   const handleAction = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (isSaving || !tenantId) return;
-
-    // Plan Enforcement
-    if (!editingProduct && !subscription.canAddProduct(products.length)) {
-       toast({ 
-         variant: "destructive", 
-         title: "تم الوصول للحد الأقصى", 
-         description: `خطتك الحالية تسمح بـ ${subscription.limits.maxProducts} منتج فقط.` 
-       });
-       return;
-    }
-
-    if (!selectedCategory) {
-      toast({ variant: "destructive", title: "تنبيه", description: "يرجى اختيار القسم أولاً." });
-      return;
-    }
-    
     setIsSaving(true);
     const formData = new FormData(e.currentTarget);
     
-    const productData: any = {
-      tenantId,
+    const productData = {
+      id: editingProduct?.id,
       name: formData.get('name'),
       barcode: formData.get('barcode'),
-      category: selectedCategory,
-      retailPrice: Number(formData.get('retailPrice')) || 0,
-      wholesalePrice: Number(formData.get('wholesalePrice')) || 0,
-      purchasePrice: Number(formData.get('purchasePrice')) || 0,
-      stock: Number(formData.get('stock')) || 0,
+      category: formData.get('category'),
+      retailPrice: Number(formData.get('retailPrice')),
+      purchasePrice: Number(formData.get('purchasePrice')),
+      stockQuantity: Number(formData.get('stock')),
       description: formData.get('description'),
-      storageLocation: formData.get('storageLocation'),
-      images: uploadedImages,
-      isFeatured: formData.get('isFeatured') === 'on',
-      updatedAt: Date.now(),
     };
 
     try {
-      if (editingProduct) {
-        await updateDoc(doc(db, 'products', editingProduct.id), productData);
-        toast({ title: "تم التحديث", description: "تم تحديث بيانات المنتج بنجاح." });
-      } else {
-        productData.createdAt = Date.now();
-        productData.status = 'available';
-        await addDoc(collection(db, 'products'), productData);
-        toast({ title: "تم الإضافة", description: "تم إضافة المنتج بنجاح." });
-      }
+      await InventoryService.saveProduct(productData);
+      toast({ title: "تم الحفظ بنجاح محلياً" });
       setIsDialogOpen(false);
+      loadData();
     } catch (error) {
-      toast({ variant: "destructive", title: "خطأ", description: "فشل في حفظ البيانات." });
+      toast({ variant: "destructive", title: "خطأ في الحفظ في SQLite" });
     } finally {
       setIsSaving(false);
     }
   };
 
-  const handleEditInit = (product: any) => {
-    setEditingProduct(product);
-    setUploadedImages(product.images || []);
-    setSelectedCategory(product.category || "");
-    setIsDialogOpen(true);
-  };
-
-  const handleDeleteProduct = async (id: string) => {
-    if (!confirm("هل أنت متأكد من حذف هذا المنتج نهائياً؟")) return;
-    try {
-      await deleteDoc(doc(db, 'products', id));
-      toast({ title: "تم الحذف", description: "تم حذف المنتج بنجاح." });
-    } catch (error) {
-      toast({ variant: "destructive", title: "خطأ", description: "فشل حذف المنتج." });
-    }
+  const handleDelete = async (id: string) => {
+    if (!confirm("حذف نهائي من الجهاز؟")) return;
+    await InventoryService.deleteProduct(id);
+    loadData();
   };
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div className="space-y-1">
-          <h1 className="text-3xl font-black tracking-tight">إدارة المنتجات</h1>
-          <p className="text-muted-foreground font-medium text-sm">إضافة، تعديل، وحذف قطع الغيار والاكسسوارات.</p>
+        <div>
+          <h1 className="text-3xl font-black tracking-tight">إدارة المنتجات (SQLite)</h1>
+          <p className="text-muted-foreground font-medium text-sm">DUBSAR 2.0 Local Storage Core</p>
         </div>
         <div className="flex items-center gap-3">
-           <Button variant="outline" className="rounded-xl border-2 font-bold h-11 gap-2">
-             <Download className="h-4 w-4" /> تصدير Excel
-           </Button>
-           
            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
              <DialogTrigger asChild>
-                <Button className="rounded-xl font-bold h-11 shadow-lg shadow-primary/20 gap-2">
-                  <Plus className="h-5 w-5" /> إضافة منتج جديد
+                <Button className="rounded-xl font-bold h-11 gap-2">
+                  <Plus className="h-5 w-5" /> إضافة منتج
                 </Button>
              </DialogTrigger>
-             <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto rounded-[32px] p-0 border-none shadow-2xl">
-                <div className="p-8 space-y-6">
-                  {subscription.isExpired && (
-                    <Card className="bg-red-50 border-red-100 p-6 rounded-3xl flex flex-col items-center text-center gap-4">
-                      <AlertTriangle className="h-10 w-10 text-red-600" />
-                      <div className="space-y-1">
-                         <h3 className="font-black text-red-900">الاشتراك منتهي!</h3>
-                         <p className="text-xs text-red-700 font-bold">يرجى تجديد الاشتراك لتتمكن من إضافة أو تعديل المنتجات.</p>
-                      </div>
-                      <Button className="bg-red-600 hover:bg-red-700 rounded-xl" asChild>
-                         <Link href="/admin/billing">صفحة الفوترة</Link>
-                      </Button>
-                    </Card>
-                  )}
-
-                  {!subscription.canAddProduct(products?.length || 0) && !editingProduct && !subscription.isExpired && (
-                    <Card className="bg-orange-50 border-orange-100 p-6 rounded-3xl flex flex-col items-center text-center gap-4">
-                       <Zap className="h-10 w-10 text-orange-600" />
-                       <div className="space-y-1">
-                          <h3 className="font-black text-orange-900">وصلت للحد الأقصى!</h3>
-                          <p className="text-xs text-orange-700 font-bold">خطتك الحالية تسمح بـ {subscription.limits.maxProducts} منتج. قم بالترقية للزيادة.</p>
-                       </div>
-                       <Button className="bg-orange-600 hover:bg-orange-700 rounded-xl" asChild>
-                          <Link href="/admin/billing">ترقية الآن</Link>
-                       </Button>
-                    </Card>
-                  )}
-
-                  <DialogHeader>
-                    <DialogTitle className="text-3xl font-black text-right">
-                      {editingProduct ? "تعديل المنتج" : "إضافة منتج جديد"}
-                    </DialogTitle>
-                    <DialogDescription className="text-muted-foreground font-bold text-right">
-                       {subscription.isTrial && !editingProduct && `متبقي لك ${subscription.limits.maxProducts - (products?.length || 0)} منتجات في الخطة التجريبية.`}
-                    </DialogDescription>
-                  </DialogHeader>
-                  <form onSubmit={handleAction} className="space-y-8 py-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8" dir="rtl">
-                      <div className="space-y-4">
-                        <div className="space-y-2">
-                          <Label className="font-bold">اسم المنتج</Label>
-                          <Input name="name" defaultValue={editingProduct?.name} required placeholder="مثال: فلتر زيت أصلي" className="rounded-2xl h-14 bg-muted/30 border-none px-6 text-lg font-bold" />
-                        </div>
-                        <div className="space-y-2">
-                          <Label className="font-bold">الباركود</Label>
-                          <Input name="barcode" defaultValue={editingProduct?.barcode} placeholder="697000..." className="rounded-2xl h-14 bg-muted/30 border-none px-6 text-lg" />
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label className="font-bold">سعر الشراء</Label>
-                            <Input name="purchasePrice" defaultValue={editingProduct?.purchasePrice} type="number" required className="rounded-2xl h-14 bg-muted/30 border-none text-center font-black text-xl" />
-                          </div>
-                          <div className="space-y-2">
-                            <Label className="font-bold">سعر المفرد</Label>
-                            <Input name="retailPrice" defaultValue={editingProduct?.retailPrice} type="number" required className="rounded-2xl h-14 bg-muted/30 border-none text-center font-black text-xl text-primary" />
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="space-y-4">
-                        <div className="space-y-2">
-                          <Label className="font-bold">القسم (التصنيف)</Label>
-                          <Select value={selectedCategory} onValueChange={setSelectedCategory} required>
-                            <SelectTrigger className="rounded-2xl h-14 bg-muted/30 border-none px-6 text-lg font-bold">
-                              <SelectValue placeholder="اختر قسم المنتج" />
-                            </SelectTrigger>
-                            <SelectContent className="rounded-2xl p-2 shadow-2xl border-none">
-                              {categories && categories.length > 0 ? (
-                                categories.map((cat: any) => (
-                                  <SelectItem key={cat.id} value={cat.name} className="rounded-xl font-bold py-3">
-                                    {cat.name}
-                                  </SelectItem>
-                                ))
-                              ) : (
-                                <p className="p-4 text-center text-xs opacity-50 font-bold">لا يوجد أقسام مضافة</p>
-                              )}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="space-y-2">
-                          <Label className="font-bold">الكمية المتوفرة</Label>
-                          <Input name="stock" defaultValue={editingProduct?.stock} type="number" required className="rounded-2xl h-14 bg-muted/30 border-none text-center font-black text-xl" />
-                        </div>
-                        <div className="space-y-2">
-                          <Label className="font-bold">وصف المنتج</Label>
-                          <Textarea name="description" defaultValue={editingProduct?.description} placeholder="اكتب تفاصيل إضافية..." className="rounded-2xl min-h-[120px] bg-muted/30 border-none p-6 text-sm font-medium" />
-                        </div>
-                      </div>
+             <DialogContent className="max-w-2xl rounded-[32px]">
+                <form onSubmit={handleAction} className="space-y-6">
+                  <DialogHeader><DialogTitle className="text-2xl font-black">منتج جديد</DialogTitle></DialogHeader>
+                  <div className="grid grid-cols-2 gap-4" dir="rtl">
+                    <div className="space-y-2">
+                      <Label>الاسم</Label>
+                      <Input name="name" defaultValue={editingProduct?.name} required />
                     </div>
-
-                    <div className="space-y-4 pt-6 border-t" dir="rtl">
-                      <Label className="font-black text-lg">صور المنتج</Label>
-                      <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-4">
-                         {uploadedImages.map((url, i) => (
-                           <div key={i} className="relative aspect-square rounded-2xl overflow-hidden border-2 bg-muted group">
-                              <Image src={getOptimizedUrl(url, { thumbnail: true })} alt="Uploaded" fill className="object-cover" />
-                              <button type="button" onClick={() => setUploadedImages(prev => prev.filter((_, idx) => idx !== i))} className="absolute top-1.5 right-1.5 bg-red-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 z-10"><X className="h-3 w-3" /></button>
-                           </div>
-                         ))}
-                         <button type="button" onClick={() => cameraInputRef.current?.click()} className="aspect-square rounded-2xl border-2 border-dashed border-primary/30 flex flex-col items-center justify-center gap-2 hover:bg-primary/5"><Camera className="h-8 w-8 text-primary" /><span className="text-[10px] font-black">تصوير</span></button>
-                         <button type="button" onClick={() => fileInputRef.current?.click()} className="aspect-square rounded-2xl border-2 border-dashed border-muted-foreground/30 flex flex-col items-center justify-center gap-2 hover:bg-muted/10">
-                            {isUploading ? <Loader2 className="h-8 w-8 animate-spin" /> : <Upload className="h-8 w-8" />}
-                            <span className="text-[10px] font-black">جهاز</span>
-                         </button>
-                         <input type="file" ref={cameraInputRef} accept="image/*" capture="environment" className="hidden" onChange={handleImageUpload} />
-                         <input type="file" ref={fileInputRef} multiple accept="image/*" className="hidden" onChange={handleImageUpload} />
-                      </div>
+                    <div className="space-y-2">
+                      <Label>الباركود</Label>
+                      <Input name="barcode" defaultValue={editingProduct?.barcode} />
                     </div>
-
-                    <DialogFooter className="pt-8 gap-4 flex-row justify-end" dir="rtl">
-                      <Button type="submit" className="rounded-2xl h-14 px-12 shadow-xl font-black text-lg gap-2" disabled={isUploading || isSaving || subscription.isExpired || (!editingProduct && !subscription.canAddProduct(products?.length || 0))}>
-                        {isSaving ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}
-                        {editingProduct ? "حفظ التعديلات" : "حفظ المنتج والنشـر"}
-                      </Button>
-                      <Button type="button" variant="ghost" className="rounded-xl h-14 px-8 font-bold" onClick={() => setIsDialogOpen(false)}>إلغاء</Button>
-                    </DialogFooter>
-                  </form>
-                </div>
+                    <div className="space-y-2">
+                      <Label>سعر الشراء</Label>
+                      <Input name="purchasePrice" type="number" defaultValue={editingProduct?.purchasePrice} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>سعر البيع</Label>
+                      <Input name="retailPrice" type="number" defaultValue={editingProduct?.retailPrice} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>الكمية</Label>
+                      <Input name="stock" type="number" defaultValue={editingProduct?.stockQuantity} />
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button type="submit" disabled={isSaving}>{isSaving ? <Loader2 className="animate-spin" /> : "حفظ في القاعدة المحلية"}</Button>
+                  </DialogFooter>
+                </form>
              </DialogContent>
            </Dialog>
         </div>
       </div>
 
       <div className="relative max-w-md" dir="rtl">
-        <Search className="absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-        <Input 
-          placeholder="بحث بالاسم، الباركود، أو الفئة..." 
-          className="h-14 rounded-2xl bg-white pr-12 border-none shadow-sm text-lg"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-        />
+        <Search className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+        <Input placeholder="بحث..." className="h-14 rounded-2xl pr-12 border-none shadow-sm bg-white" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
       </div>
 
       <div className="rounded-[32px] border-none bg-white shadow-sm overflow-hidden" dir="rtl">
         <Table>
-          <TableHeader>
-            <TableRow className="border-b bg-muted/30">
-              <TableHead className="text-right py-6 px-6 font-black text-xs">المنتج والباركود</TableHead>
-              <TableHead className="text-right font-black text-xs">التصنيف</TableHead>
-              <TableHead className="text-right font-black text-xs">الأسعار</TableHead>
-              <TableHead className="text-right font-black text-xs">المخزون</TableHead>
-              <TableHead className="text-left px-6 font-black text-xs">إجراءات</TableHead>
+          <TableHeader className="bg-muted/30">
+            <TableRow>
+              <TableHead className="text-right py-6 px-6 font-black">المنتج</TableHead>
+              <TableHead className="text-right font-black">الأسعار</TableHead>
+              <TableHead className="text-right font-black">المخزون</TableHead>
+              <TableHead className="text-left px-6 font-black">إجراءات</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
-              Array(6).fill(0).map((_, i) => (
-                <TableRow key={i}>
-                  <TableCell className="px-6"><div className="flex items-center gap-3"><Skeleton className="h-14 w-14 rounded-xl" /><div className="space-y-2"><Skeleton className="h-4 w-40" /></div></div></TableCell>
-                  <TableCell><Skeleton className="h-6 w-24 rounded-full" /></TableCell>
-                  <TableCell><Skeleton className="h-6 w-32" /></TableCell>
-                  <TableCell><Skeleton className="h-6 w-16" /></TableCell>
-                  <TableCell className="px-6 text-left"><Skeleton className="h-10 w-10" /></TableCell>
-                </TableRow>
-              ))
-            ) : filteredProducts.length > 0 ? (
-              filteredProducts.map((p: any) => (
-                <TableRow key={p.id} className="hover:bg-muted/5 transition-colors group">
-                  <TableCell className="px-6">
-                    <div className="flex items-center gap-4 py-2">
-                      <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-2xl border-2 bg-muted">
-                        {p.images?.[0] ? <Image src={getOptimizedUrl(p.images[0], { thumbnail: true })} alt={p.name} fill className="object-cover" /> : <ImageIcon className="h-5 w-5 opacity-20" />}
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="font-black text-sm">{p.name}</span>
-                        <span className="text-[10px] text-muted-foreground font-black">{p.barcode || '---'}</span>
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell><Badge variant="secondary" className="rounded-full font-black text-[10px] px-3">{p.category}</Badge></TableCell>
-                  <TableCell><span className="text-primary font-black text-sm">{(p.retailPrice || 0).toLocaleString()} د.ع</span></TableCell>
-                  <TableCell><span className={cn("font-black text-sm", (p.stock || 0) < 5 ? "text-destructive" : "")}>{p.stock || 0} قطعة</span></TableCell>
-                  <TableCell className="text-left px-6">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="rounded-2xl"><MoreHorizontal className="h-5 w-5" /></Button></DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="rounded-[24px] p-2 w-52 shadow-2xl border-none">
-                        <DropdownMenuItem className="rounded-xl gap-3 p-3 font-bold cursor-pointer" onClick={() => window.open(`/product/${p.id}`, '_blank')}><Eye className="h-4 w-4 text-blue-500" /> عرض وتفاصيل</DropdownMenuItem>
-                        <DropdownMenuItem className="rounded-xl gap-3 p-3 font-bold cursor-pointer" onClick={() => handleEditInit(p)}><Edit2 className="h-4 w-4 text-orange-500" /> تعديل البيانات</DropdownMenuItem>
-                        <DropdownMenuItem className="rounded-xl gap-3 p-3 font-bold cursor-pointer text-primary" onClick={() => router.push(`/admin/inventory?search=${p.name}`)}><History className="h-4 w-4" /> سجل المشتريات</DropdownMenuItem>
-                        <DropdownMenuItem className="rounded-xl gap-3 p-3 font-bold cursor-pointer text-destructive" onClick={() => handleDeleteProduct(p.id)}><Trash2 className="h-4 w-4" /> حذف المنتج</DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))
-            ) : (
-              <TableRow><TableCell colSpan={5} className="h-64 text-center opacity-30 font-black">لا توجد نتائج</TableCell></TableRow>
-            )}
+              Array(3).fill(0).map((_, i) => <TableRow key={i}><TableCell colSpan={4} className="p-8"><Skeleton className="h-10 w-full" /></TableCell></TableRow>)
+            ) : filteredProducts.map((p: any) => (
+              <TableRow key={p.id} className="hover:bg-muted/5">
+                <TableCell className="px-6 font-bold">{p.name}</TableCell>
+                <TableCell className="font-black text-primary">{p.retailPrice?.toLocaleString()} د.ع</TableCell>
+                <TableCell className="font-black">{p.stockQuantity} قطعة</TableCell>
+                <TableCell className="text-left px-6">
+                  <div className="flex gap-2">
+                    <Button variant="ghost" size="icon" onClick={() => {setEditingProduct(p); setIsDialogOpen(true);}}><Edit2 className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="icon" className="text-destructive" onClick={() => handleDelete(p.id)}><Trash2 className="h-4 w-4" /></Button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
           </TableBody>
         </Table>
       </div>
