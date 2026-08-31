@@ -2,8 +2,7 @@
 import { sqliteTable, text, integer, real } from 'drizzle-orm/sqlite-core';
 
 /**
- * @fileOverview المخطط الشامل لقاعدة بيانات DUBSAR 2.0 المحلية.
- * تم تصميم الجداول لدعم العمليات التجارية المعقدة محلياً بالكامل.
+ * @fileOverview المخطط الشامل لقاعدة بيانات DUBSAR 2.0 المحلية المحدثة.
  */
 
 // 1. الأقسام والمنتجات
@@ -60,8 +59,8 @@ export const sales = sqliteTable('sales', {
   customerId: text('customer_id').references(() => customers.id),
   totalAmount: real('total_amount').notNull(),
   paidAmount: real('paid_amount').default(0),
-  paymentMethod: text('payment_method'), // cash, credit, partial
-  status: text('status').default('completed'),
+  paymentMethod: text('payment_method'), // cash, credit
+  createdBy: text('created_by'), // local user id
   createdAt: integer('created_at').notNull(),
 });
 
@@ -74,48 +73,34 @@ export const saleItems = sqliteTable('sale_items', {
   totalPrice: real('total_price').notNull(),
 });
 
-export const purchases = sqliteTable('purchases', {
+// 4. المستخدمين والصلاحيات (Local Auth)
+export const users = sqliteTable('users', {
   id: text('id').primaryKey(),
-  purchaseNo: text('purchase_no').unique().notNull(),
-  supplierId: text('supplier_id').references(() => suppliers.id),
-  totalAmount: real('total_amount').notNull(),
-  paidAmount: real('paid_amount').default(0),
+  username: text('username').unique().notNull(),
+  displayName: text('display_name').notNull(),
+  pinHash: text('pin_hash').notNull(), // SHA-256
+  role: text('role').notNull(), // 'owner' | 'manager' | 'staff'
+  permissions: text('permissions'), // JSON array string
+  active: integer('active', { mode: 'boolean' }).default(1),
+  lastLogin: integer('last_login'),
   createdAt: integer('created_at').notNull(),
 });
 
-// 4. المصاريف والمالية
-export const expenses = sqliteTable('expenses', {
-  id: text('id').primaryKey(),
-  category: text('category').notNull(),
-  amount: real('amount').notNull(),
-  notes: text('notes'),
-  employeeName: text('employee_name'),
+// 5. سجل التدقيق المحلي (Local Audit Log)
+export const auditLogs = sqliteTable('audit_logs', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  userId: text('user_id'),
+  userName: text('user_name'),
+  action: text('action').notNull(),
+  module: text('module'), // 'inventory' | 'sales' | 'users'
+  details: text('details'),
   timestamp: integer('timestamp').notNull(),
 });
 
-// 5. إعدادات النظام والتراخيص
 export const appSettings = sqliteTable('app_settings', {
-  id: text('id').primaryKey(), // 'current'
+  id: text('id').primaryKey(),
   businessName: text('business_name'),
   logo: text('logo'),
   phone: text('phone'),
   address: text('address'),
-  storeSlug: text('store_slug'),
-  themeConfig: text('theme_config'),
-});
-
-export const licenseInfo = sqliteTable('license_info', {
-  id: text('id').primaryKey(),
-  licenseKey: text('license_key').notNull(),
-  activatedAt: integer('activated_at'),
-  hardwareId: text('hardware_id'),
-  planType: text('plan_type'),
-});
-
-export const auditLogs = sqliteTable('audit_logs', {
-  id: integer('id').primaryKey({ autoIncrement: true }),
-  action: text('action').notNull(),
-  details: text('details'),
-  userName: text('user_name'),
-  timestamp: integer('timestamp').notNull(),
 });
