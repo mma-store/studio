@@ -1,39 +1,36 @@
 
-'use server';
+'use client';
 
-import { SqliteSaleRepository } from '@/infra/repositories/sqlite-sale-repository';
-import { SqliteCustomerRepository } from '@/infra/repositories/sqlite-customer-repository';
-
-const saleRepo = new SqliteSaleRepository();
-const customerRepo = new SqliteCustomerRepository();
+import { AdapterFactory } from '@/infra/database/adapter-factory';
+import { DB_COMMANDS } from '@/infra/database/adapter';
 
 /**
- * @fileOverview خدمة نقطة البيع (Server Actions).
+ * @fileOverview POS Service for DUBSAR 2.0 Desktop.
+ * Uses Unified Adapter Pattern for both Preview and Production.
  */
 export class POSService {
-  static async processSale(cart: any[], customer: any, payment: any, user: any) {
-    const total = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
-    const unpaid = total - payment.paidAmount;
+  private static adapter = AdapterFactory.getAdapter();
 
-    const result = await saleRepo.create({
-      customerId: customer.id,
-      customerName: customer.name,
-      items: cart,
-      totalAmount: total,
-      paidAmount: payment.paidAmount,
-      paymentMethod: payment.method,
-      userName: user?.displayName || 'مدير',
+  static async processSale(cart: any[], customer: any, payment: any, user: any) {
+    // 1. Execute via Adapter (Tauri/Rust or Mock)
+    const result = await this.adapter.execute(DB_COMMANDS.PROCESS_SALE, {
+      cart,
+      customer,
+      payment,
+      userName: user?.displayName || 'مدير'
     });
 
-    // If there's debt, update customer balance
-    if (customer.id && unpaid > 0) {
-      await customerRepo.updateBalance(customer.id, unpaid);
-    }
+    // 2. Log Action Locally
+    await this.adapter.execute(DB_COMMANDS.LOG_AUDIT, {
+      action: 'عملية بيع',
+      details: `فاتورة رقم ${result.invoiceNo} بقيمة ${payment.paidAmount}`,
+      user: user?.displayName || 'مدير'
+    });
 
     return result;
   }
 
   static async getRecentSales() {
-    return await saleRepo.getAll();
+    return await this.adapter.query('get_sales');
   }
 }
