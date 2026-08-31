@@ -17,7 +17,8 @@ import {
   Globe,
   Copy,
   ExternalLink,
-  Share2
+  Share2,
+  ShieldCheck
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { 
@@ -40,10 +41,11 @@ import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGri
 import { cn } from "@/lib/utils";
 import { useFirestore, useCollection, useUser } from "@/firebase";
 import { collection, query, orderBy, limit, where } from "firebase/firestore";
-import { useMemo } from "react";
+import { useMemo, useEffect, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import Link from "next/link";
 import { toast } from "@/hooks/use-toast";
+import { LicenseManager, LicenseStatus } from "@/core/license/license-manager";
 
 const DATA = [
   { name: "سبت", sales: 120000 },
@@ -58,7 +60,12 @@ const DATA = [
 export default function AdminDashboard() {
   const db = useFirestore();
   const { tenantId, profile } = useUser();
+  const [license, setLicense] = useState<LicenseStatus | null>(null);
   
+  useEffect(() => {
+    LicenseManager.verifyStatus().then(setLicense);
+  }, []);
+
   const recentOrdersQuery = useMemo(() => {
     if (!tenantId) return null;
     return query(collection(db, 'orders'), where('tenantId', '==', tenantId), orderBy('createdAt', 'desc'), limit(5));
@@ -85,94 +92,82 @@ export default function AdminDashboard() {
     toast({ title: "تم نسخ الرابط", description: "يمكنك الآن مشاركته مع عملائك." });
   };
 
-  const handleShare = async () => {
-    if (!currentSlug) {
-      toast({ variant: "destructive", title: "تنبيه", description: "يرجى إعداد رابط المتجر من الإعدادات أولاً." });
-      return;
-    }
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: profile?.businessName || 'متجري الإلكتروني',
-          text: `تفضل بزيارة متجري الإلكتروني على منصة دوبسار:`,
-          url: storeUrl,
-        });
-      } catch (err) {
-        copyStoreLink();
-      }
-    } else {
-      copyStoreLink();
-    }
-  };
-
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
+    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500 pb-20">
+      {/* 2.0 Header - License Status */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div className="space-y-1">
-          <h1 className="text-3xl font-black tracking-tight text-foreground">لوحة التحكم</h1>
-          <p className="text-muted-foreground font-medium text-sm">مرحباً {profile?.displayName}، إليك ملخص أداء متجرك اليوم.</p>
+          <div className="flex items-center gap-3">
+             <h1 className="text-3xl font-black tracking-tight text-foreground">لوحة التحكم</h1>
+             {license?.isValid && (
+               <Badge className="bg-emerald-100 text-emerald-700 border-none font-black text-[10px] gap-1 px-3">
+                 <ShieldCheck className="h-3 w-3" /> DUBSAR 2.0 ACTIVATED
+               </Badge>
+             )}
+          </div>
+          <p className="text-muted-foreground font-medium text-sm">مرحباً {profile?.displayName}، إليك ملخص أداء متجرك المحلي.</p>
         </div>
         <div className="flex items-center gap-3">
-           <Link href={currentSlug ? `/store/${currentSlug}` : "/admin/settings"} target={currentSlug ? "_blank" : "_self"}>
-             <Button variant="outline" className="rounded-xl border-2 font-bold h-11 px-6 gap-2">
-                <Globe className="h-4 w-4" /> عرض المتجر
-             </Button>
-           </Link>
            <Link href="/admin/pos">
-             <Button className="rounded-xl font-bold h-11 px-8 shadow-lg shadow-primary/20">نقطة بيع POS</Button>
+             <Button className="rounded-xl font-bold h-11 px-8 shadow-lg shadow-primary/20 bg-primary text-white">نقطة بيع POS</Button>
            </Link>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-         <Card className="lg:col-span-2 rounded-[32px] border-none shadow-xl bg-primary text-white p-8 relative overflow-hidden group">
-            <div className="relative z-10 space-y-6">
-               <div className="flex items-center gap-4">
-                  <div className="h-14 w-14 rounded-2xl bg-white/20 flex items-center justify-center">
-                     <Rocket className="h-7 w-7" />
-                  </div>
-                  <div>
-                     <h3 className="text-xl font-black italic">متجرك الإلكتروني مفعّل!</h3>
-                     <p className="text-xs text-white/70 font-medium">رابطك المباشر للطلبات الأونلاين.</p>
-                  </div>
+      {/* Cloud Storefront Add-on Status */}
+      <Card className="rounded-[40px] border-none shadow-sm bg-white overflow-hidden">
+         <CardContent className="p-8 flex items-center justify-between">
+            <div className="flex items-center gap-6">
+               <div className="h-14 w-14 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
+                  <Globe className="h-7 w-7" />
                </div>
-               <div className="bg-white/10 p-4 rounded-2xl border border-white/10 flex items-center justify-between gap-4">
-                  <code className="text-xs font-mono font-bold truncate flex-1" dir="ltr">{currentSlug ? storeUrl : '/store/your-slug'}</code>
-                  <div className="flex gap-2 shrink-0">
-                     <Button onClick={copyStoreLink} size="icon" variant="ghost" className="h-10 w-10 rounded-xl hover:bg-white/20"><Copy className="h-4 w-4" /></Button>
-                     <Button onClick={handleShare} size="icon" variant="ghost" className="h-10 w-10 rounded-xl hover:bg-white/20"><Share2 className="h-4 w-4" /></Button>
-                     <Link href={currentSlug ? `/store/${currentSlug}` : "/admin/settings"} target={currentSlug ? "_blank" : "_self"}>
-                        <Button size="icon" variant="ghost" className="h-10 w-10 rounded-xl hover:bg-white/20"><ExternalLink className="h-4 w-4" /></Button>
-                     </Link>
-                  </div>
+               <div>
+                  <h3 className="font-black text-lg">المتجر الإلكتروني (إضافة سحابية)</h3>
+                  <p className="text-xs text-muted-foreground font-bold" dir="ltr">{currentSlug ? storeUrl : 'لم يتم الإعداد بعد'}</p>
                </div>
-               <p className="text-[10px] font-bold opacity-60">* شارك الرابط مع زبائنك لزيادة مبيعاتك عبر الإنترنت.</p>
             </div>
-            <Globe className="absolute -right-10 -bottom-10 h-48 w-48 opacity-10 group-hover:rotate-12 transition-transform duration-1000" />
-         </Card>
+            <div className="flex gap-2">
+               <Button variant="outline" size="sm" className="rounded-xl font-black" onClick={copyStoreLink}><Copy className="h-4 w-4 ml-2" /> نسخ</Button>
+               <Link href={currentSlug ? `/store/${currentSlug}` : "/admin/settings"}>
+                  <Button size="sm" className="rounded-xl font-black">فتح المتجر <ExternalLink className="h-4 w-4 mr-2" /></Button>
+               </Link>
+            </div>
+         </CardContent>
+      </Card>
 
-         <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-6">
-            <StatsCard 
-              title="إجمالي المبيعات" 
-              value="0 د.ع" 
-              icon={BadgeDollarSign} 
-              color="green"
-            />
-            <StatsCard 
-              title="الطلبات الجديدة" 
-              value="0" 
-              icon={ShoppingCart} 
-              color="orange"
-            />
-         </div>
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+         <StatsCard 
+           title="إجمالي المبيعات (محلي)" 
+           value="0 د.ع" 
+           icon={BadgeDollarSign} 
+           color="green"
+         />
+         <StatsCard 
+           title="الطلبات الجديدة" 
+           value="0" 
+           icon={ShoppingCart} 
+           color="orange"
+         />
+         <StatsCard 
+           title="المخزون" 
+           value="0" 
+           icon={Package} 
+           color="blue"
+         />
+         <StatsCard 
+           title="العملاء" 
+           value="0" 
+           icon={Users} 
+           color="purple"
+         />
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-7">
         <Card className="lg:col-span-4 rounded-[32px] border-none shadow-sm overflow-hidden bg-white dark:bg-card">
           <CardHeader className="flex flex-row items-center justify-between">
              <div className="space-y-1">
-               <CardTitle className="text-xl font-black">نظرة عامة على المبيعات</CardTitle>
-               <CardDescription className="font-medium">تحليل المبيعات الأسبوعي</CardDescription>
+               <CardTitle className="text-xl font-black">أداء المبيعات الأسبوعي</CardTitle>
+               <CardDescription className="font-medium">تحليل محلي فوري من الجهاز</CardDescription>
              </div>
              <Button variant="ghost" size="icon" className="rounded-xl"><MoreVertical className="h-5 w-5" /></Button>
           </CardHeader>
@@ -193,7 +188,7 @@ export default function AdminDashboard() {
                   content={({ active, payload }) => {
                     if (active && payload && payload.length) {
                       return (
-                        <div className="rounded-2xl bg-white dark:bg-card p-4 shadow-xl border border-border">
+                        <div className="rounded-2xl bg-white dark:bg-card p-4 shadow-xl border border-border text-right" dir="rtl">
                           <p className="text-xs font-black text-muted-foreground uppercase mb-1">{payload[0].payload.name}</p>
                           <p className="text-lg font-black text-primary">{payload[0].value?.toLocaleString()} د.ع</p>
                         </div>
