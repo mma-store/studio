@@ -4,8 +4,7 @@
 import { DatabaseAdapter, DB_COMMANDS } from './adapter';
 
 /**
- * Mock Adapter for Browser Preview (Development)
- * Uses localStorage to persist data across refreshes in the browser.
+ * محول المعاينة (Browser Preview Adapter)
  */
 class MockAdapter implements DatabaseAdapter {
   private async getStore(key: string): Promise<any[]> {
@@ -21,84 +20,68 @@ class MockAdapter implements DatabaseAdapter {
   }
 
   async execute(command: string, args?: any): Promise<any> {
-    console.log(`[MockDB Exec] ${command}`, args);
+    console.log(`[MockDB Desktop] Exec: ${command}`, args);
     
-    // Simple logic for products
     if (command === DB_COMMANDS.SAVE_PRODUCT) {
       const products = await this.getStore('products');
-      const index = products.findIndex(p => p.id === args.id);
-      if (index > -1) products[index] = args;
-      else products.push({ ...args, id: Math.random().toString(36).substring(2, 11) });
+      const newProduct = { ...args, id: Math.random().toString(36).substring(7) };
+      products.push(newProduct);
       await this.setStore('products', products);
+      return newProduct;
     }
 
-    // Simple logic for users
-    if (command === DB_COMMANDS.CREATE_USER) {
-      const users = await this.getStore('users');
-      users.push({ ...args, id: Math.random().toString(36).substring(2, 11) });
-      await this.setStore('users', users);
+    if (command === DB_COMMANDS.LOGIN) {
+      if (args.username === 'admin' && args.pin === '1234') {
+        return {
+          id: 'mock-owner',
+          username: 'admin',
+          displayName: 'المدير (معاينة)',
+          role: 'owner'
+        };
+      }
+      throw new Error("بيانات خاطئة");
     }
 
     return { success: true };
   }
 
   async query(command: string, args?: any): Promise<any[]> {
-    console.log(`[MockDB Query] ${command}`, args);
     if (command === DB_COMMANDS.GET_PRODUCTS) return this.getStore('products');
     if (command === DB_COMMANDS.GET_CATEGORIES) return this.getStore('categories');
-    if (command === DB_COMMANDS.GET_USERS) return this.getStore('users');
     return [];
   }
 }
 
 /**
- * Singleton factory to provide the correct database adapter.
- */
-export class AdapterFactory {
-  private static instance: DatabaseAdapter | null = null;
-
-  static getAdapter(): DatabaseAdapter {
-    // If instance already created, return it (works for MockAdapter)
-    if (this.instance) return this.instance;
-
-    // Detect environment
-    const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
-
-    if (isTauri) {
-      // Lazy-loading the Tauri adapter using a proxy or a wrapper to avoid build errors.
-      // Since execute/query are async, we can resolve the real adapter inside them.
-      return new TauriProxyAdapter();
-    }
-
-    // Default to Mock for Browser Preview
-    this.instance = new MockAdapter();
-    return this.instance;
-  }
-}
-
-/**
- * A proxy class that handles dynamic import of Tauri APIs only when called.
+ * محول Tauri الفعلي (Production Desktop Adapter)
  */
 class TauriProxyAdapter implements DatabaseAdapter {
-  private realAdapter: DatabaseAdapter | null = null;
-
-  private async getRealAdapter(): Promise<DatabaseAdapter> {
-    if (this.realAdapter) return this.realAdapter;
-    
-    // Dynamic import of the actual Tauri implementation
-    // This hides the '@tauri-apps/api' from the browser's initial bundle parsing.
-    const { TauriDatabaseAdapter } = await import('./tauri-adapter');
-    this.realAdapter = new TauriDatabaseAdapter();
-    return this.realAdapter;
+  private async invokeCommand(command: string, args?: any): Promise<any> {
+    // استيراد ديناميكي لمكتبة Tauri لمنع خطأ الـ Build في المتصفح
+    const { invoke } = await import('@tauri-apps/api/core');
+    return await invoke(command, args);
   }
 
   async execute(command: string, args?: any): Promise<any> {
-    const adapter = await this.getRealAdapter();
-    return await adapter.execute(command, args);
+    return await this.invokeCommand(command, args);
   }
 
   async query(command: string, args?: any): Promise<any[]> {
-    const adapter = await this.getRealAdapter();
-    return await adapter.query(command, args);
+    const result = await this.invokeCommand(command, args);
+    return Array.isArray(result) ? result : [];
+  }
+}
+
+export class AdapterFactory {
+  static getAdapter(): DatabaseAdapter {
+    const isDesktop = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__;
+    
+    if (isDesktop) {
+      console.log("[DUBSAR 2.0] Mode: Native Desktop");
+      return new TauriProxyAdapter();
+    }
+
+    console.log("[DUBSAR 2.0] Mode: Browser Preview");
+    return new MockAdapter();
   }
 }

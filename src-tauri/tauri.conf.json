@@ -2,7 +2,7 @@
 {
   "productName": "DUBSAR 2.0",
   "version": "2.0.0",
-  "identifier": "com.dubsar.app",
+  "identifier": "com.dubsar.pro",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:9002",
@@ -12,11 +12,12 @@
   "app": {
     "windows": [
       {
-        "title": "DUBSAR 2.0 - Management System",
+        "title": "دوبسار 2.0 - نظام إدارة المبيعات والمخزون",
         "width": 1280,
         "height": 800,
         "resizable": true,
-        "fullscreen": false
+        "fullscreen": false,
+        "decorations": true
       }
     ],
     "security": {
@@ -32,13 +33,8 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
-  },
-  "plugins": {
-    "sql": {
-      "preload": {
-        "dubsar": "sqlite:dubsar.db"
-      }
-    }
+    ],
+    "publisher": "Dubsar Systems",
+    "copyright": "Copyright © 2024 Dubsar"
   }
 }
