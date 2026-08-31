@@ -1,14 +1,12 @@
 
-'use server';
+'use client';
 
-import { db } from '@/infra/database/sqlite/client';
-import { users, auditLogs } from '@/infra/database/sqlite/schema';
-import { eq } from 'drizzle-orm';
-import { v4 as uuidv4 } from 'uuid';
-import { webcrypto } from 'node:crypto';
+import { AdapterFactory } from '@/infra/database/adapter-factory';
+import { DB_COMMANDS } from '@/infra/database/adapter';
 
 /**
- * @fileOverview نظام التوثيق المحلي لـ DUBSAR 2.0 (Server Side).
+ * @fileOverview Local Authentication Service.
+ * Uses Adapter Pattern to work in both Browser Preview and Tauri Desktop.
  */
 
 export interface LocalUser {
@@ -20,99 +18,47 @@ export interface LocalUser {
 }
 
 export class LocalAuthService {
-  /**
-   * توليد Hash لرمز الـ PIN باستخدام Node.js Crypto
-   */
-  private static async hashPIN(pin: string): Promise<string> {
-    const msgUint8 = new TextEncoder().encode(pin);
-    const hashBuffer = await webcrypto.subtle.digest('SHA-256', msgUint8);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-  }
+  private static adapter = AdapterFactory.getAdapter();
 
-  /**
-   * التأكد من وجود مستخدم Owner (عند أول تشغيل)
-   */
   static async ensureOwnerExists() {
-    const existing = await db.select().from(users).where(eq(users.role, 'owner')).get();
-    if (!existing) {
-      const pinHash = await this.hashPIN('1234'); // Default PIN
-      await db.insert(users).values({
-        id: uuidv4(),
-        username: 'admin',
-        displayName: 'المدير العام',
-        pinHash,
-        role: 'owner',
-        permissions: JSON.stringify(['*']), // كل الصلاحيات
-        createdAt: Date.now()
-      });
-      console.log("[LocalAuth] Default Owner Created: admin / 1234");
+    // This is handled by Rust sidecar or Mock initialization
+    if (!(typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__)) {
+      console.log("[LocalAuth] Mock Owner check");
     }
   }
 
-  /**
-   * تسجيل الدخول المحلي
-   */
   static async login(username: string, pin: string): Promise<LocalUser | null> {
-    const user = await db.select().from(users).where(eq(users.username, username)).get();
-    if (!user || !user.active) return null;
+    try {
+      if (!(typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__)) {
+        // Mock Login for Preview
+        if (username === 'admin' && pin === '1234') {
+          return {
+            id: 'owner-id',
+            username: 'admin',
+            displayName: 'المدير (معاينة)',
+            role: 'owner',
+            permissions: ['*']
+          };
+        }
+        return null;
+      }
 
-    const pinHash = await this.hashPIN(pin);
-    if (user.pinHash !== pinHash) return null;
-
-    // تحديث وقت الدخول
-    await db.update(users).set({ lastLogin: Date.now() }).where(eq(users.id, user.id));
-
-    // تسجيل في Audit Log
-    await db.insert(auditLogs).values({
-      userId: user.id,
-      userName: user.displayName,
-      action: 'تسجيل دخول',
-      module: 'auth',
-      details: 'تم الدخول إلى النظام محلياً',
-      timestamp: Date.now()
-    });
-
-    return {
-      id: user.id,
-      username: user.username,
-      displayName: user.displayName,
-      role: user.role,
-      permissions: JSON.parse(user.permissions || '[]')
-    };
-  }
-
-  /**
-   * إضافة مستخدم جديد
-   */
-  static async createUser(data: {
-    username: string, 
-    displayName: string, 
-    pin: string, 
-    role: string, 
-    permissions: string[]
-  }) {
-    const id = uuidv4();
-    const pinHash = await this.hashPIN(data.pin);
-    
-    await db.insert(users).values({
-      id,
-      username: data.username,
-      displayName: data.displayName,
-      pinHash,
-      role: data.role,
-      permissions: JSON.stringify(data.permissions),
-      createdAt: Date.now()
-    });
-
-    return id;
+      return await this.adapter.execute(DB_COMMANDS.LOGIN, { username, pin });
+    } catch (error) {
+      console.error("Login Error:", error);
+      return null;
+    }
   }
 
   static async getUsers() {
-    return await db.select().from(users);
+    return await this.adapter.query('get_users');
+  }
+
+  static async createUser(data: any) {
+    return await this.adapter.execute('create_user', data);
   }
 
   static async deleteUser(id: string) {
-    await db.delete(users).where(eq(users.id, id));
+    return await this.adapter.execute('delete_user', { id });
   }
 }

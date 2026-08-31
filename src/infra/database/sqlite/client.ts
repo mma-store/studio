@@ -1,23 +1,20 @@
 
-import { drizzle } from 'drizzle-orm/better-sqlite3';
-import Database from 'better-sqlite3';
-import * as schema from './schema';
-
 /**
- * @fileOverview SQLite Client Initialization for DUBSAR 2.0.
- * هذا الملف يعمل فقط في بيئة Node.js (Server Side).
+ * @fileOverview SQLite Client for Node.js environments only.
+ * This file is now protected to prevent being bundled into the client-side code.
  */
 
-// التأكد من عدم استدعاء هذا الملف في المتصفح
-const isServer = typeof window === 'undefined';
+export const getSqliteDb = async () => {
+  if (typeof window !== 'undefined') {
+    throw new Error('SQLite Native cannot be used in the browser.');
+  }
 
-if (!isServer) {
-  throw new Error('SQLite client cannot be initialized in the browser.');
-}
-
-const sqlitePath = process.env.DATABASE_URL || 'dubsar.db';
-const sqlite = new Database(sqlitePath);
-
-export const db = drizzle(sqlite, { schema });
-
-export type SQLiteDB = typeof db;
+  // Use dynamic import to prevent bundling for the client
+  const Database = (await import('better-sqlite3')).default;
+  const { drizzle } = await import('drizzle-orm/better-sqlite3');
+  
+  const sqlitePath = process.env.DATABASE_URL || 'dubsar.db';
+  const sqlite = new Database(sqlitePath);
+  
+  return drizzle(sqlite);
+};

@@ -1,42 +1,32 @@
 
-'use server';
+'use client';
 
-import { SqliteProductRepository } from '@/infra/repositories/sqlite-product-repository';
-import { SqliteCategoryRepository } from '@/infra/repositories/sqlite-category-repository';
-
-const productRepo = new SqliteProductRepository();
-const categoryRepo = new SqliteCategoryRepository();
+import { AdapterFactory } from '@/infra/database/adapter-factory';
+import { DB_COMMANDS } from '@/infra/database/adapter';
 
 /**
- * @fileOverview خدمة إدارة المخزون (Server Actions).
+ * @fileOverview Inventory Management Service.
  */
 export class InventoryService {
-  // Products
+  private static adapter = AdapterFactory.getAdapter();
+
   static async getProducts() {
-    return await productRepo.getAll();
+    return await this.adapter.query(DB_COMMANDS.GET_PRODUCTS);
   }
 
   static async saveProduct(data: any) {
-    if (data.id) {
-      return await productRepo.update(data.id, data);
-    }
-    return await productRepo.create(data);
+    return await this.adapter.execute(DB_COMMANDS.SAVE_PRODUCT, data);
   }
 
   static async deleteProduct(id: string) {
-    return await productRepo.delete(id);
+    return await this.adapter.execute(DB_COMMANDS.DELETE_PRODUCT, { id });
   }
 
-  static async updateStock(id: string, quantity: number) {
-    return await productRepo.updateStock(id, quantity);
-  }
-
-  // Categories
   static async getCategories() {
-    return await categoryRepo.getAll();
+    return await this.adapter.query(DB_COMMANDS.GET_CATEGORIES);
   }
 
   static async saveCategory(name: string, image?: string) {
-    return await categoryRepo.create(name, image);
+    return await this.adapter.execute(DB_COMMANDS.SAVE_CATEGORY, { name, image });
   }
 }
