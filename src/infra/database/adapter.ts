@@ -16,5 +16,8 @@ export const DB_COMMANDS = {
   GET_CATEGORIES: 'get_categories',
   SAVE_CATEGORY: 'save_category',
   PROCESS_SALE: 'process_sale',
-  LOG_AUDIT: 'log_audit'
+  LOG_AUDIT: 'log_audit',
+  GET_USERS: 'get_users',
+  CREATE_USER: 'create_user',
+  DELETE_USER: 'delete_user'
 };
