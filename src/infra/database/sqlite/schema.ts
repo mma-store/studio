@@ -2,11 +2,11 @@
 import { sqliteTable, text, integer, real } from 'drizzle-orm/sqlite-core';
 
 /**
- * @fileOverview SQLite Schema for DUBSAR 2.0 Local-First Architecture.
- * This schema defines the foundational data structure for the local installation.
+ * @fileOverview المخطط الشامل لقاعدة بيانات DUBSAR 2.0 المحلية.
+ * تم تصميم الجداول لدعم العمليات التجارية المعقدة محلياً بالكامل.
  */
 
-// 1. Core Data
+// 1. الأقسام والمنتجات
 export const categories = sqliteTable('categories', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),
@@ -34,7 +34,7 @@ export const products = sqliteTable('products', {
   updatedAt: integer('updated_at').notNull(),
 });
 
-// 2. Sales & Customers
+// 2. الزبائن والموردين
 export const customers = sqliteTable('customers', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),
@@ -44,6 +44,16 @@ export const customers = sqliteTable('customers', {
   createdAt: integer('created_at').notNull(),
 });
 
+export const suppliers = sqliteTable('suppliers', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  phone: text('phone'),
+  address: text('address'),
+  balance: real('balance').default(0),
+  createdAt: integer('created_at').notNull(),
+});
+
+// 3. المبيعات والمشتريات
 export const sales = sqliteTable('sales', {
   id: text('id').primaryKey(),
   invoiceNo: text('invoice_no').unique().notNull(),
@@ -64,15 +74,6 @@ export const saleItems = sqliteTable('sale_items', {
   totalPrice: real('total_price').notNull(),
 });
 
-// 3. Purchases & Suppliers
-export const suppliers = sqliteTable('suppliers', {
-  id: text('id').primaryKey(),
-  name: text('name').notNull(),
-  phone: text('phone'),
-  balance: real('balance').default(0),
-  createdAt: integer('created_at').notNull(),
-});
-
 export const purchases = sqliteTable('purchases', {
   id: text('id').primaryKey(),
   purchaseNo: text('purchase_no').unique().notNull(),
@@ -82,24 +83,33 @@ export const purchases = sqliteTable('purchases', {
   createdAt: integer('created_at').notNull(),
 });
 
-// 4. System & License
+// 4. المصاريف والمالية
+export const expenses = sqliteTable('expenses', {
+  id: text('id').primaryKey(),
+  category: text('category').notNull(),
+  amount: real('amount').notNull(),
+  notes: text('notes'),
+  employeeName: text('employee_name'),
+  timestamp: integer('timestamp').notNull(),
+});
+
+// 5. إعدادات النظام والتراخيص
 export const appSettings = sqliteTable('app_settings', {
-  id: text('id').primaryKey(), // Usually 'current'
+  id: text('id').primaryKey(), // 'current'
   businessName: text('business_name'),
   logo: text('logo'),
   phone: text('phone'),
   address: text('address'),
   storeSlug: text('store_slug'),
-  themeConfig: text('theme_config'), // JSON string
+  themeConfig: text('theme_config'),
 });
 
 export const licenseInfo = sqliteTable('license_info', {
-  id: text('id').primaryKey(), // Usually 'main'
+  id: text('id').primaryKey(),
   licenseKey: text('license_key').notNull(),
   activatedAt: integer('activated_at'),
   hardwareId: text('hardware_id'),
-  signature: text('signature'),
-  planType: text('plan_type'), // basic, pro, enterprise
+  planType: text('plan_type'),
 });
 
 export const auditLogs = sqliteTable('audit_logs', {

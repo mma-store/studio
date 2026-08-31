@@ -8,35 +8,43 @@ import { collection, query, where, getDocs } from 'firebase/firestore';
 
 /**
  * @fileOverview Product Service Layer v2.0.
- * Orchestrates data between Local SQLite (Primary) and Cloud (Secondary/Sync).
+ * يقوم هذا الملف بالتنسيق بين قاعدة البيانات المحلية (الخيار الأول) والسحابة (للمزامنة).
  */
 
 const localRepo = new SqliteProductRepository();
 
 export class ProductService {
   /**
-   * Fetches products. 
-   * In DUBSAR 2.0, this always queries the local SQLite database first.
+   * جلب المنتجات. 
+   * في DUBSAR 2.0، يتم البحث دائماً في SQLite المحلي أولاً لضمان السرعة والعمل بدون إنترنت.
    */
-  static async getAllProducts(tenantId: string): Promise<Product[]> {
+  static async getAllProducts(tenantId?: string): Promise<Product[]> {
     try {
-      // 1. Try Local SQLite (The "Truth" in 2.0)
+      // 1. محاولة القراءة من SQLite (المصدر الحقيقي للبيانات في 2.0)
       const localProducts = await localRepo.getAll();
       
       if (localProducts.length > 0) {
+        console.log(`[ProductService] Loaded ${localProducts.length} products from SQLite.`);
         return localProducts;
       }
 
-      // 2. Fallback to Firebase for Migration/Sync purposes
-      console.log(`[ProductService] Local empty, fallback to Cloud for: ${tenantId}`);
-      const { firestore } = initializeFirebase();
-      const q = query(collection(firestore, 'products'), where('tenantId', '==', tenantId));
-      const snap = await getDocs(q);
-      
-      return snap.docs.map(doc => ({
-        ...doc.data(),
-        id: doc.id
-      } as any));
+      // 2. التحول لـ Firebase فقط في حال كانت القاعدة المحلية فارغة (لأغراض الهجرة أو التزامن الأولي)
+      if (tenantId) {
+        console.log(`[ProductService] Local empty, checking Cloud for tenant: ${tenantId}`);
+        const { firestore } = initializeFirebase();
+        const q = query(collection(firestore, 'products'), where('tenantId', '==', tenantId));
+        const snap = await getDocs(q);
+        
+        const cloudProducts = snap.docs.map(doc => ({
+          ...doc.data(),
+          id: doc.id
+        } as any));
+
+        // اختيارياً: يمكن هنا حقن البيانات السحابية في القاعدة المحلية آلياً
+        return cloudProducts;
+      }
+
+      return [];
     } catch (error) {
       console.error("[ProductService] Error fetching products:", error);
       return [];
@@ -44,7 +52,9 @@ export class ProductService {
   }
 
   static async createProduct(data: any) {
-    return await localRepo.create(data);
+    // الحفظ المحلي الفوري
+    const id = await localRepo.create(data);
+    return id;
   }
 
   static async updateStock(productId: string, quantity: number) {
