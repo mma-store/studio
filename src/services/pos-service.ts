@@ -1,10 +1,15 @@
 
+'use server';
+
 import { SqliteSaleRepository } from '@/infra/repositories/sqlite-sale-repository';
 import { SqliteCustomerRepository } from '@/infra/repositories/sqlite-customer-repository';
 
 const saleRepo = new SqliteSaleRepository();
 const customerRepo = new SqliteCustomerRepository();
 
+/**
+ * @fileOverview خدمة نقطة البيع (Server Actions).
+ */
 export class POSService {
   static async processSale(cart: any[], customer: any, payment: any, user: any) {
     const total = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);

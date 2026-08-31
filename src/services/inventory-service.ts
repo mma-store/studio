@@ -1,10 +1,15 @@
 
+'use server';
+
 import { SqliteProductRepository } from '@/infra/repositories/sqlite-product-repository';
 import { SqliteCategoryRepository } from '@/infra/repositories/sqlite-category-repository';
 
 const productRepo = new SqliteProductRepository();
 const categoryRepo = new SqliteCategoryRepository();
 
+/**
+ * @fileOverview خدمة إدارة المخزون (Server Actions).
+ */
 export class InventoryService {
   // Products
   static async getProducts() {

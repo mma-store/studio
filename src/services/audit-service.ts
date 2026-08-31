@@ -1,10 +1,12 @@
 
+'use server';
+
 import { db } from '@/infra/database/sqlite/client';
 import { auditLogs } from '@/infra/database/sqlite/schema';
-import { desc, limit } from 'drizzle-orm';
+import { desc } from 'drizzle-orm';
 
 /**
- * @fileOverview خدمة سجل التدقيق المحلي (Offline Audit).
+ * @fileOverview خدمة سجل التدقيق المحلي (Server Actions).
  */
 
 export class AuditService {

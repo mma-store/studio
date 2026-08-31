@@ -1,11 +1,14 @@
 
+'use server';
+
 import { db } from '@/infra/database/sqlite/client';
 import { users, auditLogs } from '@/infra/database/sqlite/schema';
-import { eq, sql } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
+import { webcrypto } from 'node:crypto';
 
 /**
- * @fileOverview نظام التوثيق المحلي لـ DUBSAR 2.0.
+ * @fileOverview نظام التوثيق المحلي لـ DUBSAR 2.0 (Server Side).
  */
 
 export interface LocalUser {
@@ -18,11 +21,11 @@ export interface LocalUser {
 
 export class LocalAuthService {
   /**
-   * توليد Hash لرمز الـ PIN
+   * توليد Hash لرمز الـ PIN باستخدام Node.js Crypto
    */
   private static async hashPIN(pin: string): Promise<string> {
     const msgUint8 = new TextEncoder().encode(pin);
-    const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);
+    const hashBuffer = await webcrypto.subtle.digest('SHA-256', msgUint8);
     const hashArray = Array.from(new Uint8Array(hashBuffer));
     return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
   }
