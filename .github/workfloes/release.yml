@@ -34,11 +34,10 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAURI_SKIP_DEPS_CHECK: true
         with:
           tagName: v1.0.0
           releaseName: 'Sales System v1.0.0'
           releaseBody: 'ملف تثبيت نظام المبيعات للويندوز'
-          args: --ci
+          exec: npm run desktop:build
           releaseDraft: false
           prerelease: false
