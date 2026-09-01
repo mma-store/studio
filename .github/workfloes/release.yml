@@ -22,13 +22,17 @@ jobs:
       - name: setup node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
 
       - name: install Rust stable
         uses: dtolnay/rust-toolchain@stable
 
       - name: install dependencies
         run: npm install
+
+      - name: build web project
+        run: npm run build
+        continue-on-error: true
 
       - name: build tauri app
         uses: tauri-apps/tauri-action@v0
